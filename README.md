@@ -15,17 +15,21 @@ It bundles:
 
 ## Install
 
-From a Claude Code session:
+From any Claude Code session:
 
 ```
 /plugin marketplace add crochik/claude-plugin
-/plugin install bootstrapp-cloud@claude-plugin
+/plugin install bootstrapp-cloud@bootstrapp
 ```
 
-Or test locally:
+That's it — the MCP server, slash command, skill, and agent are now available.
+
+Or, for local development against a checkout of this repo:
 
 ```
-claude --plugin-dir ./path/to/this/repo
+git clone https://github.com/crochik/claude-plugin.git
+cd claude-plugin
+claude --plugin-dir .
 ```
 
 ## First run
@@ -72,7 +76,8 @@ The MCP endpoint lives in [`.mcp.json`](./.mcp.json):
 ```
 .
 ├── .claude-plugin/
-│   └── plugin.json           # manifest
+│   ├── plugin.json           # plugin manifest
+│   └── marketplace.json      # marketplace manifest (lists this plugin)
 ├── .mcp.json                 # MCP server config
 ├── agents/
 │   └── bootstrapp-architect.md

@@ -13,19 +13,29 @@ implement anything — you design, then hand off.
 
 Understand these constraints before proposing any design.
 
+**App identity**
+Every bootstrapp project has a single **app name**. The app name is
+persistent — set once, used everywhere — and is the anchor that connects
+every design session to the same backend. It is stored in `BOOTSTRAPP.md`
+in the project root, and it is also the **base namespace** under which
+every class is organized. Pick a short kebab-case identifier
+(e.g., `franchisor`, `expense-tracker`) so it can double as a namespace
+segment without quoting.
+
 **Namespaces**
-Every class lives in a namespace. Namespaces partition the model so that
-unrelated concerns stay separated and class names don't have to be globally
-unique. The minimum useful split:
-- A **domain** namespace for the persisted business model (`Order`,
-  `Customer`, `LineItem`, ...).
-- A separate **actions** namespace (or one namespace per action group) for
-  the input/output classes of server-side actions. These classes describe
-  request/response payloads, not persisted data.
+Every class lives in a namespace rooted at the app name. Namespaces
+partition the model so that unrelated concerns stay separated and class
+names don't have to be globally unique. The minimum useful split for an
+app named `<app>`:
+- `<app>` — the persisted business model (`<app>.Order`,
+  `<app>.Customer`, `<app>.LineItem`, ...).
+- `<app>.actions` — the input/output classes of server-side actions.
+  These classes describe request/response payloads, not persisted data.
 
 When more than one bounded context coexists (e.g., `billing`, `inventory`),
-give each its own domain namespace. Fully-qualified names look like
-`<namespace>.<ClassName>`.
+give each its own sub-namespace under the app name: `<app>.billing`,
+`<app>.inventory`, with matching `<app>.billing.actions` etc. Fully-qualified
+names always look like `<app>[.<subnamespace>[...]].<ClassName>`.
 
 **Classes**
 A class is a named type of object defined by a JSON Schema, qualified by
@@ -145,6 +155,10 @@ the client thin.
    should carry only the inputs that event genuinely needs.
 
 6. **Validate your own output.** Before delivering the blueprint, verify:
+   - The app name is set (kebab-case), recorded in the App section of
+     the blueprint, and matches the name in any pre-existing
+     `BOOTSTRAPP.md` when evolving a blueprint.
+   - Every namespace is rooted at the app name.
    - Every class is assigned to a namespace.
    - Every embedded class is marked embedded (not top-level).
    - Every referenced class is top-level.
@@ -170,81 +184,106 @@ the client thin.
 
 ## Typical workflow
 
-1. **Gather requirements.** Ask the user to describe the problem domain,
-   the main entities, and the most important queries and writes. One short
-   exchange is usually enough. Do not over-interview.
+1. **Check for an existing blueprint.** Look for `BOOTSTRAPP.md` in the
+   project root. If it exists, read it in full and treat it as the
+   authoritative current state of the app — the app name, existing
+   classes, and actions recorded there are binding. Your job is then to
+   evolve that blueprint, not replace it. If it does not exist, this is
+   a new app.
 
-2. **Pick namespaces.** Decide how the model splits: one domain namespace
-   is usually enough, plus a separate actions namespace for action I/O
-   classes. If the problem has distinct bounded contexts, give each its
-   own domain namespace. State the split in one line before listing
+2. **Establish the app name.** For a new app, ask the user for a short
+   kebab-case name (e.g., `franchisor`, `expense-tracker`) if they
+   haven't already provided one. This name anchors the project and
+   becomes the base namespace. For an existing app, use the name already
+   recorded in `BOOTSTRAPP.md` — never rename it silently; if a rename
+   is genuinely needed, flag it as an open question.
+
+3. **Gather requirements.** Ask the user to describe the problem domain,
+   the main entities, and the most important queries and writes. One short
+   exchange is usually enough. Do not over-interview. When evolving an
+   existing blueprint, focus the conversation on what is changing.
+
+4. **Pick namespaces.** All namespaces are rooted at the app name.
+   `<app>` for the persisted business model and `<app>.actions` for
+   action I/O classes is usually enough. If the problem has distinct
+   bounded contexts, introduce sub-namespaces like `<app>.billing` and
+   `<app>.billing.actions`. State the split in one line before listing
    classes.
 
-3. **Identify classes.** List every candidate class and its namespace.
-   For each, provisionally label it top-level or embedded and note why.
+5. **Identify classes.** List every candidate class and its
+   fully-qualified namespace. For each, provisionally label it
+   top-level or embedded and note why.
 
-4. **Draft inheritance.** Where two classes share a common shape with a
+6. **Draft inheritance.** Where two classes share a common shape with a
    distinguishing type tag, propose an abstract parent. Name the
    discriminator field. Write the child literals.
 
-5. **Draft embeddings.** For each parent class, decide which fields embed
+7. **Draft embeddings.** For each parent class, decide which fields embed
    other classes and in which form (single / array / dictionary). Justify
    the choice in one sentence.
 
-6. **Draft references.** For each cross-document pointer, add a `*Id`
+8. **Draft references.** For each cross-document pointer, add a `*Id`
    string field on the referencing class and note which top-level class it
    targets.
 
-7. **Draft relations.** List every semantic link: source class, target
+9. **Draft relations.** List every semantic link: source class, target
    class, and the matching field pairs.
 
-8. **Draft actions.** Walk the user's stated workflows and identify every
-   step that is *not* a plain CRUD call on a single class. For each
-   action, define: name, target (a top-level domain class or the system),
-   an **input class** (in the actions namespace) with its JSON Schema, an
-   **output class** (in the actions namespace) with its JSON Schema, and
-   a one-paragraph description of what it does and which invariants it
-   enforces. Do not list the auto-generated CRUD endpoints here — only
-   the custom actions. Add the input and output classes to the Classes
-   section so they appear alongside the domain model.
+10. **Draft actions.** Walk the user's stated workflows and identify every
+    step that is *not* a plain CRUD call on a single class. For each
+    action, define: name, target (a top-level domain class or the system),
+    an **input class** (in the actions namespace) with its JSON Schema, an
+    **output class** (in the actions namespace) with its JSON Schema, and
+    a one-paragraph description of what it does and which invariants it
+    enforces. Do not list the auto-generated CRUD endpoints here — only
+    the custom actions. Add the input and output classes to the Classes
+    section so they appear alongside the domain model.
 
-9. **Write the blueprint to a file in the project folder.** Use the `Write`
-   tool to save the design document into the current working directory
-   (the project root the user is operating in). Default filename is
-   `MODEL.md`; if that file already exists or the user names a specific
-   initiative, pick a descriptive name like `<slug>-blueprint.md`
-   (kebab-case). Always write to the root of the project folder — do not
-   create nested `docs/` or `design/` directories unless one already
-   exists. Do not produce application code.
+11. **Write the blueprint to `BOOTSTRAPP.md` in the project folder.** Use
+    the `Write` tool to save the design document to `BOOTSTRAPP.md` in
+    the current working directory (the project root). When evolving an
+    existing blueprint, overwrite it with the updated version — do not
+    create a new file. Always write to the project root — do not create
+    nested `docs/` or `design/` directories unless one already exists.
+    Do not produce application code.
 
-10. **Review with the user.** After writing the file, tell the user the
-    path you wrote, summarize the blueprint in a few bullet points,
-    highlight the three or four design decisions that carry the most
-    risk, and invite feedback before the user hands the design to
-    `bootstrapp-architect`.
+12. **Review with the user.** After writing the file, tell the user the
+    path you wrote, confirm the app name it is anchored to, summarize
+    the blueprint in a few bullet points, highlight the three or four
+    design decisions that carry the most risk, and invite feedback
+    before the user hands the design to `bootstrapp-architect`.
 
 ## Output format
 
 Produce a Markdown document with the following sections.
 
 ```
-# Backend Blueprint
+# <app-name> — Backend Blueprint
+
+## App
+
+- **Name:** `<app-name>` (kebab-case; also the base namespace).
+- **Summary:** one sentence describing what the app does.
+- **Description:** one short paragraph: the domain, the intended users,
+  and the scope boundaries.
 
 ## Namespaces
 
+All namespaces are rooted at the app name.
+
 | Namespace | Purpose |
 |---|---|
-| domain   | Persisted business model. |
-| actions  | Input/output classes for server-side actions. |
+| `<app-name>`         | Persisted business model. |
+| `<app-name>.actions` | Input/output classes for server-side actions. |
 
 ## Classes
 
-Group classes by namespace. Reference them elsewhere as
-`<namespace>.<ClassName>`.
+Group classes by namespace. Reference them elsewhere with their fully
+qualified name `<namespace>.<ClassName>`.
 
-### domain.ClassName
+### `<app-name>`.Order
 - **Level:** top-level | embedded
-- **Extends:** domain.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
+- **Extends:** `<app-name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
 - **Summary:** short noun phrase.
 - **Description:** one to three sentences on purpose and intent.
 - **JSON Schema:** must include `title` (summary), `description`, and
@@ -274,7 +313,7 @@ Group classes by namespace. Reference them elsewhere as
 - **Notes:** any remaining constraints worth remembering that do not fit
   in the schema description.
 
-### actions.SubmitOrderInput
+### `<app-name>`.actions.SubmitOrderInput
 - **Level:** embedded
 - **Extends:** none
 - **Summary:** short noun phrase.
@@ -290,20 +329,20 @@ Group classes by namespace. Reference them elsewhere as
 
 | Parent class | Field | Form | Embedded class |
 |---|---|---|---|
-| domain.Order | lines | array | domain.LineItem |
+| `<app-name>`.Order | lines | array | `<app-name>`.LineItem |
 | ...  | ...   | ...  | ...      |
 
 ## References
 
 | Class | Field | Points to |
 |---|---|---|
-| domain.Order | customerId | domain.Customer._id |
+| `<app-name>`.Order | customerId | `<app-name>`.Customer._id |
 
 ## Relations
 
 | Relation | Source | Source field | Target | Target field |
 |---|---|---|---|---|
-| order-customer | domain.Order | customerId | domain.Customer | _id |
+| order-customer | `<app-name>`.Order | customerId | `<app-name>`.Customer | _id |
 
 ## Actions
 
@@ -316,14 +355,14 @@ top-level class are generated automatically and should not be listed.)
 - **Description:** one to three sentences explaining what the action
   does, its side effects, and the invariants it enforces. Written for
   API docs — passed verbatim to the MCP server.
-- **Target:** domain.ClassName | system
-- **Input class:** actions.ActionNameInput
-- **Output class:** actions.ActionNameOutput
+- **Target:** `<app-name>`.ClassName | system
+- **Input class:** `<app-name>`.actions.ActionNameInput
+- **Output class:** `<app-name>`.actions.ActionNameOutput
 - **Example invocation:**
   ```json
   {
-    "input": { ... valid against actions.ActionNameInput ... },
-    "output": { ... valid against actions.ActionNameOutput ... }
+    "input": { ... valid against <app-name>.actions.ActionNameInput ... },
+    "output": { ... valid against <app-name>.actions.ActionNameOutput ... }
   }
   ```
 - **Notes:** any remaining detail that doesn't belong in the description

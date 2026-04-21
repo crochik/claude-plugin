@@ -80,8 +80,14 @@ extending:
   and input validation; it does not orchestrate multi-step workflows by
   chaining CRUD calls.
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
-  in separate namespaces; action payload classes are never reused domain
-  classes.
+  in separate namespaces, both rooted at the app name; action payload
+  classes are never reused domain classes.
+- **`BOOTSTRAPP.md` anchors the app.** The schema architect writes and
+  evolves this file in the project root. It carries the app name (which
+  is also the base namespace) and the full backend blueprint. When a
+  user's project already has a `BOOTSTRAPP.md`, that file is the source
+  of truth — read it before proposing changes, and never rename the app
+  silently.
 - **One working vertical slice.** Auth + one real read + one real write beats
   elaborate stubs.
 - **Secrets hygiene.** `.env.example` is committed; `.env` is gitignored.

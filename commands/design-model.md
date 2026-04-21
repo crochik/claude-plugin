@@ -26,9 +26,10 @@ patterns, and producing a Markdown blueprint document.
   design-only; implementation is a separate step handled by `bootstrapp-architect`.
 - If the user provides enough domain description in `$ARGUMENTS`, pass it
   straight through — do not re-interview them.
-- The subagent writes the blueprint as a Markdown file in the current
-  project folder (default `MODEL.md`, or `<slug>-blueprint.md` when a
-  specific initiative is named). Confirm the file path it wrote.
-- Once the subagent returns the blueprint, present its path and a short
-  summary to the user and ask whether they want to proceed to
-  implementation via `/bootstrapp-cloud:new-app`.
+- The subagent always writes the blueprint to `BOOTSTRAPP.md` in the
+  current project folder. If the file already exists, the subagent reads
+  it first and evolves it in place — the app name recorded there is
+  preserved. Confirm the file path back to the user.
+- Once the subagent returns the blueprint, present its path, the app
+  name, and a short summary to the user, and ask whether they want to
+  proceed to implementation via `/bootstrapp-cloud:new-app`.

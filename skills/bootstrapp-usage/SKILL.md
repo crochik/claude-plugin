@@ -17,6 +17,15 @@ Use it to **discover and drive the backend**, then generate idiomatic client cod
   client will call.
 - **Your code lives on the client.** Claude's job is to generate a thin,
   idiomatic client that talks to the bootstrapp backend — nothing more.
+- **The backend exposes two kinds of operations.** Auto-generated CRUD and
+  filter endpoints for every top-level class, plus named *actions* for
+  anything else. Actions carry the business logic: they have a JSON Schema
+  body, full read/write access to every class, and run atomically on the
+  server. If a workflow spans multiple documents or enforces invariants,
+  it is an action, not a client-side orchestration.
+- **The client handles presentation and input validation.** Rendering,
+  UX state, and form-level validation belong on the client. Anything that
+  decides *what is true* about the data belongs on the backend.
 
 ## Default workflow
 
@@ -53,7 +62,11 @@ Use it to **discover and drive the backend**, then generate idiomatic client cod
   the MCP server first.
 - Don't check secrets into git. Use `.env.example` + gitignored `.env`.
 - Don't build a parallel backend on the client (local DBs, business logic).
-  Push that work into bootstrapp.cloud.
+  Push that work into bootstrapp.cloud — usually as an action.
+- Don't orchestrate multi-step business workflows from the client by
+  chaining CRUD calls. If two or more writes must succeed together, or any
+  decision depends on data the client shouldn't be trusted with, it's an
+  action on the backend.
 - Don't skip the OAuth flow message the first time a user runs an MCP tool —
   they need to know a browser window is coming.
 

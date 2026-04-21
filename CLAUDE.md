@@ -52,10 +52,10 @@ layout.
 The two agents are intentionally separate and should stay that way:
 
 - **[bootstrapp-schema-architect](./agents/bootstrapp-schema-architect.md)** —
-  design-only. Produces a data-model blueprint (classes, inheritance with
-  discriminator, embeddings as single/array/dictionary, references, relations).
-  Never calls MCP tools, never writes application code. Invoked via
-  [/bootstrapp-cloud:design-model](./commands/design-model.md).
+  design-only. Produces a backend blueprint (classes, inheritance with
+  discriminator, embeddings as single/array/dictionary, references, relations,
+  and server-side actions). Never calls MCP tools, never writes application
+  code. Invoked via [/bootstrapp-cloud:design-model](./commands/design-model.md).
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
   implementation. Drives the `bootstrapp` MCP server to inspect/modify the
   backend, then scaffolds idiomatic client code. Invoked via
@@ -72,6 +72,11 @@ extending:
 - **Backend-first, discover-don't-guess.** Client code only emits endpoints,
   fields, and auth flows that the MCP server confirmed. Never invent API
   shapes.
+- **Thin client, fat backend.** Business logic lives in bootstrapp.cloud
+  actions (named server-side operations with a JSON Schema body and full
+  access to every class). The client handles presentation and input
+  validation; it does not orchestrate multi-step workflows by chaining CRUD
+  calls.
 - **One working vertical slice.** Auth + one real read + one real write beats
   elaborate stubs.
 - **Secrets hygiene.** `.env.example` is committed; `.env` is gitignored.

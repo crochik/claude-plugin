@@ -35,6 +35,24 @@ a component inside another class, never persisted on its own). Action
 input/output classes are always embedded — they represent transient
 payloads, not documents.
 
+**Documentation attached to every class and property**
+The downstream tooling that calls the `bootstrapp` MCP server to create
+these classes relies on the design document for all human-readable
+metadata. That means every class and every property carries three
+attributes, without exception:
+- **summary** — a short noun phrase (5–10 words) identifying the thing.
+  Goes into JSON Schema `title`.
+- **description** — one to three sentences explaining purpose, intent,
+  and any non-obvious constraints. Goes into JSON Schema `description`.
+- **example** — a concrete realistic value. For a class, a fully-formed
+  example object (valid against the schema, filled with plausible data,
+  not lorem-ipsum placeholders). For a property, an example value of the
+  right type. Goes into JSON Schema `examples` (as a single-element
+  array) or `example`.
+
+Treat these as part of the contract, not decoration — downstream
+generation uses them verbatim.
+
 **Inheritance**
 A class may extend exactly one parent class. The parent must include a
 string property designated as the *discriminator*; child classes set that
@@ -72,6 +90,11 @@ class.
 Anything the backend must do beyond plain CRUD is modeled as a named
 *action*. An action has:
 - A name (verb-phrased, e.g. `submitOrder`, `cancelReservation`).
+- A **summary** (5–10 words) and a **description** (1–3 sentences
+  covering purpose, side effects, and the invariants the action enforces)
+  — same documentation rules as classes. Both are passed verbatim to the
+  MCP server when the action is created downstream, so write them as if
+  they will appear in API docs without further editing.
 - A target — either a specific top-level class (the action operates on an
   instance) or the system at large (no specific target).
 - An **input class** — a class in an actions namespace whose JSON Schema
@@ -80,6 +103,8 @@ Anything the backend must do beyond plain CRUD is modeled as a named
 - An **output class** — a class in an actions namespace whose JSON Schema
   defines the response body. Use a dedicated class even when the action
   returns a single scalar or a reference to a domain object.
+- An **example invocation** — a concrete example input object plus the
+  expected output object, both valid against their respective classes.
 - Full read/write access to every class and object in the backend, so it
   can cross aggregates, enforce invariants, and perform multi-step work
   atomically on the server side.
@@ -132,6 +157,11 @@ the client thin.
    - Every action input/output class lives in an actions namespace, not
      the domain namespace, and is embedded (not top-level).
    - No action can be replaced by a single CRUD call — if it can, drop it.
+   - Every class has a summary, description, and a complete example
+     object. Every property has a summary, description, and an example
+     value. No placeholders, no "TODO", no lorem ipsum.
+   - Every action has a summary, a description, and an example
+     invocation (input + expected output). Same no-placeholder rule.
 
 7. **No implementation.** Do not call MCP tools, write application code,
    or create files other than the design document. Leave all of that for
@@ -206,19 +236,44 @@ Group classes by namespace. Reference them elsewhere as
 ### domain.ClassName
 - **Level:** top-level | embedded
 - **Extends:** domain.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
-- **JSON Schema:**
+- **Summary:** short noun phrase.
+- **Description:** one to three sentences on purpose and intent.
+- **JSON Schema:** must include `title` (summary), `description`, and
+  `examples`. Each property must include `title`, `description`, and
+  `examples` (or `example`).
   ```json
-  { ... }
+  {
+    "title": "Order",
+    "description": "A customer's request to purchase one or more items, including delivery and payment details.",
+    "type": "object",
+    "properties": {
+      "customerId": {
+        "type": "string",
+        "title": "Customer ID",
+        "description": "Reference to the Customer who placed the order.",
+        "examples": ["cus_7Hk3z9"]
+      }
+    },
+    "required": ["customerId"],
+    "examples": [
+      {
+        "customerId": "cus_7Hk3z9"
+      }
+    ]
+  }
   ```
-- **Notes:** one or two sentences on why this class exists and any
-  constraints worth remembering.
+- **Notes:** any remaining constraints worth remembering that do not fit
+  in the schema description.
 
 ### actions.SubmitOrderInput
 - **Level:** embedded
 - **Extends:** none
-- **JSON Schema:**
+- **Summary:** short noun phrase.
+- **Description:** one to three sentences; cross-reference the action.
+- **JSON Schema:** same documentation rules apply — `title`,
+  `description`, `examples` on the class and on every property.
   ```json
-  { ... }
+  { "title": "...", "description": "...", "examples": [ { ... } ], ... }
   ```
 - **Notes:** input payload for the `submitOrder` action.
 
@@ -247,11 +302,23 @@ Group classes by namespace. Reference them elsewhere as
 top-level class are generated automatically and should not be listed.)
 
 ### actionName
+- **Summary:** short verb phrase, passed to the MCP server as the
+  action's title.
+- **Description:** one to three sentences explaining what the action
+  does, its side effects, and the invariants it enforces. Written for
+  API docs — passed verbatim to the MCP server.
 - **Target:** domain.ClassName | system
 - **Input class:** actions.ActionNameInput
 - **Output class:** actions.ActionNameOutput
-- **Behavior:** what the action does, which classes it reads/writes, and
-  which invariants it enforces. One short paragraph.
+- **Example invocation:**
+  ```json
+  {
+    "input": { ... valid against actions.ActionNameInput ... },
+    "output": { ... valid against actions.ActionNameOutput ... }
+  }
+  ```
+- **Notes:** any remaining detail that doesn't belong in the description
+  (cross-class reads/writes, ordering constraints, etc.). Optional.
 
 ## Design decisions
 

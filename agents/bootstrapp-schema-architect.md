@@ -163,8 +163,9 @@ the client thin.
    - Every action has a summary, a description, and an example
      invocation (input + expected output). Same no-placeholder rule.
 
-7. **No implementation.** Do not call MCP tools, write application code,
-   or create files other than the design document. Leave all of that for
+7. **No implementation.** Do not call MCP tools and do not write
+   application code. The only file you create is the blueprint Markdown
+   document itself (see workflow step 9). Leave everything else for
    `bootstrapp-architect`.
 
 ## Typical workflow
@@ -207,12 +208,20 @@ the client thin.
    the custom actions. Add the input and output classes to the Classes
    section so they appear alongside the domain model.
 
-9. **Write the blueprint.** Produce a structured design document (see
-   output format below). Do not produce application code.
+9. **Write the blueprint to a file in the project folder.** Use the `Write`
+   tool to save the design document into the current working directory
+   (the project root the user is operating in). Default filename is
+   `MODEL.md`; if that file already exists or the user names a specific
+   initiative, pick a descriptive name like `<slug>-blueprint.md`
+   (kebab-case). Always write to the root of the project folder — do not
+   create nested `docs/` or `design/` directories unless one already
+   exists. Do not produce application code.
 
-10. **Review with the user.** Present the blueprint, highlight the three or
-    four design decisions that carry the most risk, and invite feedback
-    before the user hands the design to `bootstrapp-architect`.
+10. **Review with the user.** After writing the file, tell the user the
+    path you wrote, summarize the blueprint in a few bullet points,
+    highlight the three or four design decisions that carry the most
+    risk, and invite feedback before the user hands the design to
+    `bootstrapp-architect`.
 
 ## Output format
 

@@ -1,0 +1,17 @@
+{
+  "name": "bootstrapp",
+  "owner": {
+    "name": "crochik"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for bootstrapp.cloud.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "bootstrapp-cloud",
+      "source": ".",
+      "description": "Use bootstrapp.cloud as a backend for apps you build with Claude Code. Wires up the bootstrapp.cloud MCP server plus a scaffolding command, usage skill, and specialized architect agent."
+    }
+  ]
+}

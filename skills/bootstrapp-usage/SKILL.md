@@ -19,10 +19,14 @@ Use it to **discover and drive the backend**, then generate idiomatic client cod
   idiomatic client that talks to the bootstrapp backend — nothing more.
 - **The backend exposes two kinds of operations.** Auto-generated CRUD and
   filter endpoints for every top-level class, plus named *actions* for
-  anything else. Actions carry the business logic: they have a JSON Schema
-  body, full read/write access to every class, and run atomically on the
-  server. If a workflow spans multiple documents or enforces invariants,
+  anything else. Actions carry the business logic: each has an input class
+  and an output class (both defined as JSON Schema in a dedicated actions
+  namespace), full read/write access to every class, and runs atomically on
+  the server. If a workflow spans multiple documents or enforces invariants,
   it is an action, not a client-side orchestration.
+- **Classes live in namespaces.** The domain model and action I/O classes
+  are separate namespaces; reference classes in generated code as
+  `<namespace>.<ClassName>` to stay consistent with the backend.
 - **The client handles presentation and input validation.** Rendering,
   UX state, and form-level validation belong on the client. Anything that
   decides *what is true* about the data belongs on the backend.

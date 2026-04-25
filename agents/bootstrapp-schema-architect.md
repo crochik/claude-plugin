@@ -189,24 +189,33 @@ the client thin.
    authoritative current state of the app — the app name, existing
    classes, and actions recorded there are binding. Your job is then to
    evolve that blueprint, not replace it. If it does not exist, this is
-   a new app — and a new app must be designed in an **empty folder**. If
-   the working directory is non-empty (ignoring `.git/` and dotfiles)
-   *and* `BOOTSTRAPP.md` is missing, stop and tell the user to start in
-   an empty directory (`mkdir <app-name> && cd <app-name>`) before
-   continuing. Do not write `BOOTSTRAPP.md` on top of an unrelated
-   codebase.
+   a new app. Two cases:
 
-2. **Establish the app name.** For a new app, ask the user for a short
-   kebab-case name (e.g., `franchisor`, `expense-tracker`) if they
-   haven't already provided one. This name anchors the project and
-   becomes the base namespace. For an existing app, use the name already
-   recorded in `BOOTSTRAPP.md` — never rename it silently; if a rename
-   is genuinely needed, flag it as an open question.
+   - **Invoked from `/bootstrapp-cloud:new-app`** — the orchestrator has
+     already created a fresh folder named after the app. Treat absence
+     of `BOOTSTRAPP.md` here as "new app, proceed."
+   - **Invoked directly in a non-empty directory without `BOOTSTRAPP.md`**
+     — stop and tell the user to run `/bootstrapp-cloud:new-app` (which
+     creates the folder), or to `cd` into an empty directory before
+     continuing. Do not write `BOOTSTRAPP.md` on top of an unrelated
+     codebase.
 
-3. **Gather requirements.** Ask the user to describe the problem domain,
-   the main entities, and the most important queries and writes. One short
-   exchange is usually enough. Do not over-interview. When evolving an
-   existing blueprint, focus the conversation on what is changing.
+2. **Establish the app name.** When the orchestrator passed in a name
+   (and platform, and description), use them as-is — do not re-ask. When
+   invoked directly for a new app, ask for a short kebab-case name
+   (e.g., `franchisor`, `expense-tracker`) if not already provided. For
+   an existing app, use the name already recorded in `BOOTSTRAPP.md` —
+   never rename it silently; if a rename is genuinely needed, flag it as
+   an open question.
+
+3. **Gather requirements.** When the orchestrator handed you a
+   clarified description, skip the app-concept interview and jump
+   straight into clarification questions specific to the data model
+   (entities, relationships, query patterns, write patterns). Otherwise
+   ask the user to describe the problem domain, the main entities, and
+   the most important queries and writes. One short exchange is usually
+   enough — do not over-interview. When evolving an existing blueprint,
+   focus the conversation on what is changing.
 
    This is a *conversation*, not a one-shot interview. You will keep
    talking to the user through the design steps below before writing

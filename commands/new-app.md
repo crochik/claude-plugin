@@ -1,64 +1,136 @@
 ---
-description: Scaffold a new app (web, Flutter, CLI, ...) wired to bootstrapp.cloud as its backend.
-argument-hint: [web|flutter|cli|other] <app-name>
+description: Create a new app on bootstrapp.cloud end-to-end — intake, schema design, backend class creation, client generation, UI scaffold, and iterate.
+argument-hint: [<short intent, optional>]
 ---
 
 # /bootstrapp-cloud:new-app
 
-The user wants to create a new application that uses **bootstrapp.cloud** as its backend.
+The user wants to create a new application that uses **bootstrapp.cloud**
+as its backend. This command orchestrates the entire flow from a blank
+parent directory through a running, iterating UI.
 
 Arguments passed by the user: `$ARGUMENTS`
 
-## Your job
+If `$ARGUMENTS` is non-empty, treat it as the user's initial intent and
+**skip any intake question it already answers** (e.g. "flutter app for
+tracking expenses" answers platform and gives a description — only the
+app name still needs asking).
 
-0. **Pre-flight: verify the working directory.** Before any other step:
-   - If `BOOTSTRAPP.md` is present in the current directory, this is an
-     existing app — treat that file as the source of truth and proceed.
-   - If `BOOTSTRAPP.md` is **absent** and the directory is **not empty**
-     (ignoring `.git/` and other dotfiles is fine), **stop**. Tell the user
-     a new app must be scaffolded into an empty folder, and ask them to
-     either `cd` into an empty directory or create one
-     (`mkdir <app-name> && cd <app-name>`). Do not write any files until
-     the user is in an empty directory or confirms `BOOTSTRAPP.md` should
-     be created here despite the existing contents.
+## Phase 0 — Pre-flight
 
-1. **Clarify the target** if it isn't obvious from `$ARGUMENTS`:
-   - Platform: `web` (React/Vite/Next), `flutter`, `cli`, `mobile-native`, or something else.
-   - App name (kebab-case).
-   - One-line description of what the app does.
+Before any other step, look at the current working directory:
 
-2. **Connect to bootstrapp.cloud** via the MCP server that ships with this plugin
-   (server name: `bootstrapp`). On the first tool call the user will be sent through
-   an OAuth browser flow — tell them to expect it.
+- If `BOOTSTRAPP.md` is present in the cwd, the user is already inside an
+  existing app. **Stop** and tell them:
+  - For schema-only changes, run `/bootstrapp-cloud:design-model`.
+  - For implementation work, invoke the `bootstrapp-architect` agent
+    directly.
+  Do not run the new-app flow on top of an existing app.
+- Otherwise, proceed. Do **not** check whether the directory is empty —
+  this command will create its own folder in Phase 2.
 
-3. **Discover backend capabilities** using the MCP tools. Typical workflow:
-   - List the user's existing bootstrapp.cloud projects / workspaces.
-   - Either create a new backend project or reuse an existing one.
-   - Inspect the backend's data model, auth config, and endpoints.
-   - Note any SDK, OpenAPI spec, or client-generation tool bootstrapp exposes.
+## Phase 1 — Intake (3 questions)
 
-4. **Scaffold the client project** in the current working directory:
-   - Use the idiomatic toolchain for the platform (Vite/Next for web, `flutter create`
-     for Flutter, etc.). Prefer running the real scaffolding CLI over hand-writing files.
-   - Drop in a thin `bootstrapp` client module that wraps the backend endpoints /
-     SDK / OpenAPI client. Keep credentials out of source — read from env.
-   - Wire up auth (login / logout / session) end-to-end against the bootstrapp backend.
-   - Add one working example screen/route that reads and writes real data via the MCP-discovered API.
+Ask the user, in order, only the questions not already answered by
+`$ARGUMENTS`:
 
-5. **Leave the user with**:
-   - A `README.md` explaining how to run the app, where backend credentials live,
-     and which bootstrapp.cloud project it is wired to.
-   - An `.env.example` listing required variables.
-   - A short summary in chat: what was created, what still needs the user's input,
-     and the exact commands to run it.
+1. **App name** — short kebab-case identifier (e.g. `expense-tracker`,
+   `franchisor`). This becomes the folder name and the base namespace.
+2. **Platform** — `web` or `other`.
+   - If `web`: default to React + Vite (TypeScript). Ask only if the user
+     signals a preference for something else (Next.js, SvelteKit, etc.).
+   - If `other`: drill down once.
+     - **Mobile** → default to Flutter.
+     - **Desktop** → ask which framework (Tauri, Electron, native — no
+       default; the choice is too workload-dependent).
+     - **CLI** → only if the user explicitly asks.
+3. **Detailed description** — what the app does, who uses it, and the
+   handful of features that matter for the first slice. Encourage a
+   paragraph, not a one-liner.
+
+## Phase 2 — Create the directory
+
+From the current working directory, run `mkdir <app-name> && cd <app-name>`.
+After this point all subsequent work happens inside the new folder. Tell
+the user the folder you created.
+
+## Phase 3 — Discovery via `bootstrapp-architect`
+
+Invoke the **`bootstrapp-architect`** subagent. Pass it:
+
+- The app name, platform (and sub-choice), and full description.
+- Any other context the user has shared in this conversation.
+
+The agent will:
+
+- Confirm the `bootstrapp` MCP server is connected (and surface the OAuth
+  browser flow if not).
+- Ask 1–2 short rounds of clarifying questions about scope, target users,
+  and the smallest meaningful first slice.
+- Offer concrete feedback or alternative scoping when the description is
+  fuzzy or over-broad.
+
+Do not let the agent skip the discovery exchange — the schema architect
+needs the clarified description.
+
+## Phase 4 — Schema design via `bootstrapp-schema-architect`
+
+Once discovery is settled, invoke the **`bootstrapp-schema-architect`**
+subagent. Pass it the app name, platform, and the clarified description.
+It will:
+
+- Design namespaces, classes, embeddings, references, relations, and
+  actions.
+- **Present the proposed design in chat** and wait for the user's
+  confirmation before writing.
+- Write `BOOTSTRAPP.md` to the project root.
+
+## Phase 5 — Create classes on the backend
+
+Hand back to the **`bootstrapp-architect`**. It will:
+
+- Pick or create the bootstrapp.cloud project (using the app name).
+- Walk `BOOTSTRAPP.md` and call `mcp__bootstrapp__add_object_class` once
+  per class.
+- Verify with `mcp__bootstrapp__get_object_classes`.
+- Use `mcp__bootstrapp__tool_search` to discover the action-creation tool
+  (its name is not assumed) and register each action defined in the
+  blueprint.
+
+## Phase 6 — Generate the API client
+
+The architect invokes the
+[openapi-client-generator](../skills/openapi-client-generator/SKILL.md)
+skill: call `mcp__bootstrapp__generate_openapi_spec`, save the spec
+locally, and run `generate_api.sh` to emit the typed client.
+
+## Phase 7 — Scaffold the UI app
+
+The architect runs the platform's official scaffolder in the project
+folder:
+
+- **Web** → `npm create vite@latest` (TypeScript + React by default).
+- **Mobile (Flutter)** → `flutter create`.
+- **Desktop** → the framework the user picked in Phase 1.
+- **CLI** → the platform's idiomatic generator.
+
+Then it drops in the generated client + a thin `bootstrapp` module,
+wires login / logout / session against the backend, and adds one real
+read + one real write screen against live data.
+
+## Phase 8 — Start the UI and iterate
+
+The architect starts the dev server in the background, surfaces the URL
+or output, and **stays in chat** to add features, fix issues, and respond
+to user feedback until the user signals the app is complete.
 
 ## Rules
 
-- Don't invent bootstrapp.cloud APIs — always confirm via the MCP server first.
-- If the MCP server is not connected, stop and ask the user to enable the
-  `bootstrapp-cloud` plugin / complete the OAuth flow before continuing.
-- Don't commit secrets. `.env` must be gitignored; only `.env.example` is committed.
-- Don't over-engineer. Ship a minimal, working vertical slice, not a framework.
-
-If the user hands you specific intent (e.g. "flutter app for tracking expenses"),
-treat that as source of truth and skip the clarifying questions.
+- **Don't invent bootstrapp.cloud APIs.** Always confirm via the MCP
+  server.
+- **Don't commit secrets.** `.env` must be gitignored; only `.env.example`
+  is committed.
+- **Don't over-engineer.** Ship a minimal, working vertical slice — not
+  a framework — before iterating.
+- **If the MCP server is not connected**, stop and ask the user to enable
+  the `bootstrapp-cloud` plugin / complete the OAuth flow before continuing.

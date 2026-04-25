@@ -20,14 +20,15 @@ Before doing any bootstrapp work, check the project root for a file named
   every class (`<app-name>.Order`, `<app-name>.actions.SubmitOrderInput`,
   etc.). Do not rename it. Keep all new classes consistent with this
   namespace.
-- Any design change belongs in the `bootstrapp-schema-architect` agent,
-  which will evolve the same `BOOTSTRAPP.md` rather than creating a new
-  file.
+- Schema changes go through `/bootstrapp-cloud:design-model`, which
+  delegates to the `bootstrapp-schema-architect` to evolve the same
+  `BOOTSTRAPP.md` in place.
 
-If `BOOTSTRAPP.md` does not exist, this is a new app. Before building
-anything substantial, run `/bootstrapp-cloud:design-model` (or delegate
-to the `bootstrapp-schema-architect` agent directly) so the file is
-created and the app has a stable name and namespace.
+If `BOOTSTRAPP.md` does not exist, this is a new app. Run
+`/bootstrapp-cloud:new-app` — that command handles the full flow: intake
+(name, platform, description), folder creation, discovery, schema design,
+class creation on the backend via the MCP server, API client generation,
+UI scaffold, and starting the dev server.
 
 ## Mental model
 
@@ -55,21 +56,35 @@ created and the app has a stable name and namespace.
 
 ## Default workflow
 
+For a brand-new app, run `/bootstrapp-cloud:new-app` — it orchestrates
+intake → folder creation → discovery → schema design → backend class
+creation → client generation → scaffold → auth + slice → dev server +
+iteration. The steps below apply when you are working directly on an
+existing app (post-orchestration) or when invoking the architect on its
+own:
+
 1. **Confirm the MCP server is connected.** If tool calls fail with an auth
    error, tell the user to complete the OAuth browser flow.
 2. **Discover before coding.** Call the MCP tools to enumerate projects,
    resources, endpoints, and schemas. Never guess API shapes.
 3. **Pick or create a backend project.** Ask the user if it isn't clear.
-4. **Generate the client.**
-   - Prefer official scaffolders (`npm create vite`, `flutter create`, etc.).
+4. **Sync the backend with `BOOTSTRAPP.md`.** When the blueprint changes,
+   re-run class creation via `mcp__bootstrapp__add_object_class` and
+   regenerate the API client via the
+   [openapi-client-generator skill](../openapi-client-generator/SKILL.md)
+   before touching client code that depends on the new shape.
+5. **Generate the client.**
+   - Use the openapi-client-generator skill — never hand-edit generated
+     files.
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
-5. **Wire auth first.** Login, logout, and authenticated requests should work
-   before you build feature screens.
-6. **Ship a vertical slice.** One real read + one real write against the
-   backend, not stubs.
-7. **Document.** Update the project README with: how to run, which bootstrapp
-   project it points at, and the env vars required.
+6. **Wire auth first.** Login, logout, and authenticated requests should
+   work before you build feature screens.
+7. **Ship a vertical slice, then iterate.** One real read + one real write
+   against the backend, not stubs. Then start the dev server and stay in
+   chat to extend the app.
+8. **Document.** Update the project README with: how to run, which
+   bootstrapp project it points at, and the env vars required.
 
 ## Client patterns by platform
 

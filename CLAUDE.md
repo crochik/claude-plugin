@@ -56,15 +56,23 @@ The two agents are intentionally separate and should stay that way:
   with discriminator, embeddings as single/array/dictionary, references,
   relations, and server-side actions — each with an input class and output
   class in a dedicated actions namespace). Never calls MCP tools, never
-  writes application code. Invoked via
-  [/bootstrapp-cloud:design-model](./commands/design-model.md).
+  writes application code. Invoked from
+  [/bootstrapp-cloud:new-app](./commands/new-app.md) (Phase 4) for new apps,
+  and from [/bootstrapp-cloud:design-model](./commands/design-model.md) for
+  schema-only changes on existing apps.
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
-  implementation. Drives the `bootstrapp` MCP server to inspect/modify the
-  backend, then scaffolds idiomatic client code. Invoked via
-  [/bootstrapp-cloud:new-app](./commands/new-app.md).
+  discovery, implementation, and iteration. Runs the upfront discovery
+  exchange (clarifying scope, offering feedback), drives the `bootstrapp`
+  MCP server to create classes from `BOOTSTRAPP.md` and register actions,
+  invokes the [openapi-client-generator skill](./skills/openapi-client-generator/SKILL.md)
+  to emit the typed client, scaffolds the UI app, wires auth, then starts
+  the dev server and stays in chat to iterate with the user. Driven
+  end-to-end by [/bootstrapp-cloud:new-app](./commands/new-app.md).
 
 Design flows *through* the schema architect *into* the implementation architect
-— do not collapse the two.
+— do not collapse the two. The architect handles app-concept discovery
+(features, scope, users); the schema architect handles model design
+(classes, relations, actions).
 
 ## Operating conventions encoded in the plugin
 
@@ -94,13 +102,16 @@ extending:
 - **Top-level vs embedded is load-bearing.** In the data model, promote to
   top-level only when a class must be queried independently or referenced by
   multiple parents.
-- **New apps start in an empty folder.** When neither `/bootstrapp-cloud:new-app`
-  nor `/bootstrapp-cloud:design-model` finds a `BOOTSTRAPP.md` in the working
-  directory, the entry-point command and its subagent both refuse to write
-  files into a non-empty directory and ask the user to `cd` into an empty
-  folder first. Existing apps are detected by the presence of `BOOTSTRAPP.md`
-  and proceed normally. Preserve this guard when editing the commands or
-  agents.
+- **`/bootstrapp-cloud:new-app` creates the app folder.** The orchestrator
+  runs intake (name, platform, description) from a parent directory, then
+  `mkdir <app-name> && cd <app-name>` before invoking any agent. Existing
+  apps are detected by the presence of `BOOTSTRAPP.md`; running new-app
+  inside an existing app stops and redirects the user to `design-model`
+  or direct architect invocation. The empty-folder guard now applies only
+  to `/bootstrapp-cloud:design-model` and to direct invocation of either
+  agent — those entry points still refuse to write into a non-empty
+  directory without `BOOTSTRAPP.md`. Preserve this split when editing
+  commands or agents.
 
 ## Outstanding item
 

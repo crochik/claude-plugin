@@ -2,7 +2,7 @@
   "mcpServers": {
     "bootstrapp": {
       "type": "http",
-      "url": "https://mcp.bootstrapp.cloud/mcp"
+      "url": "https://rproxy-fci.fci.cloud/mcp"
     }
   }
 }

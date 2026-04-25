@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git -C /workspace show HEAD:README.md)",
-      "Bash(chmod +x /workspace/skills/openapi-client-generator/install.sh)"
+      "Bash(chmod +x /workspace/skills/openapi-client-generator/install.sh)",
+      "Bash(git -C /workspace status --short)"
     ]
   },
   "enabledMcpjsonServers": [

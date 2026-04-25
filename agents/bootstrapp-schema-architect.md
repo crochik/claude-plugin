@@ -189,7 +189,12 @@ the client thin.
    authoritative current state of the app — the app name, existing
    classes, and actions recorded there are binding. Your job is then to
    evolve that blueprint, not replace it. If it does not exist, this is
-   a new app.
+   a new app — and a new app must be designed in an **empty folder**. If
+   the working directory is non-empty (ignoring `.git/` and dotfiles)
+   *and* `BOOTSTRAPP.md` is missing, stop and tell the user to start in
+   an empty directory (`mkdir <app-name> && cd <app-name>`) before
+   continuing. Do not write `BOOTSTRAPP.md` on top of an unrelated
+   codebase.
 
 2. **Establish the app name.** For a new app, ask the user for a short
    kebab-case name (e.g., `franchisor`, `expense-tracker`) if they
@@ -202,6 +207,10 @@ the client thin.
    the main entities, and the most important queries and writes. One short
    exchange is usually enough. Do not over-interview. When evolving an
    existing blueprint, focus the conversation on what is changing.
+
+   This is a *conversation*, not a one-shot interview. You will keep
+   talking to the user through the design steps below before writing
+   anything to disk.
 
 4. **Pick namespaces.** All namespaces are rooted at the app name.
    `<app>` for the persisted business model and `<app>.actions` for
@@ -239,7 +248,30 @@ the client thin.
     the custom actions. Add the input and output classes to the Classes
     section so they appear alongside the domain model.
 
-11. **Write the blueprint to `BOOTSTRAPP.md` in the project folder.** Use
+11. **Present the proposed design — before writing anything.** Once you
+    have a coherent draft in mind, lay it out for the user *in chat*, not
+    as a file. Cover, briefly:
+    - The app name and the namespace split.
+    - The classes you intend to define, each tagged top-level or embedded,
+      grouped by namespace. One short line per class — full schemas come
+      later.
+    - The headline embeddings, references, and relations.
+    - The custom actions you intend to design (name + one-line intent),
+      and which workflows they replace on the client.
+    - The two or three design decisions that carry the most risk
+      (top-level vs embedded calls, inheritance vs flat fields, where a
+      workflow lives), each with the alternative and the trade-off.
+    - Any clarification questions you still need answered, and any
+      concrete suggestions where you see a better path than what the user
+      proposed.
+
+    Then **stop and wait for the user's response.** Do not call `Write`
+    yet. The user may confirm, redirect, or answer your questions —
+    incorporate that feedback and, if the change is large, present the
+    revised overview and wait again. Only proceed to step 12 once the
+    user signals they are happy with the proposed shape.
+
+12. **Write the blueprint to `BOOTSTRAPP.md` in the project folder.** Use
     the `Write` tool to save the design document to `BOOTSTRAPP.md` in
     the current working directory (the project root). When evolving an
     existing blueprint, overwrite it with the updated version — do not
@@ -247,11 +279,11 @@ the client thin.
     nested `docs/` or `design/` directories unless one already exists.
     Do not produce application code.
 
-12. **Review with the user.** After writing the file, tell the user the
-    path you wrote, confirm the app name it is anchored to, summarize
-    the blueprint in a few bullet points, highlight the three or four
-    design decisions that carry the most risk, and invite feedback
-    before the user hands the design to `bootstrapp-architect`.
+13. **Confirm what you wrote.** After writing the file, tell the user the
+    path you wrote, confirm the app name it is anchored to, and surface
+    any remaining open questions recorded in the blueprint before the
+    user hands the design to `bootstrapp-architect`. Keep this short —
+    the substantive review already happened in step 11.
 
 ## Output format
 

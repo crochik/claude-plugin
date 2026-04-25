@@ -94,6 +94,13 @@ extending:
 - **Top-level vs embedded is load-bearing.** In the data model, promote to
   top-level only when a class must be queried independently or referenced by
   multiple parents.
+- **New apps start in an empty folder.** When neither `/bootstrapp-cloud:new-app`
+  nor `/bootstrapp-cloud:design-model` finds a `BOOTSTRAPP.md` in the working
+  directory, the entry-point command and its subagent both refuse to write
+  files into a non-empty directory and ask the user to `cd` into an empty
+  folder first. Existing apps are detected by the presence of `BOOTSTRAPP.md`
+  and proceed normally. Preserve this guard when editing the commands or
+  agents.
 
 ## Outstanding item
 

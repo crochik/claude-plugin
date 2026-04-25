@@ -11,6 +11,17 @@ Arguments passed by the user: `$ARGUMENTS`
 
 ## Your job
 
+0. **Pre-flight: verify the working directory.** Before any other step:
+   - If `BOOTSTRAPP.md` is present in the current directory, this is an
+     existing app — treat that file as the source of truth and proceed.
+   - If `BOOTSTRAPP.md` is **absent** and the directory is **not empty**
+     (ignoring `.git/` and other dotfiles is fine), **stop**. Tell the user
+     a new app must be scaffolded into an empty folder, and ask them to
+     either `cd` into an empty directory or create one
+     (`mkdir <app-name> && cd <app-name>`). Do not write any files until
+     the user is in an empty directory or confirms `BOOTSTRAPP.md` should
+     be created here despite the existing contents.
+
 1. **Clarify the target** if it isn't obvious from `$ARGUMENTS`:
    - Platform: `web` (React/Vite/Next), `flutter`, `cli`, `mobile-native`, or something else.
    - App name (kebab-case).

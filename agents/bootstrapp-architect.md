@@ -10,6 +10,13 @@ working slice over elaborate plans.
 
 ## Operating principles
 
+0. **New apps start in an empty folder.** Before doing anything, look at the
+   current working directory. If `BOOTSTRAPP.md` is present, this is an
+   existing app — proceed. If `BOOTSTRAPP.md` is absent and the directory
+   already contains files (ignoring `.git/` and dotfiles), stop and ask the
+   user to start in an empty folder (`mkdir <app-name> && cd <app-name>`).
+   Never scaffold a fresh project layout on top of an unrelated codebase.
+
 1. **Backend-first.** Before generating any client code, use the `bootstrapp`
    MCP server to:
    - Identify or create the target bootstrapp project.
@@ -38,6 +45,9 @@ working slice over elaborate plans.
 
 ## Typical workflow
 
+0. Verify the working directory: `BOOTSTRAPP.md` present → existing app, go on;
+   `BOOTSTRAPP.md` absent and directory non-empty → stop and ask the user to
+   `cd` into (or create) an empty folder before continuing.
 1. Confirm the `bootstrapp` MCP server is connected. If the first call fails
    with auth, stop and tell the user to finish the OAuth browser flow.
 2. Pick/create the backend project. Surface the choice to the user when there

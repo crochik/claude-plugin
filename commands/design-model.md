@@ -1,11 +1,15 @@
 ---
-description: Design the bootstrapp.cloud data model for a new or existing backend — classes, inheritance, embeddings, references, and relations — without implementing anything.
+description: Evolve the bootstrapp.cloud data model of an existing app — classes, inheritance, embeddings, references, relations, and actions — without implementing anything. For brand-new apps, use /bootstrapp-cloud:new-app instead.
 argument-hint: [<topic>]
 ---
 
 # /bootstrapp-cloud:design-model
 
-The user wants to design a data model for a **bootstrapp.cloud** backend.
+The user wants to design or update the data model for an existing
+**bootstrapp.cloud** app. This command is the entry point for
+**schema-only changes**; brand-new apps go through
+`/bootstrapp-cloud:new-app`, which orchestrates intake, schema design,
+class creation, client generation, and scaffolding end-to-end.
 
 Arguments passed by the user: `$ARGUMENTS`
 
@@ -15,10 +19,11 @@ Arguments passed by the user: `$ARGUMENTS`
 
 - If `BOOTSTRAPP.md` is present, this is an existing app — proceed; the
   subagent will read it and evolve it in place.
-- If `BOOTSTRAPP.md` is absent and the directory is not empty (ignoring
-  `.git/` and dotfiles), stop and ask the user to start in an empty folder
-  (`mkdir <app-name> && cd <app-name>`). A fresh blueprint should anchor
-  its own project root, not land in someone else's codebase.
+- If `BOOTSTRAPP.md` is absent, this is not the right entry point. Tell
+  the user to run `/bootstrapp-cloud:new-app` instead — that command
+  creates the app folder, runs intake, and orchestrates the full flow.
+  Do not invoke the schema architect from a directory with no
+  `BOOTSTRAPP.md`.
 
 Once the directory check passes, delegate to the
 **`bootstrapp-schema-architect`** subagent. Pass along:
@@ -38,13 +43,19 @@ document.
   design-only; implementation is a separate step handled by `bootstrapp-architect`.
 - If the user provides enough domain description in `$ARGUMENTS`, pass it
   straight through — do not re-interview them.
-- The subagent always writes the blueprint to `BOOTSTRAPP.md` in the
-  current project folder. If the file already exists, the subagent reads
-  it first and evolves it in place — the app name recorded there is
-  preserved. Confirm the file path back to the user.
+- The blueprint is two kinds of files: **`BOOTSTRAPP.md`** at the
+  project root (the index — registries of classes and actions, no JSON
+  Schemas) and **`schemas/<Namespace>.md`** files (one per namespace,
+  full class definitions; the actions namespace file also holds full
+  action definitions). The subagent reads the index plus the touched
+  schemas files first, evolves them in place, and updates both sides
+  in the same turn — the app name recorded there is preserved.
+  Confirm the touched paths back to the user.
 - The subagent must present its proposed design in chat and wait for the
-  user's confirmation before calling `Write`. Do not let it skip that
-  step or write the file on the first turn.
-- Once the subagent returns the blueprint, present its path, the app
-  name, and a short summary to the user, and ask whether they want to
-  proceed to implementation via `/bootstrapp-cloud:new-app`.
+  user's confirmation before calling `Write` or `Edit`. Do not let it
+  skip that step or write the files on the first turn.
+- Once the subagent returns the updated blueprint, present the touched
+  paths, the app name, and a short summary of what changed. Then ask
+  whether the user wants the `bootstrapp-architect` to apply the
+  schema changes to the backend (re-running class creation via the
+  MCP server and regenerating the API client) or to defer until later.

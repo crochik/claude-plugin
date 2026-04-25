@@ -3,10 +3,24 @@
     "allow": [
       "Bash(git -C /workspace show HEAD:README.md)",
       "Bash(chmod +x /workspace/skills/openapi-client-generator/install.sh)",
-      "Bash(git -C /workspace status --short)"
+      "Bash(git -C /workspace status --short)",
+      "Bash(curl -sS -i -X POST https://rproxy-fci.fci.cloud/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"curl-test\",\"version\":\"1.0\"}}}' --max-time 15)",
+      "Bash(getent hosts *)",
+      "Bash(curl -sS -o /dev/null -w \"HTTP %{http_code}  resolve=%{remote_ip}\\\\n\" https://rproxy-fci.fci.cloud/ --max-time 10 -v)",
+      "Bash(curl -sS -o /dev/null -w \"HTTP %{http_code}\\\\n\" https://www.google.com --max-time 10)",
+      "Bash(curl -sS -v https://rproxy-fci.fci.cloud/mcp --max-time 10)",
+      "mcp__bootstrapp__get_object_classes",
+      "mcp__bootstrapp__get_namespaces",
+      "WebFetch(domain:spec.modelcontextprotocol.io)",
+      "WebSearch",
+      "WebFetch(domain:ts.sdk.modelcontextprotocol.io)",
+      "WebFetch(domain:github.com)",
+      "mcp__bootstrapp__tool_search",
+      "mcp__bootstrapp__generate_openapi_spec"
     ]
   },
   "enabledMcpjsonServers": [
     "bootstrapp"
-  ]
+  ],
+  "enabledPlugins": {}
 }

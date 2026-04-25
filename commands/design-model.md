@@ -43,15 +43,19 @@ document.
   design-only; implementation is a separate step handled by `bootstrapp-architect`.
 - If the user provides enough domain description in `$ARGUMENTS`, pass it
   straight through — do not re-interview them.
-- The subagent always writes the blueprint to `BOOTSTRAPP.md` in the
-  current project folder. If the file already exists, the subagent reads
-  it first and evolves it in place — the app name recorded there is
-  preserved. Confirm the file path back to the user.
+- The blueprint is two kinds of files: **`BOOTSTRAPP.md`** at the
+  project root (the index — registries of classes and actions, no JSON
+  Schemas) and **`schemas/<Namespace>.md`** files (one per namespace,
+  full class definitions; the actions namespace file also holds full
+  action definitions). The subagent reads the index plus the touched
+  schemas files first, evolves them in place, and updates both sides
+  in the same turn — the app name recorded there is preserved.
+  Confirm the touched paths back to the user.
 - The subagent must present its proposed design in chat and wait for the
-  user's confirmation before calling `Write`. Do not let it skip that
-  step or write the file on the first turn.
-- Once the subagent returns the updated blueprint, present its path,
-  the app name, and a short summary of what changed. Then ask whether
-  the user wants the `bootstrapp-architect` to apply the schema changes
-  to the backend (re-running class creation via the MCP server and
-  regenerating the API client) or to defer until later.
+  user's confirmation before calling `Write` or `Edit`. Do not let it
+  skip that step or write the files on the first turn.
+- Once the subagent returns the updated blueprint, present the touched
+  paths, the app name, and a short summary of what changed. Then ask
+  whether the user wants the `bootstrapp-architect` to apply the
+  schema changes to the backend (re-running class creation via the
+  MCP server and regenerating the API client) or to defer until later.

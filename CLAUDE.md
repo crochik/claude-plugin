@@ -90,12 +90,21 @@ extending:
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
   in separate namespaces, both rooted at the app name; action payload
   classes are never reused domain classes.
-- **`BOOTSTRAPP.md` anchors the app.** The schema architect writes and
-  evolves this file in the project root. It carries the app name (which
-  is also the base namespace) and the full backend blueprint. When a
-  user's project already has a `BOOTSTRAPP.md`, that file is the source
-  of truth — read it before proposing changes, and never rename the app
-  silently.
+- **`BOOTSTRAPP.md` anchors the app; `schemas/` holds the definitions.**
+  The blueprint is split: `BOOTSTRAPP.md` at the project root is the
+  **index** (app identity + registry tables for classes, actions,
+  embeddings, references, relations — no JSON Schemas), and one
+  `schemas/<Namespace>.md` file per namespace holds the full class
+  definitions (the actions namespace file also holds the full action
+  definitions). The schema architect writes and evolves both sides;
+  the implementation architect and any other reader load the index
+  first, then only the schemas files relevant to the change.
+  Invariant: every class and action appears in exactly one schemas
+  file *and* exactly one row of the matching registry — never one
+  without the other. When a user's project already has a
+  `BOOTSTRAPP.md`, the index plus schemas files are the source of
+  truth — read them before proposing changes, and never rename the
+  app silently.
 - **One working vertical slice.** Auth + one real read + one real write beats
   elaborate stubs.
 - **Secrets hygiene.** `.env.example` is committed; `.env` is gitignored.

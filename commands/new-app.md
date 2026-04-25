@@ -83,19 +83,25 @@ It will:
   actions.
 - **Present the proposed design in chat** and wait for the user's
   confirmation before writing.
-- Write `BOOTSTRAPP.md` to the project root.
+- Write the blueprint as **`BOOTSTRAPP.md`** (the index) plus one
+  **`schemas/<Namespace>.md`** file per namespace in the project root.
+  The index holds registry tables; the schemas files hold the full
+  JSON Schemas (and, for an actions namespace, full action
+  definitions).
 
 ## Phase 5 — Create classes on the backend
 
 Hand back to the **`bootstrapp-architect`**. It will:
 
 - Pick or create the bootstrapp.cloud project (using the app name).
-- Walk `BOOTSTRAPP.md` and call `mcp__bootstrapp__add_object_class` once
-  per class.
+- Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
+  walk the class registry and call
+  `mcp__bootstrapp__add_object_class` once per class, pulling each
+  JSON Schema from its namespace's schemas file.
 - Verify with `mcp__bootstrapp__get_object_classes`.
 - Use `mcp__bootstrapp__tool_search` to discover the action-creation tool
-  (its name is not assumed) and register each action defined in the
-  blueprint.
+  (its name is not assumed) and walk the action registry to register
+  each action.
 
 ## Phase 6 — Generate the API client
 

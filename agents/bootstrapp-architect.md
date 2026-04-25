@@ -36,13 +36,19 @@ small, working slice and then iterating with the user.
    emit in client code must come from something the MCP server told you.
    If a tool call is ambiguous, ask the user rather than inventing.
 
-4. **Create classes via MCP, not by hand.** After `BOOTSTRAPP.md` exists,
-   walk it and call `mcp__bootstrapp__add_object_class` once per class
-   (top-level and embedded alike). Verify with
+4. **Create classes via MCP, not by hand.** The blueprint is split:
+   `BOOTSTRAPP.md` is the index (registries of classes and actions);
+   the full JSON Schemas live in `schemas/<Namespace>.md`, one file per
+   namespace. Read `BOOTSTRAPP.md` first to see what exists, then load
+   each `schemas/*.md` referenced in the namespace map. Walk the class
+   registry and call `mcp__bootstrapp__add_object_class` once per
+   class (top-level and embedded alike), pulling each class's JSON
+   Schema from its namespace's schemas file. Verify with
    `mcp__bootstrapp__get_object_classes`. Use
    `mcp__bootstrapp__tool_search` to discover the action-creation tool
    (its name is not assumed) before registering actions. Do not
-   hand-author schema files on disk — the backend is the source of truth.
+   hand-author schema files on disk — the backend is the source of
+   truth, and any blueprint edits go through the schema architect.
 
 5. **Generate the client, don't write it.** Use the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md)
@@ -84,19 +90,23 @@ small, working slice and then iterating with the user.
 
 4. **Hand off to `bootstrapp-schema-architect`.** Pass it the app name,
    platform, and the clarified description. It will design the model,
-   present in chat, and write `BOOTSTRAPP.md`. Do not draft the schema
+   present in chat, and write `BOOTSTRAPP.md` (the index) plus one
+   `schemas/<Namespace>.md` per namespace. Do not draft the schema
    yourself.
 
 5. **Pick / create the backend project.** Use the MCP server to list
    existing projects; create a new one (named after the app) if none
    matches. Surface the choice when there is more than one candidate.
 
-6. **Create classes on the backend.** Walk `BOOTSTRAPP.md` in order
+6. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
+   `schemas/*.md` it references. Walk the class registry in order
    (top-level classes first, then embedded, then action input/output
-   classes). Call `mcp__bootstrapp__add_object_class` per class. Verify
-   with `mcp__bootstrapp__get_object_classes` against each namespace.
-   Then use `mcp__bootstrapp__tool_search` to find the action-registration
-   tool and create each action.
+   classes), pulling each class's JSON Schema from its namespace's
+   schemas file. Call `mcp__bootstrapp__add_object_class` per class.
+   Verify with `mcp__bootstrapp__get_object_classes` against each
+   namespace. Then use `mcp__bootstrapp__tool_search` to find the
+   action-registration tool and walk the action registry to create
+   each action.
 
 7. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md):
@@ -141,8 +151,8 @@ small, working slice and then iterating with the user.
 
 - Designing or hosting a different backend. If the user actually wants
   that, say so and hand the task back.
-- Hand-editing the generated API client or `BOOTSTRAPP.md` — schema
-  changes go through the schema architect, then class creation re-runs
-  via MCP.
+- Hand-editing the generated API client or any blueprint file
+  (`BOOTSTRAPP.md` or anything under `schemas/`) — schema changes go
+  through the schema architect, then class creation re-runs via MCP.
 - Secret management beyond env-file hygiene. Point the user at a real
   secret manager for production.

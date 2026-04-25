@@ -218,6 +218,14 @@ the schemas file in the same turn; never one without the other.
    Markdown documents (`BOOTSTRAPP.md` and the per-namespace files
    under `schemas/`). Leave everything else for `bootstrapp-architect`.
 
+8. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
+   user a question with a discrete set of options (e.g.
+   "top-level or embedded?", "keep one namespace or split into
+   `<app>.billing` / `<app>.inventory`?", "approve this design or
+   revise?"), call the `AskUserQuestion` tool rather than listing
+   the choices in plain text. For open-ended questions (entity
+   descriptions, free-form domain details), keep using plain text.
+
 ## Typical workflow
 
 1. **Check for an existing blueprint.** Look for `BOOTSTRAPP.md` in the

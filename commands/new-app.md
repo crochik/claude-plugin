@@ -32,21 +32,26 @@ Before any other step, look at the current working directory:
 ## Phase 1 — Intake (3 questions)
 
 Ask the user, in order, only the questions not already answered by
-`$ARGUMENTS`:
+`$ARGUMENTS`. **Use the `AskUserQuestion` tool for any question that
+has a discrete set of options** (platform, mobile/desktop/CLI choice,
+desktop framework). Use plain text for open-ended questions (app name,
+detailed description).
 
 1. **App name** — short kebab-case identifier (e.g. `expense-tracker`,
    `franchisor`). This becomes the folder name and the base namespace.
-2. **Platform** — `web` or `other`.
+   Open-ended; ask in plain text.
+2. **Platform** — `web` or `other`. Use `AskUserQuestion`.
    - If `web`: default to React + Vite (TypeScript). Ask only if the user
      signals a preference for something else (Next.js, SvelteKit, etc.).
-   - If `other`: drill down once.
+   - If `other`: drill down once with `AskUserQuestion`.
      - **Mobile** → default to Flutter.
-     - **Desktop** → ask which framework (Tauri, Electron, native — no
-       default; the choice is too workload-dependent).
+     - **Desktop** → ask which framework via `AskUserQuestion`
+       (Tauri, Electron, native — no default; the choice is too
+       workload-dependent).
      - **CLI** → only if the user explicitly asks.
 3. **Detailed description** — what the app does, who uses it, and the
    handful of features that matter for the first slice. Encourage a
-   paragraph, not a one-liner.
+   paragraph, not a one-liner. Open-ended; ask in plain text.
 
 ## Phase 2 — Create the directory
 

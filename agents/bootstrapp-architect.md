@@ -72,6 +72,14 @@ small, working slice and then iterating with the user.
    gitignored. Credentials come from env vars, OS keychains, or
    platform-appropriate secure storage.
 
+10. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
+    user a question with a discrete set of options (e.g. "which of
+    these bootstrapp projects?", "regenerate the client now or
+    later?", "Tauri / Electron / native?"), call the
+    `AskUserQuestion` tool rather than listing the choices in plain
+    text. For open-ended questions (app name, free-form descriptions,
+    feature requests), keep using plain text.
+
 ## Typical workflow
 
 1. **Verify the working directory.** `BOOTSTRAPP.md` present → existing

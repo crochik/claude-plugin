@@ -78,7 +78,9 @@ wrapper with three positional arguments:
 2. The path to the directory where generated client files should be
    written (e.g. `src/generated/` or `lib/api/`). Use a dedicated
    folder so the generator can overwrite on regeneration without
-   touching hand-written code.
+   touching hand-written code. Once chosen, **this path is permanent**
+   — every regeneration must target the exact same folder so the
+   output stays in place and remains a clean drop-in replacement.
 3. The target language — the suffix that selects the
    `bootstrapp-gen-<language>` binary. Use `typescript` for TypeScript
    apps, `flutter` for Flutter apps.
@@ -106,6 +108,38 @@ Before running anything, confirm:
   TypeScript/web apps, `flutter` for Flutter apps. The wrapper will
   fail fast if `bootstrapp-gen-<language>` is not on `PATH`.
 
+## Treat the generated output as a vendored library
+
+The generated folder is a **library**, not part of the app's source
+tree to be reshaped. Treat it the same way you would treat a package
+pulled from a registry: import from it, never modify it, never
+relocate it.
+
+- **Do not move, rename, or split the generated folder** after the
+  first run. The path passed to `generate_api.sh` is the contract —
+  changing it on a later regeneration leaves orphaned files in the
+  old location and breaks every existing import in the app.
+- **Do not flatten, merge, or "tidy" the generated structure** into
+  the rest of the app's folders. Models, APIs, runtime helpers, and
+  index files belong exactly where the generator put them. A
+  reorganized client cannot be cleanly regenerated.
+- **Do not edit any file inside the generated folder**, even
+  trivially (formatting, lint fixes, removing unused exports,
+  reordering imports). The next regeneration overwrites everything
+  and will discard the edit silently.
+- **Consume the client via a thin wrapper module** outside the
+  generated folder (e.g. `src/bootstrapp/` re-exporting and
+  configuring what `src/generated/` provides). All app code imports
+  from the wrapper; the wrapper is the only file that imports from
+  the generated folder. Customizations, default headers, auth token
+  injection, error mapping, and convenience helpers live in the
+  wrapper, never inside the generated tree.
+- **Regeneration must be a no-friction operation.** A user (or you,
+  on the next change) should be able to re-run step 3 with the same
+  arguments and get a working client with zero manual fixup. If you
+  ever feel tempted to "just tweak this one generated file," stop
+  and add the tweak to the wrapper instead.
+
 ## After a successful run
 
 - Show the user the command you ran and a one-line summary of what
@@ -132,6 +166,13 @@ the call. Use these methods to back named views (recorded in
 - Don't hand-edit files inside the generated output directory — they
   will be overwritten on the next run. Wrappers and customizations
   belong in a separate module that imports the generated types.
+- Don't move, rename, restructure, or split the generated folder
+  after the first run. Its path is the contract for every future
+  regeneration; relocating it breaks imports and forfeits clean
+  regeneration.
+- Don't merge generated files into the app's own source folders or
+  reorganize the generated tree to "fit" the app's conventions —
+  consume it as a library through a thin wrapper module instead.
 - Don't pass a relative path as the first argument to
   `generate_api.sh` — the script expects an absolute path.
 - Don't skip step 1 by guessing a spec URL or reusing a stale local

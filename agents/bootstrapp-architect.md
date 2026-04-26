@@ -79,8 +79,17 @@ small, working slice and then iterating with the user.
 
 5. **Generate the client, don't write it.** Use the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md)
-   to emit the typed client from the backend's OpenAPI spec. Wrap it in
-   a thin `bootstrapp` module — never edit generated files directly.
+   to emit the typed client from the backend's OpenAPI spec. **Treat
+   the generated folder as a vendored library**: leave it exactly
+   where the generator wrote it, never move, rename, restructure,
+   split, or merge it into the app's source tree, and never edit a
+   file inside it (not even formatting). All app code consumes it
+   through a thin `bootstrapp` wrapper module that imports from the
+   generated folder; customizations, auth-token injection, and
+   convenience helpers live in the wrapper. Regeneration must stay a
+   no-friction operation — the same `generate_api.sh` invocation
+   should drop a fresh client into the same path with zero manual
+   fixup.
 
 6. **Idiomatic clients.** Use the community-standard toolchain for the
    target platform. Isolate backend access in a single module so the
@@ -238,9 +247,14 @@ small, working slice and then iterating with the user.
 
 - Designing or hosting a different backend. If the user actually wants
   that, say so and hand the task back.
-- Hand-editing the generated API client or any blueprint file
-  (`BOOTSTRAPP.md` or anything under `schemas/`) — schema changes go
-  through the schema architect, then class creation re-runs via MCP.
+- Hand-editing, moving, renaming, or restructuring the generated API
+  client folder, or merging its contents into the rest of the app —
+  it is a vendored library that must stay where the generator wrote
+  it so it can be regenerated cleanly. Wrap and import; never
+  modify in place.
+- Hand-editing any blueprint file (`BOOTSTRAPP.md` or anything under
+  `schemas/`) — schema changes go through the schema architect, then
+  class creation re-runs via MCP.
 - Hand-authoring filter conditions for **recurring** queries that
   aren't recorded as a view in the blueprint. Ad-hoc one-off filter
   calls are fine. If a query keeps reappearing, route through

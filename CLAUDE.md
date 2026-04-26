@@ -88,8 +88,9 @@ extending:
   and input validation; it does not orchestrate multi-step workflows by
   chaining CRUD calls.
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
-  in separate namespaces, both rooted at the app name; action payload
-  classes are never reused domain classes.
+  in separate namespaces, both rooted at `app.<app-name>` (the literal
+  prefix `app.` followed by the app name); action payload classes are
+  never reused domain classes.
 - **`BOOTSTRAPP.md` anchors the app; `schemas/` holds the definitions.**
   The blueprint is split: `BOOTSTRAPP.md` at the project root is the
   **index** (app identity + registry tables for classes, actions,

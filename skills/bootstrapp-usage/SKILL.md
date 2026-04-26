@@ -16,10 +16,10 @@ Before doing any bootstrapp work, check the project root for a file named
 - Read it in full. It records the app's name, namespaces, classes, and
   actions. Treat it as the authoritative design for the current app — the
   project is an ongoing one, not a fresh start.
-- The **app name** at the top of the file is also the base namespace for
-  every class (`<app-name>.Order`, `<app-name>.actions.SubmitOrderInput`,
-  etc.). Do not rename it. Keep all new classes consistent with this
-  namespace.
+- The **app name** at the top of the file anchors the base namespace
+  `app.<app-name>` under which every class lives (`app.<app-name>.Order`,
+  `app.<app-name>.actions.SubmitOrderInput`, etc.). Do not rename it. Keep
+  all new classes consistent with this namespace.
 - Schema changes go through `/bootstrapp-cloud:design-model`, which
   delegates to the `bootstrapp-schema-architect` to evolve the same
   `BOOTSTRAPP.md` in place.
@@ -46,9 +46,9 @@ UI scaffold, and starting the dev server.
   namespace), full read/write access to every class, and runs atomically on
   the server. If a workflow spans multiple documents or enforces invariants,
   it is an action, not a client-side orchestration.
-- **Classes live in namespaces rooted at the app name.** The domain model
-  sits under `<app-name>` and action I/O classes sit under
-  `<app-name>.actions`. Reference classes in generated code with their
+- **Classes live in namespaces rooted at `app.<app-name>`.** The domain
+  model sits under `app.<app-name>` and action I/O classes sit under
+  `app.<app-name>.actions`. Reference classes in generated code with their
   fully qualified name to stay consistent with the backend.
 - **The client handles presentation and input validation.** Rendering,
   UX state, and form-level validation belong on the client. Anything that

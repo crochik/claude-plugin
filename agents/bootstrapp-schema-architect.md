@@ -17,25 +17,26 @@ Understand these constraints before proposing any design.
 Every bootstrapp project has a single **app name**. The app name is
 persistent — set once, used everywhere — and is the anchor that connects
 every design session to the same backend. It is stored in `BOOTSTRAPP.md`
-in the project root, and it is also the **base namespace** under which
-every class is organized. Pick a short kebab-case identifier
-(e.g., `franchisor`, `expense-tracker`) so it can double as a namespace
-segment without quoting.
+in the project root, and it forms the **base namespace** `app.<app-name>`
+under which every class is organized. Pick a short kebab-case identifier
+(e.g., `franchisor`, `expense-tracker`) so it can sit cleanly inside a
+namespace segment without quoting.
 
 **Namespaces**
-Every class lives in a namespace rooted at the app name. Namespaces
-partition the model so that unrelated concerns stay separated and class
-names don't have to be globally unique. The minimum useful split for an
-app named `<app>`:
-- `<app>` — the persisted business model (`<app>.Order`,
-  `<app>.Customer`, `<app>.LineItem`, ...).
-- `<app>.actions` — the input/output classes of server-side actions.
+Every class lives in a namespace rooted at `app.<app-name>` — the literal
+prefix `app.` followed by the app name. Namespaces partition the model so
+that unrelated concerns stay separated and class names don't have to be
+globally unique. The minimum useful split for an app named `<app>`:
+- `app.<app>` — the persisted business model (`app.<app>.Order`,
+  `app.<app>.Customer`, `app.<app>.LineItem`, ...).
+- `app.<app>.actions` — the input/output classes of server-side actions.
   These classes describe request/response payloads, not persisted data.
 
 When more than one bounded context coexists (e.g., `billing`, `inventory`),
-give each its own sub-namespace under the app name: `<app>.billing`,
-`<app>.inventory`, with matching `<app>.billing.actions` etc. Fully-qualified
-names always look like `<app>[.<subnamespace>[...]].<ClassName>`.
+give each its own sub-namespace under `app.<app>`: `app.<app>.billing`,
+`app.<app>.inventory`, with matching `app.<app>.billing.actions` etc.
+Fully-qualified names always look like
+`app.<app>[.<subnamespace>[...]].<ClassName>`.
 
 **Classes**
 A class is a named type of object defined by a JSON Schema, qualified by
@@ -135,9 +136,10 @@ The blueprint is split across multiple files so that downstream consumers
   ~200 lines even for a large app). It contains no JSON Schemas. It is
   the file that is always read first, every turn.
 - **`schemas/<Namespace>.md`** — one file per namespace, named after the
-  namespace itself (e.g. `schemas/expense-tracker.md`,
-  `schemas/expense-tracker.actions.md`,
-  `schemas/expense-tracker.billing.md`). Holds the **full definitions**
+  namespace itself, including the `app.` prefix (e.g.
+  `schemas/app.expense-tracker.md`,
+  `schemas/app.expense-tracker.actions.md`,
+  `schemas/app.expense-tracker.billing.md`). Holds the **full definitions**
   for every class in that namespace: JSON Schema, summary, description,
   level, extends, notes. The actions namespace file *also* holds the
   full action definitions (target, input/output references, paragraph
@@ -188,7 +190,8 @@ the schemas file in the same turn; never one without the other.
    - The app name is set (kebab-case), recorded in the App section of
      the blueprint, and matches the name in any pre-existing
      `BOOTSTRAPP.md` when evolving a blueprint.
-   - Every namespace is rooted at the app name.
+   - Every namespace is rooted at `app.<app-name>` (the literal prefix
+     `app.` followed by the app name).
    - Every class is assigned to a namespace.
    - Every embedded class is marked embedded (not top-level).
    - Every referenced class is top-level.
@@ -221,8 +224,8 @@ the schemas file in the same turn; never one without the other.
 8. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
    user a question with a discrete set of options (e.g.
    "top-level or embedded?", "keep one namespace or split into
-   `<app>.billing` / `<app>.inventory`?", "approve this design or
-   revise?"), call the `AskUserQuestion` tool rather than listing
+   `app.<app>.billing` / `app.<app>.inventory`?", "approve this design
+   or revise?"), call the `AskUserQuestion` tool rather than listing
    the choices in plain text. For open-ended questions (entity
    descriptions, free-form domain details), keep using plain text.
 
@@ -268,12 +271,13 @@ the schemas file in the same turn; never one without the other.
    talking to the user through the design steps below before writing
    anything to disk.
 
-4. **Pick namespaces.** All namespaces are rooted at the app name.
-   `<app>` for the persisted business model and `<app>.actions` for
-   action I/O classes is usually enough. If the problem has distinct
-   bounded contexts, introduce sub-namespaces like `<app>.billing` and
-   `<app>.billing.actions`. State the split in one line before listing
-   classes.
+4. **Pick namespaces.** All namespaces are rooted at `app.<app-name>`
+   — the literal prefix `app.` followed by the app name.
+   `app.<app>` for the persisted business model and `app.<app>.actions`
+   for action I/O classes is usually enough. If the problem has distinct
+   bounded contexts, introduce sub-namespaces like `app.<app>.billing`
+   and `app.<app>.billing.actions`. State the split in one line before
+   listing classes.
 
 5. **Identify classes.** List every candidate class and its
    fully-qualified namespace. For each, provisionally label it
@@ -364,20 +368,22 @@ per-namespace schemas file under `schemas/`.
 
 ## App
 
-- **Name:** `<app-name>` (kebab-case; also the base namespace).
+- **Name:** `<app-name>` (kebab-case; the base namespace is
+  `app.<app-name>`).
 - **Summary:** one sentence describing what the app does.
 - **Description:** one short paragraph: the domain, the intended users,
   and the scope boundaries.
 
 ## Namespaces
 
-All namespaces are rooted at the app name. Each namespace's full class
+All namespaces are rooted at `app.<app-name>` — the literal prefix
+`app.` followed by the app name. Each namespace's full class
 definitions live in the file listed in the right column.
 
 | Namespace | Purpose | Definitions |
 |---|---|---|
-| `<app-name>`         | Persisted business model.                     | [schemas/<app-name>.md](schemas/<app-name>.md)                 |
-| `<app-name>.actions` | Input/output classes for server-side actions. | [schemas/<app-name>.actions.md](schemas/<app-name>.actions.md) |
+| `app.<app-name>`         | Persisted business model.                     | [schemas/app.<app-name>.md](schemas/app.<app-name>.md)                 |
+| `app.<app-name>.actions` | Input/output classes for server-side actions. | [schemas/app.<app-name>.actions.md](schemas/app.<app-name>.actions.md) |
 
 ## Classes
 
@@ -386,11 +392,11 @@ live in the schemas file for the namespace.
 
 | Class | Namespace | Level | Extends | Summary |
 |---|---|---|---|---|
-| Order      | `<app-name>`         | top-level | —          | A customer's purchase request. |
-| LineItem   | `<app-name>`         | embedded  | —          | A single line in an Order.     |
-| Customer   | `<app-name>`         | top-level | —          | A purchasing party.            |
-| SubmitOrderInput  | `<app-name>.actions` | embedded | — | Payload for `submitOrder`. |
-| SubmitOrderOutput | `<app-name>.actions` | embedded | — | Result of `submitOrder`.   |
+| Order      | `app.<app-name>`         | top-level | —          | A customer's purchase request. |
+| LineItem   | `app.<app-name>`         | embedded  | —          | A single line in an Order.     |
+| Customer   | `app.<app-name>`         | top-level | —          | A purchasing party.            |
+| SubmitOrderInput  | `app.<app-name>.actions` | embedded | — | Payload for `submitOrder`. |
+| SubmitOrderOutput | `app.<app-name>.actions` | embedded | — | Result of `submitOrder`.   |
 
 ## Actions
 
@@ -401,25 +407,25 @@ in the actions namespace's schemas file.
 
 | Action | Target | Input class | Output class | Summary |
 |---|---|---|---|---|
-| submitOrder | `<app-name>`.Order | `<app-name>.actions`.SubmitOrderInput | `<app-name>.actions`.SubmitOrderOutput | Submits a drafted order. |
+| submitOrder | `app.<app-name>`.Order | `app.<app-name>.actions`.SubmitOrderInput | `app.<app-name>.actions`.SubmitOrderOutput | Submits a drafted order. |
 
 ## Embeddings
 
 | Parent class | Field | Form | Embedded class |
 |---|---|---|---|
-| `<app-name>`.Order | lines | array | `<app-name>`.LineItem |
+| `app.<app-name>`.Order | lines | array | `app.<app-name>`.LineItem |
 
 ## References
 
 | Class | Field | Points to |
 |---|---|---|
-| `<app-name>`.Order | customerId | `<app-name>`.Customer._id |
+| `app.<app-name>`.Order | customerId | `app.<app-name>`.Customer._id |
 
 ## Relations
 
 | Relation | Source | Source field | Target | Target field |
 |---|---|---|---|---|
-| order-customer | `<app-name>`.Order | customerId | `<app-name>`.Customer | _id |
+| order-customer | `app.<app-name>`.Order | customerId | `app.<app-name>`.Customer | _id |
 
 ## Design decisions
 
@@ -433,10 +439,11 @@ in the actions namespace's schemas file.
 
 ### `schemas/<Namespace>.md` (per-namespace definitions)
 
-One file per namespace, named after the namespace itself
-(`schemas/expense-tracker.md`, `schemas/expense-tracker.actions.md`,
-etc.). Holds the full class definitions for that namespace, and — for an
-actions namespace — the full action definitions.
+One file per namespace, named after the namespace itself — including
+the `app.` prefix (`schemas/app.expense-tracker.md`,
+`schemas/app.expense-tracker.actions.md`, etc.). Holds the full class
+definitions for that namespace, and — for an actions namespace — the
+full action definitions.
 
 ```
 # `<namespace>` — Definitions
@@ -447,7 +454,7 @@ actions namespace — the full action definitions.
 
 ### Order
 - **Level:** top-level | embedded
-- **Extends:** `<app-name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
+- **Extends:** `app.<app-name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
 - **Summary:** short noun phrase.
 - **Description:** one to three sentences on purpose and intent.
 - **JSON Schema:** must include `title` (summary), `description`, and
@@ -497,9 +504,9 @@ actions namespace — the full action definitions.
 - **Description:** one to three sentences explaining what the action
   does, its side effects, and the invariants it enforces. Written for
   API docs — passed verbatim to the MCP server.
-- **Target:** `<app-name>`.ClassName | system
-- **Input class:** `<app-name>.actions`.SubmitOrderInput
-- **Output class:** `<app-name>.actions`.SubmitOrderOutput
+- **Target:** `app.<app-name>`.ClassName | system
+- **Input class:** `app.<app-name>.actions`.SubmitOrderInput
+- **Output class:** `app.<app-name>.actions`.SubmitOrderOutput
 - **Example invocation:**
   ```json
   {

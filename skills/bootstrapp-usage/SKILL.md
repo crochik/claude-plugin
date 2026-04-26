@@ -43,10 +43,13 @@ UI scaffold, and starting the dev server.
   a **filter** endpoint for every top-level class, plus named *actions*
   for anything else. The filter endpoint takes an AND-array of conditions
   (`{field, operator, value?}`) over the operator set
-  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`. **Conditions are only valid
-  on a class's indexed fields** (declared at registration time via
-  `add_object_class`'s `indexedFields` argument and recorded in the
-  schemas file); the backend rejects conditions on non-indexed
+  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists` **and a required `fields`
+  array** naming the top-level properties to return on each match
+  (the backend projects to that list — it does not return the full
+  document by default; `_id` is always included). **Conditions are
+  only valid on a class's indexed fields** (declared at registration
+  time via `add_object_class`'s `indexedFields` argument and recorded
+  in the schemas file); the backend rejects conditions on non-indexed
   properties. See the
   [`bootstrapp-schema-architect`](../../agents/bootstrapp-schema-architect.md)
   agent for the full contract — value rules per operator, type-matching
@@ -71,17 +74,23 @@ and the target's namespace schemas file (full definition). A view bundles
 filter conditions, visible fields, an optional primary label field, and
 optional sort/limit. When generating UI, treat each view as a list-screen
 specification: a screen named after the view that calls the target's
-filter endpoint with the recorded conditions, renders the view's
-`visibleFields` (using `primaryField` for row labels when present), and
-applies the view's sort and limit.
+filter endpoint with the recorded conditions, passes the view's
+`visibleFields` as the request's required `fields` projection (adding
+any sort/label field that the screen needs but is not already in the
+list), renders those fields (using `primaryField` for row labels when
+present), and applies the view's sort and limit.
 
 For **on-demand filter calls** (queries that aren't registered as a view),
-build the request body as `{ conditions: [...] }`. Each condition's
-`value` must match the target class's property type: omit it for
-`Exists`, pass an array for `In`, pass a scalar otherwise. Reject any
-condition whose `field` is not on the target class **or is not in the
-class's `indexedFields` list** — the filter will reject it
-server-side too. If a query needs a non-indexed field, route through
+build the request body as `{ conditions: [...], fields: [...] }`. Each
+condition's `value` must match the target class's property type: omit
+it for `Exists`, pass an array for `In`, pass a scalar otherwise. The
+`fields` array is required and must explicitly list every top-level
+property the caller intends to read on the response (`_id` always comes
+back; everything else only comes back if named). Reject any condition
+whose `field` is not on the target class **or is not in the class's
+`indexedFields` list** — the filter will reject it server-side too.
+Reject any entry in `fields` that is not a property of the target
+class for the same reason. If a query needs a non-indexed field, route through
 `/bootstrapp-cloud:design-model` to add the field to `indexedFields`
 and re-run class creation; if the same query keeps reappearing,
 register it as a named view at the same time.
@@ -220,6 +229,10 @@ own:
   class's `indexedFields` list — both are server-side rejections.
   Don't invent sort/limit params on the filter endpoint — discover
   from the OpenAPI spec or apply client-side.
+- Don't omit the `fields` array on a filter call, and don't expect
+  fields you didn't list to come back — the filter response is
+  projected to exactly the requested top-level fields (plus `_id`).
+  If a screen needs a property, it must be named in `fields`.
 - Don't skip the OAuth flow message the first time a user runs an MCP tool —
   they need to know a browser window is coming.
 

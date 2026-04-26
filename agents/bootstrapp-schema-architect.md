@@ -117,9 +117,20 @@ class. You may, however, design **named views** that record canonical
 filter calls for the implementation agent to scaffold (see "Named views"
 below).
 
-*Filter endpoint contract.* The request body is `{ conditions: Condition[] }`
-and the response is an array of matching objects. Conditions combine with
-**AND** semantics — a result is returned only if every condition matches.
+*Filter endpoint contract.* The request body is
+`{ conditions: Condition[], fields: string[] }` and the response is an
+array of matching objects projected to the requested fields. Conditions
+combine with **AND** semantics — a result is returned only if every
+condition matches.
+
+The `fields` array is **required** and lists the top-level property
+names the caller wants returned on each matching object. The backend
+does not return the full document by default — it returns only the
+fields named here (plus `_id`, which is always present). Naming a
+field that does not exist on the target class is rejected
+server-side. Embedded sub-trees come back whole when their parent
+field is listed; there is no per-leaf projection inside an embedded
+class.
 
 A `Condition` is `{ field, operator, value? }` where:
 - `field` is the name of a property on the target class (recursing through
@@ -211,7 +222,10 @@ on every screen. A view has:
 - **Display config** — `visibleFields` (ordered array of property names
   on the target class; first entry is the primary column) and optional
   `primaryField` (the user-facing label field, e.g. `name`, `title`).
-  Drives the list-screen scaffolding.
+  Drives the list-screen scaffolding. `visibleFields` doubles as the
+  view's projection: the implementation agent passes it (plus any
+  field needed for sort/label that is not already in the list) as the
+  filter call's required `fields` array.
 - **Sort** — optional array of `{ field, direction: "asc" | "desc" }`.
   The implementation agent passes sort params to the filter endpoint
   when the OpenAPI spec exposes them, otherwise sorts client-side after

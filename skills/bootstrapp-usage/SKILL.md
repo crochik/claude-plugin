@@ -107,6 +107,13 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
   ID and do not load it from env.
 - **Flow — every other platform (Flutter, mobile, desktop, CLI):**
   Authorization Code with PKCE. Load the OIDC `client_id` from env.
+- **Scopes:** the issuer **does not accept the `email` scope** (or
+  any other profile-style scope) in the authorize request — asking
+  for it will fail the flow. Request only `openid` (plus `id_token`
+  via `response_type` for the Implicit flow). User profile data
+  (`name`, `email`, group membership, etc.) is already embedded as
+  claims in the access token; decode the JWT and read claims directly
+  rather than calling a userinfo endpoint or asking for extra scopes.
 - **Session storage:** platform-appropriate. For TypeScript web apps,
   the implicit-flow access token lives in memory plus
   `sessionStorage` (cleared on tab close) — not `localStorage`, and
@@ -131,9 +138,12 @@ redefine them.
   the backend returns (including authorization rejections). Do not
   replicate the access policy on the client.
 
-When the client needs the current user (to show their name, filter
-"my X", etc.), read it from the access-token claims after login — do
-not infer it from app data.
+When the client needs the current user (to show their name or
+email, filter "my X", etc.), decode the access-token JWT and read
+it from the claims after login — do not infer it from app data, do
+not request extra scopes (the issuer rejects `email`/profile
+scopes), and do not call a userinfo endpoint. `name`, `email`, and
+group membership all arrive as claims on the token.
 
 **Every app must expose a user-initiated way to start the login
 flow** — a Login button on web, a sign-in screen on mobile/desktop,

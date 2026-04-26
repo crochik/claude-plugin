@@ -106,10 +106,15 @@ small, working slice and then iterating with the user.
    no hyphens); do not load the client ID from env. For every
    other platform (Flutter, mobile, desktop, CLI), use Authorization
    Code with PKCE and load the `client_id` from env. Store tokens in
-   platform-appropriate storage. bootstrapp.cloud already provides
-   the **User** (UUID `id`) and **Group** (`id`, `name`) classes —
-   never redefine them in the app namespace; reference users by
-   storing their UUID. Authorization is group-based and enforced by
+   platform-appropriate storage. **The issuer does not accept the
+   `email` scope (or any other profile-style scope) — request only
+   `openid` (plus `id_token` via `response_type` for the Implicit
+   flow). User profile data (`name`, `email`, group membership) is
+   already embedded as claims in the access token; decode the JWT
+   instead of asking for extra scopes or calling a userinfo
+   endpoint.** bootstrapp.cloud already provides the **User** (UUID
+   `id`) and **Group** (`id`, `name`) classes — never redefine them
+   in the app namespace; reference users by storing their UUID. Authorization is group-based and enforced by
    the backend on every object, action, and view; do not reimplement
    the policy on the client. A feature screen with broken auth is
    worse than no feature screen.
@@ -202,9 +207,12 @@ small, working slice and then iterating with the user.
    `app.<app_name>` — lowercase letters, digits, and underscores only,
    no hyphens) — do not load the client ID from env. **For
    every other platform**, use Authorization Code with PKCE and load
-   the `client_id` from env. Read the current user (UUID `id` and
-   group membership) from the access-token claims — never redefine a
-   User or Group class in the app namespace. Surface backend
+   the `client_id` from env. Read the current user (UUID `id`, `name`,
+   `email`, group membership) by decoding the access-token JWT claims
+   — the issuer rejects `email`/profile scopes, so do not request
+   them and do not call a userinfo endpoint; everything you need is
+   already on the token. Never redefine a User or Group class in the
+   app namespace. Surface backend
    authorization rejections in the UI rather than gating actions
    client-side. **Always include a user-initiated entry point to the
    login flow** (a Login button, a sign-in screen, a `login`
@@ -235,10 +243,11 @@ small, working slice and then iterating with the user.
   (re-engage the schema architect and re-run class creation) or reshape
   the feature.
 - Ambiguous auth setup beyond the defaults (redirect URIs,
-  additional scopes, non-TypeScript `client_id`) — ask. The issuer
-  (`https://idp.fci.cloud`), the TypeScript flow (Implicit), and the
-  TypeScript `client_id` (the app name) are fixed; don't ask about
-  those.
+  non-TypeScript `client_id`) — ask. The issuer
+  (`https://idp.fci.cloud`), the TypeScript flow (Implicit), the
+  TypeScript `client_id` (the app name), and the scope set
+  (`openid` only — `email`/profile scopes are rejected by the
+  issuer) are all fixed; don't ask about those.
 - The user requests something that would require bypassing
   bootstrapp.cloud (e.g. a parallel local database) — push back and
   propose the backend-first alternative.

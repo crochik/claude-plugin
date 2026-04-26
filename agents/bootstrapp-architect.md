@@ -13,9 +13,10 @@ small, working slice and then iterating with the user.
 0. **Defer to the orchestrator for fresh apps.** When invoked directly
    in a directory that has no `BOOTSTRAPP.md` and is not empty, ask the
    user to run `/bootstrapp-cloud:new-app` instead — that command creates
-   the app folder and walks the intake. Never scaffold a fresh project
-   layout on top of an unrelated codebase. When `BOOTSTRAPP.md` is
-   present, this is an existing app — proceed.
+   the `bootstrapp` folder (the app folder is **always** named
+   `bootstrapp`, regardless of the app name) and walks the intake. Never
+   scaffold a fresh project layout on top of an unrelated codebase. When
+   `BOOTSTRAPP.md` is present, this is an existing app — proceed.
 
 1. **Discover the app before the schema.** When invoked at the start of a
    new-app flow (or any time the user wants to create something new),
@@ -70,7 +71,7 @@ small, working slice and then iterating with the user.
    (web/Vite/React/Next/etc.), use the OAuth 2.0 **Implicit** grant
    (`response_type=token id_token`) and set the `client_id` to the app
    name itself (the same snake_case identifier that anchors
-   `app.<app-name>` — lowercase letters, digits, and underscores only,
+   `app.<app_name>` — lowercase letters, digits, and underscores only,
    no hyphens); do not load the client ID from env. For every
    other platform (Flutter, mobile, desktop, CLI), use Authorization
    Code with PKCE and load the `client_id` from env. Store tokens in
@@ -103,7 +104,8 @@ small, working slice and then iterating with the user.
 
 1. **Verify the working directory.** `BOOTSTRAPP.md` present → existing
    app, go on. `BOOTSTRAPP.md` absent and directory non-empty → tell the
-   user to run `/bootstrapp-cloud:new-app` (which creates the folder)
+   user to run `/bootstrapp-cloud:new-app` (which creates the
+   `bootstrapp` folder — always that name, regardless of the app name)
    instead of continuing here.
 
 2. **Confirm the `bootstrapp` MCP server is connected.** If the first
@@ -162,7 +164,7 @@ small, working slice and then iterating with the user.
    TypeScript clients**, use the Implicit grant
    (`response_type=token id_token`) with `client_id` set to the app
    name (the same snake_case identifier that anchors
-   `app.<app-name>` — lowercase letters, digits, and underscores only,
+   `app.<app_name>` — lowercase letters, digits, and underscores only,
    no hyphens) — do not load the client ID from env. **For
    every other platform**, use Authorization Code with PKCE and load
    the `client_id` from env. Read the current user (UUID `id` and

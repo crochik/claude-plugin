@@ -21,9 +21,9 @@ Arguments passed by the user: `$ARGUMENTS`
   subagent will read it and evolve it in place.
 - If `BOOTSTRAPP.md` is absent, this is not the right entry point. Tell
   the user to run `/bootstrapp-cloud:new-app` instead — that command
-  creates the app folder, runs intake, and orchestrates the full flow.
-  Do not invoke the schema architect from a directory with no
-  `BOOTSTRAPP.md`.
+  creates the `bootstrapp` folder (always that name, regardless of the
+  app name), runs intake, and orchestrates the full flow. Do not invoke
+  the schema architect from a directory with no `BOOTSTRAPP.md`.
 
 Once the directory check passes, delegate to the
 **`bootstrapp-schema-architect`** subagent. Pass along:

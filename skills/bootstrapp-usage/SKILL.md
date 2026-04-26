@@ -17,8 +17,8 @@ Before doing any bootstrapp work, check the project root for a file named
   actions. Treat it as the authoritative design for the current app — the
   project is an ongoing one, not a fresh start.
 - The **app name** at the top of the file anchors the base namespace
-  `app.<app-name>` under which every class lives (`app.<app-name>.Order`,
-  `app.<app-name>.actions.SubmitOrderInput`, etc.). Do not rename it. Keep
+  `app.<app_name>` under which every class lives (`app.<app_name>.Order`,
+  `app.<app_name>.actions.SubmitOrderInput`, etc.). Do not rename it. Keep
   all new classes consistent with this namespace.
 - Schema changes go through `/bootstrapp-cloud:design-model`, which
   delegates to the `bootstrapp-schema-architect` to evolve the same
@@ -52,9 +52,9 @@ UI scaffold, and starting the dev server.
   read/write access to every class, and runs atomically on the server.
   If a workflow spans multiple documents or enforces invariants, it is
   an action, not a client-side orchestration.
-- **Classes live in namespaces rooted at `app.<app-name>`.** The domain
-  model sits under `app.<app-name>` and action I/O classes sit under
-  `app.<app-name>.actions`. Reference classes in generated code with their
+- **Classes live in namespaces rooted at `app.<app_name>`.** The domain
+  model sits under `app.<app_name>` and action I/O classes sit under
+  `app.<app_name>.actions`. Reference classes in generated code with their
   fully qualified name to stay consistent with the backend.
 - **The client handles presentation and input validation.** Rendering,
   UX state, and form-level validation belong on the client. Anything that
@@ -95,7 +95,7 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
   endpoint with `response_type=token id_token`, receives tokens in the
   redirect fragment, and presents the access token on every backend
   call. The OIDC **`client_id` is the app name** (the same snake_case
-  identifier that anchors `app.<app-name>` — lowercase letters, digits,
+  identifier that anchors `app.<app_name>` — lowercase letters, digits,
   and underscores only; no hyphens) — do not invent a separate client
   ID and do not load it from env.
 - **Flow — every other platform (Flutter, mobile, desktop, CLI):**
@@ -109,7 +109,7 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
   clear on logout in every case.
 
 The platform already provides the **User** and **Group** classes — they
-are not part of any app's `app.<app-name>` namespace and apps must not
+are not part of any app's `app.<app_name>` namespace and apps must not
 redefine them.
 
 - **User** — has an `id` (UUID string) and belongs to exactly one
@@ -159,7 +159,7 @@ own:
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
 6. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
-   (Implicit flow with `client_id = <app-name>` for TypeScript
+   (Implicit flow with `client_id = <app_name>` for TypeScript
    clients; Authorization Code with PKCE for everything else),
    logout, and authenticated requests must work end-to-end before you
    build feature screens. See "Authentication and authorization"

@@ -37,14 +37,17 @@ has a discrete set of options** (platform, mobile/desktop/CLI choice,
 desktop framework). Use plain text for open-ended questions (app name,
 detailed description).
 
-1. **App name** — short snake_case identifier (e.g. `expense_tracker`,
-   `franchisor`). Allowed characters are lowercase letters, digits, and
-   underscores only — **no hyphens** (the app name is reused as a
-   namespace segment, and namespace segments must be plain identifiers).
-   This becomes the folder name and the suffix of the base namespace
-   `app.<app-name>`. Open-ended; ask in plain text — if the user
-   suggests a name with hyphens or other disallowed characters,
-   replace them with underscores and confirm the corrected name.
+1. **App name** — must be **snake_case**: lowercase letters, digits, and
+   underscores only, **no hyphens, no spaces, no camelCase**. The app
+   name is reused as a namespace segment, and namespace segments must be
+   plain identifiers. Examples: `expense_tracker`, `franchisor`,
+   `order_book`. This becomes the suffix of the base namespace
+   `app.<app_name>`. **It is not the folder name** — the folder is
+   always `bootstrapp` (see Phase 2). Open-ended; ask in plain text. If
+   you propose a name yourself, propose it already in snake_case. If
+   the user replies with a name containing hyphens, spaces, or
+   camelCase, convert it to snake_case and confirm the corrected name
+   before proceeding.
 2. **Platform** — `web` or `other`. Use `AskUserQuestion`.
    - If `web`: default to React + Vite (TypeScript). Ask only if the user
      signals a preference for something else (Next.js, SvelteKit, etc.).
@@ -60,7 +63,11 @@ detailed description).
 
 ## Phase 2 — Create the directory
 
-From the current working directory, run `mkdir <app-name> && cd <app-name>`.
+From the current working directory, run `mkdir bootstrapp && cd bootstrapp`.
+The folder is **always** named `bootstrapp` — independent of the app name
+chosen in Phase 1. If a `bootstrapp` folder already exists in the cwd,
+stop and ask the user how to proceed (pick a different parent directory,
+remove the existing folder, or rename it) rather than writing into it.
 After this point all subsequent work happens inside the new folder. Tell
 the user the folder you created.
 

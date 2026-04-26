@@ -88,7 +88,7 @@ extending:
   and input validation; it does not orchestrate multi-step workflows by
   chaining CRUD calls.
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
-  in separate namespaces, both rooted at `app.<app-name>` (the literal
+  in separate namespaces, both rooted at `app.<app_name>` (the literal
   prefix `app.` followed by the app name); action payload classes are
   never reused domain classes.
 - **`BOOTSTRAPP.md` anchors the app; `schemas/` holds the definitions.**
@@ -114,8 +114,12 @@ extending:
   multiple parents.
 - **`/bootstrapp-cloud:new-app` creates the app folder.** The orchestrator
   runs intake (name, platform, description) from a parent directory, then
-  `mkdir <app-name> && cd <app-name>` before invoking any agent. Existing
-  apps are detected by the presence of `BOOTSTRAPP.md`; running new-app
+  `mkdir bootstrapp && cd bootstrapp` before invoking any agent. The
+  folder is **always** named `bootstrapp` — it is decoupled from the
+  app name (the app name is the namespace suffix `app.<app_name>`, not
+  the folder). If a `bootstrapp` folder already exists in the cwd, the
+  orchestrator stops and asks the user how to proceed. Existing apps
+  are detected by the presence of `BOOTSTRAPP.md`; running new-app
   inside an existing app stops and redirects the user to `design-model`
   or direct architect invocation. The empty-folder guard now applies only
   to `/bootstrapp-cloud:design-model` and to direct invocation of either

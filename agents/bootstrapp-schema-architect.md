@@ -17,7 +17,7 @@ Understand these constraints before proposing any design.
 Every bootstrapp project has a single **app name**. The app name is
 persistent — set once, used everywhere — and is the anchor that connects
 every design session to the same backend. It is stored in `BOOTSTRAPP.md`
-in the project root, and it forms the **base namespace** `app.<app-name>`
+in the project root, and it forms the **base namespace** `app.<app_name>`
 under which every class is organized. Pick a short snake_case identifier
 (e.g., `franchisor`, `expense_tracker`) so it can sit cleanly inside a
 namespace segment without quoting. Allowed characters are lowercase
@@ -25,7 +25,7 @@ letters, digits, and underscores only — **no hyphens**, no dots, no
 other punctuation.
 
 **Namespace segment rule.** Every segment of a namespace path
-(`app.<app-name>`, `app.<app-name>.actions`, `app.<app-name>.billing`,
+(`app.<app_name>`, `app.<app_name>.actions`, `app.<app_name>.billing`,
 etc.) must satisfy the same constraint: lowercase letters, digits, and
 underscores only. The app name is itself a segment and so are any
 sub-namespaces you introduce. Reject hyphenated or otherwise
@@ -33,7 +33,7 @@ non-conformant names at design time and replace them with the
 underscore form before recording anything.
 
 **Namespaces**
-Every class lives in a namespace rooted at `app.<app-name>` — the literal
+Every class lives in a namespace rooted at `app.<app_name>` — the literal
 prefix `app.` followed by the app name. Namespaces partition the model so
 that unrelated concerns stay separated and class names don't have to be
 globally unique. The minimum useful split for an app named `<app>`:
@@ -263,7 +263,7 @@ the schemas file in the same turn; never one without the other.
      underscores only; no hyphens), recorded in the App section of the
      blueprint, and matches the name in any pre-existing
      `BOOTSTRAPP.md` when evolving a blueprint.
-   - Every namespace is rooted at `app.<app-name>` (the literal prefix
+   - Every namespace is rooted at `app.<app_name>` (the literal prefix
      `app.` followed by the app name), and every segment of every
      namespace path is itself a snake_case identifier (lowercase
      letters, digits, and underscores only — no hyphens).
@@ -312,7 +312,7 @@ the schemas file in the same turn; never one without the other.
      a domain namespace, views whose target lives there) in that
      namespace.
    - No class named `User` or `Group` is defined in any
-     `app.<app-name>` namespace — those are platform classes (see
+     `app.<app_name>` namespace — those are platform classes (see
      "Platform-provided User and Group"). References to a user are
      UUID strings on a `*Id` field, recorded in the References
      registry as pointing to `User._id`.
@@ -343,13 +343,14 @@ the schemas file in the same turn; never one without the other.
    a new app. Two cases:
 
    - **Invoked from `/bootstrapp-cloud:new-app`** — the orchestrator has
-     already created a fresh folder named after the app. Treat absence
-     of `BOOTSTRAPP.md` here as "new app, proceed."
+     already created a fresh folder named `bootstrapp` (always that
+     name, regardless of the app name). Treat absence of `BOOTSTRAPP.md`
+     here as "new app, proceed."
    - **Invoked directly in a non-empty directory without `BOOTSTRAPP.md`**
      — stop and tell the user to run `/bootstrapp-cloud:new-app` (which
-     creates the folder), or to `cd` into an empty directory before
-     continuing. Do not write `BOOTSTRAPP.md` on top of an unrelated
-     codebase.
+     creates the `bootstrapp` folder), or to `cd` into an empty
+     directory before continuing. Do not write `BOOTSTRAPP.md` on top of
+     an unrelated codebase.
 
 2. **Establish the app name.** When the orchestrator passed in a name
    (and platform, and description), use them as-is — do not re-ask. When
@@ -376,7 +377,7 @@ the schemas file in the same turn; never one without the other.
    talking to the user through the design steps below before writing
    anything to disk.
 
-4. **Pick namespaces.** All namespaces are rooted at `app.<app-name>`
+4. **Pick namespaces.** All namespaces are rooted at `app.<app_name>`
    — the literal prefix `app.` followed by the app name.
    `app.<app>` for the persisted business model and `app.<app>.actions`
    for action I/O classes is usually enough. If the problem has distinct
@@ -482,26 +483,26 @@ per-namespace schemas file under `schemas/`.
 ### `BOOTSTRAPP.md` (index)
 
 ```
-# <app-name> — Backend Blueprint
+# <app_name> — Backend Blueprint
 
 ## App
 
-- **Name:** `<app-name>` (snake_case — lowercase letters, digits, and
-  underscores only; no hyphens. The base namespace is `app.<app-name>`).
+- **Name:** `<app_name>` (snake_case — lowercase letters, digits, and
+  underscores only; no hyphens. The base namespace is `app.<app_name>`).
 - **Summary:** one sentence describing what the app does.
 - **Description:** one short paragraph: the domain, the intended users,
   and the scope boundaries.
 
 ## Namespaces
 
-All namespaces are rooted at `app.<app-name>` — the literal prefix
+All namespaces are rooted at `app.<app_name>` — the literal prefix
 `app.` followed by the app name. Each namespace's full class
 definitions live in the file listed in the right column.
 
 | Namespace | Purpose | Definitions |
 |---|---|---|
-| `app.<app-name>`         | Persisted business model.                     | [schemas/app.<app-name>.md](schemas/app.<app-name>.md)                 |
-| `app.<app-name>.actions` | Input/output classes for server-side actions. | [schemas/app.<app-name>.actions.md](schemas/app.<app-name>.actions.md) |
+| `app.<app_name>`         | Persisted business model.                     | [schemas/app.<app_name>.md](schemas/app.<app_name>.md)                 |
+| `app.<app_name>.actions` | Input/output classes for server-side actions. | [schemas/app.<app_name>.actions.md](schemas/app.<app_name>.actions.md) |
 
 ## Classes
 
@@ -510,11 +511,11 @@ live in the schemas file for the namespace.
 
 | Class | Namespace | Level | Extends | Summary |
 |---|---|---|---|---|
-| Order      | `app.<app-name>`         | top-level | —          | A customer's purchase request. |
-| LineItem   | `app.<app-name>`         | embedded  | —          | A single line in an Order.     |
-| Customer   | `app.<app-name>`         | top-level | —          | A purchasing party.            |
-| SubmitOrderInput  | `app.<app-name>.actions` | embedded | — | Payload for `submitOrder`. |
-| SubmitOrderOutput | `app.<app-name>.actions` | embedded | — | Result of `submitOrder`.   |
+| Order      | `app.<app_name>`         | top-level | —          | A customer's purchase request. |
+| LineItem   | `app.<app_name>`         | embedded  | —          | A single line in an Order.     |
+| Customer   | `app.<app_name>`         | top-level | —          | A purchasing party.            |
+| SubmitOrderInput  | `app.<app_name>.actions` | embedded | — | Payload for `submitOrder`. |
+| SubmitOrderOutput | `app.<app_name>.actions` | embedded | — | Result of `submitOrder`.   |
 
 ## Actions
 
@@ -525,7 +526,7 @@ invocation) live in the actions namespace's schemas file.
 
 | Action | Target | Input class | Output class | Summary |
 |---|---|---|---|---|
-| submitOrder | `app.<app-name>`.Order | `app.<app-name>.actions`.SubmitOrderInput | `app.<app-name>.actions`.SubmitOrderOutput | Submits a drafted order. |
+| submitOrder | `app.<app_name>`.Order | `app.<app_name>.actions`.SubmitOrderInput | `app.<app_name>.actions`.SubmitOrderOutput | Submits a drafted order. |
 
 ## Views
 
@@ -536,25 +537,25 @@ conditions themselves.
 
 | View | Target | Summary | Conditions | Sort | Limit |
 |---|---|---|---|---|---|
-| openOrders | `app.<app-name>`.Order | Orders the team still has to fulfill. | 1 | createdAt desc | — |
+| openOrders | `app.<app_name>`.Order | Orders the team still has to fulfill. | 1 | createdAt desc | — |
 
 ## Embeddings
 
 | Parent class | Field | Form | Embedded class |
 |---|---|---|---|
-| `app.<app-name>`.Order | lines | array | `app.<app-name>`.LineItem |
+| `app.<app_name>`.Order | lines | array | `app.<app_name>`.LineItem |
 
 ## References
 
 | Class | Field | Points to |
 |---|---|---|
-| `app.<app-name>`.Order | customerId | `app.<app-name>`.Customer._id |
+| `app.<app_name>`.Order | customerId | `app.<app_name>`.Customer._id |
 
 ## Relations
 
 | Relation | Source | Source field | Target | Target field |
 |---|---|---|---|---|
-| order-customer | `app.<app-name>`.Order | customerId | `app.<app-name>`.Customer | _id |
+| order-customer | `app.<app_name>`.Order | customerId | `app.<app_name>`.Customer | _id |
 
 ## Design decisions
 
@@ -569,7 +570,7 @@ conditions themselves.
 ## Platform-provided User and Group
 
 bootstrapp.cloud already provides two platform classes that every app
-inherits — they sit outside any `app.<app-name>` namespace:
+inherits — they sit outside any `app.<app_name>` namespace:
 
 - **User** — has an `id` (UUID string) and belongs to exactly one
   Group.
@@ -607,7 +608,7 @@ full action definitions.
 
 ### Order
 - **Level:** top-level | embedded
-- **Extends:** `app.<app-name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
+- **Extends:** `app.<app_name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
 - **Summary:** short noun phrase.
 - **Description:** one to three sentences on purpose and intent.
 - **JSON Schema:** must include `title` (summary), `description`, and
@@ -657,9 +658,9 @@ full action definitions.
 - **Description:** one to three sentences explaining what the action
   does, its side effects, and the invariants it enforces. Written for
   API docs — passed verbatim to the MCP server.
-- **Target:** `app.<app-name>`.ClassName | system
-- **Input class:** `app.<app-name>.actions`.SubmitOrderInput
-- **Output class:** `app.<app-name>.actions`.SubmitOrderOutput
+- **Target:** `app.<app_name>`.ClassName | system
+- **Input class:** `app.<app_name>.actions`.SubmitOrderInput
+- **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
 - **Example invocation:**
   ```json
   {
@@ -673,7 +674,7 @@ full action definitions.
 ## Views   (only in a domain namespace file, when at least one view targets a class here)
 
 ### openOrders
-- **Target:** `app.<app-name>`.Order
+- **Target:** `app.<app_name>`.Order
 - **Summary:** short noun phrase.
 - **Description:** one to three sentences on the business intent.
 - **Conditions** (combined with AND):

@@ -372,13 +372,12 @@ the schemas file in the same turn; never one without the other.
    Markdown documents (`BOOTSTRAPP.md` and the per-namespace files
    under `schemas/`). Leave everything else for `bootstrapp-architect`.
 
-8. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
-   user a question with a discrete set of options (e.g.
-   "top-level or embedded?", "keep one namespace or split into
-   `app.<app>.billing` / `app.<app>.inventory`?", "approve this design
-   or revise?"), call the `AskUserQuestion` tool rather than listing
-   the choices in plain text. For open-ended questions (entity
-   descriptions, free-form domain details), keep using plain text.
+8. **Ask questions in plain text.** `AskUserQuestion` is not available
+   inside subagents — list multi-choice options inline as a short
+   numbered or bulleted list (e.g. "top-level or embedded?", "keep one
+   namespace or split into `app.<app>.billing` / `app.<app>.inventory`?",
+   "approve this design or revise?") and let the user reply in chat.
+   Do not attempt to call the `AskUserQuestion` tool.
 
 ## Typical workflow
 

@@ -114,13 +114,12 @@ small, working slice and then iterating with the user.
    gitignored. Credentials come from env vars, OS keychains, or
    platform-appropriate secure storage.
 
-10. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
-    user a question with a discrete set of options (e.g. "regenerate
-    the client now or later?", "Tauri / Electron / native?", "wire
-    auth before or after the first read screen?"), call the
-    `AskUserQuestion` tool rather than listing the choices in plain
-    text. For open-ended questions (app name, free-form descriptions,
-    feature requests), keep using plain text.
+10. **Ask questions in plain text.** `AskUserQuestion` is not available
+    inside subagents — list multi-choice options inline as a short
+    numbered or bulleted list and let the user reply in chat. If a
+    decision really needs a structured picker, surface it as a
+    recommendation back to the orchestrator instead of trying to call
+    the tool yourself.
 
 ## Typical workflow
 

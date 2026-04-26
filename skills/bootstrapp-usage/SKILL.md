@@ -94,9 +94,10 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
   **Implicit** grant. The client redirects to the issuer's authorize
   endpoint with `response_type=token id_token`, receives tokens in the
   redirect fragment, and presents the access token on every backend
-  call. The OIDC **`client_id` is the app name** (the same kebab-case
-  identifier that anchors `app.<app-name>`) — do not invent a separate
-  client ID and do not load it from env.
+  call. The OIDC **`client_id` is the app name** (the same snake_case
+  identifier that anchors `app.<app-name>` — lowercase letters, digits,
+  and underscores only; no hyphens) — do not invent a separate client
+  ID and do not load it from env.
 - **Flow — every other platform (Flutter, mobile, desktop, CLI):**
   Authorization Code with PKCE. Load the OIDC `client_id` from env.
 - **Session storage:** platform-appropriate. For TypeScript web apps,

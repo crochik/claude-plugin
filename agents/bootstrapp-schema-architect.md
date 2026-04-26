@@ -18,9 +18,19 @@ Every bootstrapp project has a single **app name**. The app name is
 persistent — set once, used everywhere — and is the anchor that connects
 every design session to the same backend. It is stored in `BOOTSTRAPP.md`
 in the project root, and it forms the **base namespace** `app.<app-name>`
-under which every class is organized. Pick a short kebab-case identifier
-(e.g., `franchisor`, `expense-tracker`) so it can sit cleanly inside a
-namespace segment without quoting.
+under which every class is organized. Pick a short snake_case identifier
+(e.g., `franchisor`, `expense_tracker`) so it can sit cleanly inside a
+namespace segment without quoting. Allowed characters are lowercase
+letters, digits, and underscores only — **no hyphens**, no dots, no
+other punctuation.
+
+**Namespace segment rule.** Every segment of a namespace path
+(`app.<app-name>`, `app.<app-name>.actions`, `app.<app-name>.billing`,
+etc.) must satisfy the same constraint: lowercase letters, digits, and
+underscores only. The app name is itself a segment and so are any
+sub-namespaces you introduce. Reject hyphenated or otherwise
+non-conformant names at design time and replace them with the
+underscore form before recording anything.
 
 **Namespaces**
 Every class lives in a namespace rooted at `app.<app-name>` — the literal
@@ -194,9 +204,9 @@ The blueprint is split across multiple files so that downstream consumers
   It is the file that is always read first, every turn.
 - **`schemas/<Namespace>.md`** — one file per namespace, named after the
   namespace itself, including the `app.` prefix (e.g.
-  `schemas/app.expense-tracker.md`,
-  `schemas/app.expense-tracker.actions.md`,
-  `schemas/app.expense-tracker.billing.md`). Holds the **full definitions**
+  `schemas/app.expense_tracker.md`,
+  `schemas/app.expense_tracker.actions.md`,
+  `schemas/app.expense_tracker.billing.md`). Holds the **full definitions**
   for every class in that namespace: JSON Schema, summary, description,
   level, extends, notes. The actions namespace file *also* holds the
   full action definitions (target, input/output references, paragraph
@@ -249,11 +259,14 @@ the schemas file in the same turn; never one without the other.
    should carry only the inputs that event genuinely needs.
 
 6. **Validate your own output.** Before delivering the blueprint, verify:
-   - The app name is set (kebab-case), recorded in the App section of
-     the blueprint, and matches the name in any pre-existing
+   - The app name is set (snake_case — lowercase letters, digits, and
+     underscores only; no hyphens), recorded in the App section of the
+     blueprint, and matches the name in any pre-existing
      `BOOTSTRAPP.md` when evolving a blueprint.
    - Every namespace is rooted at `app.<app-name>` (the literal prefix
-     `app.` followed by the app name).
+     `app.` followed by the app name), and every segment of every
+     namespace path is itself a snake_case identifier (lowercase
+     letters, digits, and underscores only — no hyphens).
    - Every class is assigned to a namespace.
    - Every embedded class is marked embedded (not top-level).
    - Every referenced class is top-level.
@@ -340,11 +353,15 @@ the schemas file in the same turn; never one without the other.
 
 2. **Establish the app name.** When the orchestrator passed in a name
    (and platform, and description), use them as-is — do not re-ask. When
-   invoked directly for a new app, ask for a short kebab-case name
-   (e.g., `franchisor`, `expense-tracker`) if not already provided. For
-   an existing app, use the name already recorded in `BOOTSTRAPP.md` —
-   never rename it silently; if a rename is genuinely needed, flag it as
-   an open question.
+   invoked directly for a new app, ask for a short snake_case name
+   (e.g., `franchisor`, `expense_tracker`) if not already provided —
+   lowercase letters, digits, and underscores only; no hyphens. If the
+   user supplies a name with disallowed characters, normalize it
+   (replace hyphens with underscores, drop other punctuation) and
+   confirm the corrected name before recording it. For an existing
+   app, use the name already recorded in `BOOTSTRAPP.md` — never
+   rename it silently; if a rename is genuinely needed, flag it as an
+   open question.
 
 3. **Gather requirements.** When the orchestrator handed you a
    clarified description, skip the app-concept interview and jump
@@ -469,8 +486,8 @@ per-namespace schemas file under `schemas/`.
 
 ## App
 
-- **Name:** `<app-name>` (kebab-case; the base namespace is
-  `app.<app-name>`).
+- **Name:** `<app-name>` (snake_case — lowercase letters, digits, and
+  underscores only; no hyphens. The base namespace is `app.<app-name>`).
 - **Summary:** one sentence describing what the app does.
 - **Description:** one short paragraph: the domain, the intended users,
   and the scope boundaries.
@@ -576,8 +593,8 @@ rule inside the action that needs it; do not surface it as schema.
 ### `schemas/<Namespace>.md` (per-namespace definitions)
 
 One file per namespace, named after the namespace itself — including
-the `app.` prefix (`schemas/app.expense-tracker.md`,
-`schemas/app.expense-tracker.actions.md`, etc.). Holds the full class
+the `app.` prefix (`schemas/app.expense_tracker.md`,
+`schemas/app.expense_tracker.actions.md`, etc.). Holds the full class
 definitions for that namespace, and — for an actions namespace — the
 full action definitions.
 

@@ -37,9 +37,14 @@ has a discrete set of options** (platform, mobile/desktop/CLI choice,
 desktop framework). Use plain text for open-ended questions (app name,
 detailed description).
 
-1. **App name** — short kebab-case identifier (e.g. `expense-tracker`,
-   `franchisor`). This becomes the folder name and the suffix of the
-   base namespace `app.<app-name>`. Open-ended; ask in plain text.
+1. **App name** — short snake_case identifier (e.g. `expense_tracker`,
+   `franchisor`). Allowed characters are lowercase letters, digits, and
+   underscores only — **no hyphens** (the app name is reused as a
+   namespace segment, and namespace segments must be plain identifiers).
+   This becomes the folder name and the suffix of the base namespace
+   `app.<app-name>`. Open-ended; ask in plain text — if the user
+   suggests a name with hyphens or other disallowed characters,
+   replace them with underscores and confirm the corrected name.
 2. **Platform** — `web` or `other`. Use `AskUserQuestion`.
    - If `web`: default to React + Vite (TypeScript). Ask only if the user
      signals a preference for something else (Next.js, SvelteKit, etc.).

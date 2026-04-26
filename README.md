@@ -48,7 +48,7 @@ session is cached and subsequent calls are silent.
 Kick off a new app:
 
 ```
-/bootstrapp-cloud:new-app flutter expense-tracker
+/bootstrapp-cloud:new-app flutter expense_tracker
 ```
 
 Or just describe what you want and let the architect agent handle it:

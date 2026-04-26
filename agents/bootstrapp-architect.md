@@ -69,8 +69,9 @@ small, working slice and then iterating with the user.
    (`/.well-known/openid-configuration`). For **TypeScript clients**
    (web/Vite/React/Next/etc.), use the OAuth 2.0 **Implicit** grant
    (`response_type=token id_token`) and set the `client_id` to the app
-   name itself (the same kebab-case identifier that anchors
-   `app.<app-name>`); do not load the client ID from env. For every
+   name itself (the same snake_case identifier that anchors
+   `app.<app-name>` — lowercase letters, digits, and underscores only,
+   no hyphens); do not load the client ID from env. For every
    other platform (Flutter, mobile, desktop, CLI), use Authorization
    Code with PKCE and load the `client_id` from env. Store tokens in
    platform-appropriate storage. bootstrapp.cloud already provides
@@ -160,8 +161,9 @@ small, working slice and then iterating with the user.
    login, logout, and authenticated requests end-to-end. **For
    TypeScript clients**, use the Implicit grant
    (`response_type=token id_token`) with `client_id` set to the app
-   name (the same kebab-case identifier that anchors
-   `app.<app-name>`) — do not load the client ID from env. **For
+   name (the same snake_case identifier that anchors
+   `app.<app-name>` — lowercase letters, digits, and underscores only,
+   no hyphens) — do not load the client ID from env. **For
    every other platform**, use Authorization Code with PKCE and load
    the `client_id` from env. Read the current user (UUID `id` and
    group membership) from the access-token claims — never redefine a

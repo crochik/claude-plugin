@@ -14,8 +14,8 @@ Before doing any bootstrapp work, check the project root for a file named
 `BOOTSTRAPP.md`. If it exists:
 
 - Read it in full. It records the app's name, namespaces, classes, and
-  actions. Treat it as the authoritative design for the current app — the
-  project is an ongoing one, not a fresh start.
+  actions. Treat it as the authoritative design for the current app —
+  this is an ongoing app, not a fresh start.
 - The **app name** at the top of the file anchors the base namespace
   `app.<app_name>` under which every class lives (`app.<app_name>.Order`,
   `app.<app_name>.actions.SubmitOrderInput`, etc.). Do not rename it. Keep
@@ -34,8 +34,8 @@ UI scaffold, and starting the dev server.
 
 - **bootstrapp.cloud is the backend.** Data model, auth, storage, and business
   logic live there. You never reimplement those on the client.
-- **The MCP server is the control plane.** It lets you inspect a user's
-  bootstrapp projects, create resources, and read the concrete API surface the
+- **The MCP server is the control plane.** It lets you inspect the
+  user's app, create resources, and read the concrete API surface the
   client will call.
 - **Your code lives on the client.** Claude's job is to generate a thin,
   idiomatic client that talks to the bootstrapp backend — nothing more.
@@ -43,7 +43,11 @@ UI scaffold, and starting the dev server.
   a **filter** endpoint for every top-level class, plus named *actions*
   for anything else. The filter endpoint takes an AND-array of conditions
   (`{field, operator, value?}`) over the operator set
-  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`. See the
+  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`. **Conditions are only valid
+  on a class's indexed fields** (declared at registration time via
+  `add_object_class`'s `indexedFields` argument and recorded in the
+  schemas file); the backend rejects conditions on non-indexed
+  properties. See the
   [`bootstrapp-schema-architect`](../../agents/bootstrapp-schema-architect.md)
   agent for the full contract — value rules per operator, type-matching
   against the field's JSON Schema, and `Exists`/`In` specifics. Actions
@@ -75,9 +79,12 @@ For **on-demand filter calls** (queries that aren't registered as a view),
 build the request body as `{ conditions: [...] }`. Each condition's
 `value` must match the target class's property type: omit it for
 `Exists`, pass an array for `In`, pass a scalar otherwise. Reject any
-condition whose `field` is not on the target class — the filter will
-reject it server-side too. If a query keeps reappearing, route through
-`/bootstrapp-cloud:design-model` to register it as a view.
+condition whose `field` is not on the target class **or is not in the
+class's `indexedFields` list** — the filter will reject it
+server-side too. If a query needs a non-indexed field, route through
+`/bootstrapp-cloud:design-model` to add the field to `indexedFields`
+and re-run class creation; if the same query keeps reappearing,
+register it as a named view at the same time.
 
 **Sort and limit:** if the OpenAPI spec exposes sort/limit params on the
 filter endpoint, pass them. Otherwise sort and slice client-side after
@@ -145,31 +152,31 @@ own:
 
 1. **Confirm the MCP server is connected.** If tool calls fail with an auth
    error, tell the user to complete the OAuth browser flow.
-2. **Discover before coding.** Call the MCP tools to enumerate projects,
-   resources, endpoints, and schemas. Never guess API shapes.
-3. **Pick or create a backend project.** Ask the user if it isn't clear.
-4. **Sync the backend with `BOOTSTRAPP.md`.** When the blueprint changes,
+2. **Discover before coding.** Call the MCP tools to enumerate the
+   app's classes, actions, endpoints, and schemas. Never guess API
+   shapes.
+3. **Sync the backend with `BOOTSTRAPP.md`.** When the blueprint changes,
    re-run class creation via `mcp__bootstrapp__add_object_class` and
    regenerate the API client via the
    [openapi-client-generator skill](../openapi-client-generator/SKILL.md)
    before touching client code that depends on the new shape.
-5. **Generate the client.**
+4. **Generate the client.**
    - Use the openapi-client-generator skill — never hand-edit generated
      files.
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
-6. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
+5. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
    (Implicit flow with `client_id = <app_name>` for TypeScript
    clients; Authorization Code with PKCE for everything else),
    logout, and authenticated requests must work end-to-end before you
    build feature screens. See "Authentication and authorization"
    above for the per-platform flow, the `client_id` rule, the
    User/Group model, and storage rules.
-7. **Ship a vertical slice, then iterate.** One real read + one real write
+6. **Ship a vertical slice, then iterate.** One real read + one real write
    against the backend, not stubs. Then start the dev server and stay in
    chat to extend the app.
-8. **Document.** Update the project README with: how to run, which
-   bootstrapp project it points at, and the env vars required.
+7. **Document.** Update the README with how to run the app and the env
+   vars required.
 
 ## Client patterns by platform
 
@@ -199,14 +206,15 @@ own:
   decision depends on data the client shouldn't be trusted with, it's an
   action on the backend.
 - Don't fabricate filter conditions on fields that aren't in the target
-  class's JSON Schema. Don't invent sort/limit params on the filter
-  endpoint — discover from the OpenAPI spec or apply client-side.
+  class's JSON Schema, and don't filter on a property that isn't in the
+  class's `indexedFields` list — both are server-side rejections.
+  Don't invent sort/limit params on the filter endpoint — discover
+  from the OpenAPI spec or apply client-side.
 - Don't skip the OAuth flow message the first time a user runs an MCP tool —
   they need to know a browser window is coming.
 
 ## When to escalate to the user
 
-- Multiple bootstrapp projects exist and it isn't clear which one to target.
 - The backend is missing a resource or field the requested feature needs
   (ask whether to add it on bootstrapp.cloud or adapt the client).
 - Auth configuration is ambiguous (which providers, redirect URIs, etc.).

@@ -110,15 +110,20 @@ It will:
 
 Hand back to the **`bootstrapp-architect`**. It will:
 
-- Pick or create the bootstrapp.cloud project (using the app name).
 - Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
   walk the class registry and call
-  `mcp__bootstrapp__add_object_class` once per class, pulling each
-  JSON Schema from its namespace's schemas file.
-- Verify with `mcp__bootstrapp__get_object_classes`.
-- Use `mcp__bootstrapp__tool_search` to discover the action-creation tool
-  (its name is not assumed) and walk the action registry to register
-  each action.
+  `mcp__bootstrapp__add_object_class` once per class — passing
+  `appName` (from `BOOTSTRAPP.md`), `fullObjectType`, `type`
+  (`TopLevel` / `Embedded`), `schema`, `indexedFields` (verbatim
+  from the schemas file — `[]` for embedded classes), and
+  `baseObjectType` for classes that extend another.
+- Verify with `mcp__bootstrapp__get_object_classes` (and
+  `mcp__bootstrapp__get_class_schema` /
+  `mcp__bootstrapp__get_namespaces` when finer-grained checks help).
+- Walk the action registry and call
+  `mcp__bootstrapp__register_action` once per action — passing
+  `fullObjectType`, `actionSummary`, `actionInputObjectType`, and
+  `actionOutputObjectType`.
 
 ## Phase 6 — Generate the API client
 
@@ -127,7 +132,8 @@ The architect invokes the
 skill. Phase 6 strictly depends on Phase 5: the OpenAPI spec is
 generated from current backend state, so every class and action must
 already be registered before calling
-`mcp__bootstrapp__generate_openapi_spec`. The skill then downloads and
+`mcp__bootstrapp__generate_openapi_spec` (with `applicationName` set
+to the app name in `BOOTSTRAPP.md`). The skill then downloads and
 saves the spec locally, and **only after the spec file is on disk**
 runs `generate_api.sh` against it to emit the typed client. Do not
 collapse these into one step or run the generator against a stale

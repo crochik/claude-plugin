@@ -14,7 +14,7 @@ implement anything — you design, then hand off.
 Understand these constraints before proposing any design.
 
 **App identity**
-Every bootstrapp project has a single **app name**. The app name is
+Every bootstrapp app has a single **app name**. The app name is
 persistent — set once, used everywhere — and is the anchor that connects
 every design session to the same backend. It is stored in `BOOTSTRAPP.md`
 in the project root, and it forms the **base namespace** `app.<app_name>`
@@ -123,7 +123,9 @@ and the response is an array of matching objects. Conditions combine with
 
 A `Condition` is `{ field, operator, value? }` where:
 - `field` is the name of a property on the target class (recursing through
-  `extends`).
+  `extends`) **and is in the class's `indexedFields` list** — see
+  "Indexed fields" below. The backend rejects conditions on
+  non-indexed fields.
 - `operator` is one of: `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`,
   `Exists`.
 - `value` rules:
@@ -135,15 +137,43 @@ A `Condition` is `{ field, operator, value? }` where:
 The filter endpoint is available **only** on top-level classes — embedded
 classes are not independently queryable.
 
+**Indexed fields**
+Every top-level class declares an explicit list of **indexed fields**.
+This list is passed verbatim to `mcp__bootstrapp__add_object_class` as
+the `indexedFields` argument. The contract is blunt: **only indexed
+fields can be used to filter results.** Any field expected to appear
+in a `Condition` — directly via the filter endpoint or indirectly via
+a named view — must be on this list. Fields not on the list are
+storable and readable, just not queryable.
+
+Design rules:
+- For each top-level class, walk the user's stated read patterns and
+  the conditions of every named view that targets the class; the
+  union of those `field` names is the minimum indexed set.
+- Always include `_id` (every reference lookup needs it).
+- Always include any `*Id` reference field that joins this class to
+  another (so cross-class queries work).
+- Keep the list tight — don't index a field "just in case." Add later
+  when a real query appears.
+
+Embedded classes have no filter endpoint, so their `indexedFields`
+list is empty (the registration call still requires the parameter;
+pass `[]`).
+
 **Actions**
 Anything the backend must do beyond plain CRUD is modeled as a named
 *action*. An action has:
 - A name (verb-phrased, e.g. `submitOrder`, `cancelReservation`).
-- A **summary** (5–10 words) and a **description** (1–3 sentences
-  covering purpose, side effects, and the invariants the action enforces)
-  — same documentation rules as classes. Both are passed verbatim to the
-  MCP server when the action is created downstream, so write them as if
-  they will appear in API docs without further editing.
+- A **summary** (5–10 words) — passed verbatim to the MCP server as
+  `actionSummary` when the action is registered. The summary is the
+  only free-text the registration call accepts, so it is the action's
+  public handle in API docs.
+- A **description** (1–3 sentences covering purpose, side effects, and
+  the invariants the action enforces) — written into the **input
+  class's** JSON Schema `description`, since `register_action` has no
+  separate description slot. The input class is what surfaces in the
+  generated OpenAPI as the action's request body, so its description
+  is the natural carrier for the longer prose.
 - A target — either a specific top-level class (the action operates on an
   instance) or the system at large (no specific target).
 - An **input class** — a class in an actions namespace whose JSON Schema
@@ -281,6 +311,10 @@ the schemas file in the same turn; never one without the other.
      `{ "type": "string", "format": "uuid" }`, listed in `required`,
      with full `title`/`description`/`examples` documentation. No
      embedded class declares `_id`.
+   - Every top-level class declares an explicit `indexedFields` list,
+     including `_id` and every `*Id` reference field, plus every
+     property used in any view condition or expected filter call on
+     that class. Embedded classes declare `indexedFields: []`.
    - Every referenced class is top-level.
    - Every inheritance chain has exactly one discriminator field on the
      parent.
@@ -294,12 +328,16 @@ the schemas file in the same turn; never one without the other.
    - Every class has a summary, description, and a complete example
      object. Every property has a summary, description, and an example
      value. No placeholders, no "TODO", no lorem ipsum.
-   - Every action has a summary, a description, and an example
-     invocation (input + expected output). Same no-placeholder rule.
+   - Every action has a summary (the value passed to
+     `register_action` as `actionSummary`), a description (recorded on
+     the input class's JSON Schema, since the registration call has no
+     separate description slot), and an example invocation (input +
+     expected output). Same no-placeholder rule.
    - Every view targets a class in the registry that is marked
      top-level (embedded classes have no filter endpoint).
    - Every condition's `field` is a property declared on the target
-     class's JSON Schema (recurse through `extends`).
+     class's JSON Schema (recurse through `extends`) **and is on the
+     target's `indexedFields` list**.
    - Every condition's `operator` is in the closed set
      `{Eq, Ne, Gt, Gte, Lt, Lte, In, Exists}`.
    - For `Exists`, `value` is absent. For `In`, `value` is an array
@@ -521,13 +559,13 @@ definitions live in the file listed in the right column.
 Every class in any namespace has exactly one row here. Full JSON Schemas
 live in the schemas file for the namespace.
 
-| Class | Namespace | Level | Extends | Summary |
-|---|---|---|---|---|
-| Order      | `app.<app_name>`         | top-level | —          | A customer's purchase request. |
-| LineItem   | `app.<app_name>`         | embedded  | —          | A single line in an Order.     |
-| Customer   | `app.<app_name>`         | top-level | —          | A purchasing party.            |
-| SubmitOrderInput  | `app.<app_name>.actions` | embedded | — | Payload for `submitOrder`. |
-| SubmitOrderOutput | `app.<app_name>.actions` | embedded | — | Result of `submitOrder`.   |
+| Class | Namespace | Level | Extends | Indexed fields | Summary |
+|---|---|---|---|---|---|
+| Order      | `app.<app_name>`         | top-level | —          | `_id`, `customerId`, `status`, `createdAt` | A customer's purchase request. |
+| LineItem   | `app.<app_name>`         | embedded  | —          | —                                          | A single line in an Order.     |
+| Customer   | `app.<app_name>`         | top-level | —          | `_id`, `email`                             | A purchasing party.            |
+| SubmitOrderInput  | `app.<app_name>.actions` | embedded | — | — | Payload for `submitOrder`. |
+| SubmitOrderOutput | `app.<app_name>.actions` | embedded | — | — | Result of `submitOrder`.   |
 
 ## Actions
 
@@ -621,6 +659,11 @@ full action definitions.
 ### Order
 - **Level:** top-level | embedded
 - **Extends:** `app.<app_name>`.ParentClassName (discriminator: `fieldName` = `"literal"`) | none
+- **Indexed fields:** `["_id", "customerId", "status", "createdAt"]`
+  *(top-level only; passed verbatim to `add_object_class` as
+  `indexedFields`. Embedded classes use `[]`. Must be a superset of
+  every field that appears in any view condition or expected filter
+  call on this class.)*
 - **Summary:** short noun phrase.
 - **Description:** one to three sentences on purpose and intent.
 - **JSON Schema:** must include `title` (summary), `description`, and
@@ -674,11 +717,12 @@ full action definitions.
 ## Actions   (only in an actions namespace file)
 
 ### submitOrder
-- **Summary:** short verb phrase, passed to the MCP server as the
-  action's title.
+- **Summary:** short verb phrase, passed to the MCP server as
+  `actionSummary` — the action's only free-text registration field.
 - **Description:** one to three sentences explaining what the action
-  does, its side effects, and the invariants it enforces. Written for
-  API docs — passed verbatim to the MCP server.
+  does, its side effects, and the invariants it enforces. The
+  registration call has no description slot, so this prose lives on
+  the **input class's** JSON Schema `description`.
 - **Target:** `app.<app_name>`.ClassName | system
 - **Input class:** `app.<app_name>.actions`.SubmitOrderInput
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput

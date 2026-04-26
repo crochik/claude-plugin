@@ -1,7 +1,7 @@
 ---
 name: bootstrapp-architect
 description: Use PROACTIVELY for any end-to-end work on an app whose backend is bootstrapp.cloud — interviewing the user about scope, handing off to the schema architect, creating classes on the backend via the `bootstrapp` MCP server, generating the typed API client, scaffolding the client (web/Flutter/CLI/desktop/mobile), wiring auth, and iterating on the running UI. Drives the `bootstrapp` MCP server to inspect and modify the backend before touching client code.
-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_class_schema, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__tool_search
 mcpServers:
   - bootstrapp
 ---
@@ -30,7 +30,7 @@ small, working slice and then iterating with the user.
 
 2. **Backend-first.** Before generating any client code, use the
    `bootstrapp` MCP server to:
-   - Identify or create the target bootstrapp project.
+   - Confirm the server is connected and pointed at the user's app.
    - Inspect the existing data model, auth config, and endpoints.
    - Make backend changes through the MCP server — never hand-edit client
      code to paper over a missing backend capability.
@@ -46,11 +46,31 @@ small, working slice and then iterating with the user.
    exists, then load each `schemas/*.md` referenced in the namespace
    map. Walk the class registry and call
    `mcp__bootstrapp__add_object_class` once per class (top-level and
-   embedded alike), pulling each class's JSON Schema from its
-   namespace's schemas file. Verify with
-   `mcp__bootstrapp__get_object_classes`. Use
-   `mcp__bootstrapp__tool_search` to discover the action-creation tool
-   (its name is not assumed) before registering actions. The views
+   embedded alike). For each call, pass:
+   - `appName` — the snake_case app name from the App section of
+     `BOOTSTRAPP.md`.
+   - `fullObjectType` — the namespace-qualified class name.
+   - `type` — `TopLevel` or `Embedded`, mirroring the registry's
+     Level column.
+   - `schema` — the class's JSON Schema, pulled from its namespace's
+     schemas file.
+   - `indexedFields` — the list recorded under "Indexed fields" in
+     the schemas file. Top-level classes carry the actual list;
+     embedded classes pass `[]`. **Only indexed fields can be
+     filtered**, so missing entries here will silently break filter
+     calls and named views downstream — copy the list verbatim.
+   - `baseObjectType` — only when the class extends another (single
+     inheritance with a discriminator).
+
+   Verify with `mcp__bootstrapp__get_object_classes` (and
+   `mcp__bootstrapp__get_class_schema` / `mcp__bootstrapp__get_namespaces`
+   when you need to inspect what's already on the backend). Register
+   each custom action with `mcp__bootstrapp__register_action`,
+   passing `fullObjectType` (the action's target class), the
+   recorded `actionSummary`, and the `actionInputObjectType` /
+   `actionOutputObjectType` from the action registry; if a future
+   tool name is unknown, fall back to
+   `mcp__bootstrapp__tool_search` to discover it. The views
    registry requires **no MCP call** — the filter endpoint is
    auto-generated for every top-level class; views drive UI scaffolding,
    not backend setup. Do not hand-author schema files on disk — the
@@ -95,9 +115,9 @@ small, working slice and then iterating with the user.
    platform-appropriate secure storage.
 
 10. **Multi-choice prompts use `AskUserQuestion`.** When you ask the
-    user a question with a discrete set of options (e.g. "which of
-    these bootstrapp projects?", "regenerate the client now or
-    later?", "Tauri / Electron / native?"), call the
+    user a question with a discrete set of options (e.g. "regenerate
+    the client now or later?", "Tauri / Electron / native?", "wire
+    auth before or after the first read screen?"), call the
     `AskUserQuestion` tool rather than listing the choices in plain
     text. For open-ended questions (app name, free-form descriptions,
     feature requests), keep using plain text.
@@ -125,25 +145,30 @@ small, working slice and then iterating with the user.
    `schemas/<Namespace>.md` per namespace. Do not draft the schema
    yourself.
 
-5. **Pick / create the backend project.** Use the MCP server to list
-   existing projects; create a new one (named after the app) if none
-   matches. Surface the choice when there is more than one candidate.
-
-6. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
+5. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
    `schemas/*.md` it references. Walk the class registry in order
    (top-level classes first, then embedded, then action input/output
-   classes), pulling each class's JSON Schema from its namespace's
-   schemas file. Call `mcp__bootstrapp__add_object_class` per class.
-   Verify with `mcp__bootstrapp__get_object_classes` against each
-   namespace. Then use `mcp__bootstrapp__tool_search` to find the
-   action-registration tool and walk the action registry to create
-   each action.
+   classes), pulling each class's JSON Schema and recorded
+   `Indexed fields` list from its namespace's schemas file. Call
+   `mcp__bootstrapp__add_object_class` per class with `appName`
+   (from BOOTSTRAPP.md), `fullObjectType`, `type`, `schema`,
+   `indexedFields` (verbatim from the schemas file — `[]` for
+   embedded classes), and `baseObjectType` when the class extends
+   another. Verify with `mcp__bootstrapp__get_object_classes`
+   against each namespace (use `mcp__bootstrapp__get_namespaces`
+   first if you need to see which namespaces already exist, and
+   `mcp__bootstrapp__get_class_schema` to inspect a single class's
+   schema). Then walk the action registry and call
+   `mcp__bootstrapp__register_action` once per action with
+   `fullObjectType`, `actionSummary`, `actionInputObjectType`, and
+   `actionOutputObjectType`.
 
-7. **Generate the API client** via the
+6. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).
    The skill's three steps are strictly ordered and each depends on
    the previous one: (a) call
-   `mcp__bootstrapp__generate_openapi_spec` — only after step 6 has
+   `mcp__bootstrapp__generate_openapi_spec` with `applicationName`
+   set to the app name from `BOOTSTRAPP.md` — only after step 5 has
    created every class and action on the backend, since the spec
    reflects current backend state; (b) download and save the returned
    spec to a local file; (c) run `generate_api.sh` against the saved
@@ -152,14 +177,14 @@ small, working slice and then iterating with the user.
    `generate_openapi_spec` before the classes exist — both produce a
    stale or empty client.
 
-8. **Scaffold the UI app** with the platform's official generator:
+7. **Scaffold the UI app** with the platform's official generator:
    - Web → `npm create vite@latest` (TypeScript + React unless the user
      asked otherwise).
    - Mobile → `flutter create`.
    - Desktop → the framework the user picked.
    - CLI → the platform's idiomatic generator.
 
-9. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
+8. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
    client wrapping the generated SDK; load the backend base URL and
    OIDC issuer (`https://idp.fci.cloud`) from env. Implement OIDC
    login, logout, and authenticated requests end-to-end. **For
@@ -187,19 +212,17 @@ small, working slice and then iterating with the user.
    slice client-side after the call — discover, don't guess.
    Type-check / compile before claiming done.
 
-10. **Start the dev server and iterate.** Launch the dev server in the
-    background, surface the URL or output to the user, and stay in chat
-    to extend the app: add features, fix bugs, regenerate the client
-    when the schema changes, and respond to user feedback until the user
-    signals the app is complete.
+9. **Start the dev server and iterate.** Launch the dev server in the
+   background, surface the URL or output to the user, and stay in chat
+   to extend the app: add features, fix bugs, regenerate the client
+   when the schema changes, and respond to user feedback until the user
+   signals the app is complete.
 
-11. **Leave a README** explaining how to run the app, which bootstrapp
-    project it targets, and the env vars required. Keep `.env.example`
-    in sync.
+10. **Leave a README** explaining how to run the app and the env vars
+    required. Keep `.env.example` in sync.
 
 ## When to escalate
 
-- Multiple viable bootstrapp projects — ask which to use.
 - Missing backend capability — ask whether to add it on bootstrapp.cloud
   (re-engage the schema architect and re-run class creation) or reshape
   the feature.

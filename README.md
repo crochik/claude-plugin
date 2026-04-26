@@ -55,7 +55,7 @@ Or just describe what you want and let the architect agent handle it:
 
 ```
 Use the bootstrapp-architect agent to build me a Next.js dashboard
-on top of my "acme-inventory" bootstrapp project.
+for my "acme-inventory" app.
 ```
 
 ### Named views

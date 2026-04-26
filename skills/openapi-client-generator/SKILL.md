@@ -36,9 +36,11 @@ regenerating the spec — the order is the same every time.
 
 ## Step 1 — Get the spec URL from the MCP server
 
-Call the `mcp__bootstrapp__generate_openapi_spec` tool. It takes no
-arguments and returns a URL pointing at the spec for the currently
-selected backend project.
+Call the `mcp__bootstrapp__generate_openapi_spec` tool. Pass
+`applicationName` — the snake_case app name recorded at the top of
+`BOOTSTRAPP.md` (the same name used as the `appName` argument to
+`mcp__bootstrapp__add_object_class` in the previous step). The tool
+returns a URL pointing at the spec for the app's backend.
 
 If the call fails with an auth error, stop and tell the user to
 complete the OAuth browser flow for the `bootstrapp` MCP server

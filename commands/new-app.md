@@ -112,8 +112,14 @@ Hand back to the **`bootstrapp-architect`**. It will:
 
 The architect invokes the
 [openapi-client-generator](../skills/openapi-client-generator/SKILL.md)
-skill: call `mcp__bootstrapp__generate_openapi_spec`, save the spec
-locally, and run `generate_api.sh` to emit the typed client.
+skill. Phase 6 strictly depends on Phase 5: the OpenAPI spec is
+generated from current backend state, so every class and action must
+already be registered before calling
+`mcp__bootstrapp__generate_openapi_spec`. The skill then downloads and
+saves the spec locally, and **only after the spec file is on disk**
+runs `generate_api.sh` against it to emit the typed client. Do not
+collapse these into one step or run the generator against a stale
+file.
 
 ## Phase 7 — Scaffold the UI app
 

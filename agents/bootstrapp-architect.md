@@ -129,9 +129,17 @@ small, working slice and then iterating with the user.
    each action.
 
 7. **Generate the API client** via the
-   [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md):
-   call `mcp__bootstrapp__generate_openapi_spec`, save the spec, run
-   `generate_api.sh` against a dedicated output folder.
+   [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).
+   The skill's three steps are strictly ordered and each depends on
+   the previous one: (a) call
+   `mcp__bootstrapp__generate_openapi_spec` — only after step 6 has
+   created every class and action on the backend, since the spec
+   reflects current backend state; (b) download and save the returned
+   spec to a local file; (c) run `generate_api.sh` against the saved
+   file and a dedicated output folder. Do not call the generator
+   before the spec is on disk, and do not call
+   `generate_openapi_spec` before the classes exist — both produce a
+   stale or empty client.
 
 8. **Scaffold the UI app** with the platform's official generator:
    - Web → `npm create vite@latest` (TypeScript + React unless the user

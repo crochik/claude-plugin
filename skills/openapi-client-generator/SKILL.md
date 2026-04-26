@@ -5,7 +5,8 @@ description: How to generate a typed API client for a bootstrapp.cloud app. Call
 
 # Generating an API client for a bootstrapp.cloud app
 
-There are three steps, in order:
+There are three steps, in strict order — each one depends on the
+previous step having completed successfully:
 
 1. Ask the `bootstrapp` MCP server for the OpenAPI spec.
 2. Download and save the spec to a local file.
@@ -14,6 +15,24 @@ There are three steps, in order:
    and the target language.
 
 Do all three from the project root (the client app's working directory).
+
+## Prerequisite — classes must already exist on the backend
+
+The OpenAPI spec is **generated from the current state of the backend
+project**. Endpoints, request/response schemas, and filter signatures
+only appear in the spec for classes and actions that have already been
+registered on bootstrapp.cloud. Before step 1:
+
+- Every class in `BOOTSTRAPP.md`'s class registry must have been
+  created via `mcp__bootstrapp__add_object_class` (verify with
+  `mcp__bootstrapp__get_object_classes`).
+- Every action in the action registry must have been registered.
+
+If you skip this and call `mcp__bootstrapp__generate_openapi_spec`
+first, the returned spec will be missing the classes and actions you
+just designed, and the generated client will not compile against them.
+When the schema changes later, re-run class/action creation **before**
+regenerating the spec — the order is the same every time.
 
 ## Step 1 — Get the spec URL from the MCP server
 
@@ -40,6 +59,11 @@ curl -fsSL "<spec_url_from_step_1>" -o openapi.json
 Confirm the file is non-empty and well-formed before continuing.
 
 ## Step 3 — Run `generate_api.sh`
+
+Only run this step **after** step 2 has written a valid spec file to
+disk. The generator reads from the local file path you pass it; it
+does not fetch the spec itself. Running it against a stale or missing
+file produces a stale or broken client.
 
 The generator script ships with this skill at
 `${CLAUDE_PLUGIN_ROOT}/skills/openapi-client-generator/generate_api.sh`.
@@ -110,6 +134,12 @@ the call. Use these methods to back named views (recorded in
   `generate_api.sh` — the script expects an absolute path.
 - Don't skip step 1 by guessing a spec URL or reusing a stale local
   file when the user asks for a fresh regeneration.
+- Don't call `mcp__bootstrapp__generate_openapi_spec` before the
+  classes and actions exist on the backend — the spec reflects
+  current backend state, so a premature call yields a spec that is
+  missing the very endpoints you are trying to generate a client for.
+- Don't run `generate_api.sh` before step 2 has written the spec
+  file — the script reads from the local path, not the network.
 
 ## When to escalate to the user
 

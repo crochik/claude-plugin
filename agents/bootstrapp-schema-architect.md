@@ -298,6 +298,11 @@ the schemas file in the same turn; never one without the other.
      holds *only* classes (and, for an actions namespace, actions; for
      a domain namespace, views whose target lives there) in that
      namespace.
+   - No class named `User` or `Group` is defined in any
+     `app.<app-name>` namespace — those are platform classes (see
+     "Platform-provided User and Group"). References to a user are
+     UUID strings on a `*Id` field, recorded in the References
+     registry as pointing to `User._id`.
 
 7. **No implementation.** Do not call MCP tools and do not write
    application code. The only files you create are the blueprint
@@ -544,6 +549,30 @@ conditions themselves.
 - Anything the user must confirm before implementation begins.
 ```
 
+## Platform-provided User and Group
+
+bootstrapp.cloud already provides two platform classes that every app
+inherits — they sit outside any `app.<app-name>` namespace:
+
+- **User** — has an `id` (UUID string) and belongs to exactly one
+  Group.
+- **Group** — has an `id` and a `name`.
+
+**Never redefine `User` or `Group` in the app namespace.** When a
+domain class needs to point at a user, add a `*Id` string field
+(`ownerId`, `assigneeId`, `createdById`, ...) whose value is the
+user's UUID — same pattern as any other cross-document reference.
+Record the link in the **References** registry as pointing to
+`User._id`; you do not need a row in the **Classes** registry for
+User itself.
+
+Authorization is **group-based** and enforced by the backend on every
+object, action, and view. You do not design ACL fields, role
+hierarchies, or per-user permission flags into the schema — those
+concerns live with the platform, not with the app's data model. If a
+business rule depends on the caller's group membership, encode that
+rule inside the action that needs it; do not surface it as schema.
+
 ### `schemas/<Namespace>.md` (per-namespace definitions)
 
 One file per namespace, named after the namespace itself — including
@@ -677,4 +706,9 @@ full action definitions.
 - Calling the `bootstrapp` MCP server or any other tool.
 - Generating client code, API routes, or action implementations.
 - Performance tuning, index design, or sharding strategy.
-- Authentication and authorization design.
+- Authentication and authorization design. Authentication is OIDC
+  against `https://idp.fci.cloud`; authorization is group-based and
+  enforced by the bootstrapp.cloud backend on every object, action,
+  and view. The platform's `User` and `Group` classes are inputs to
+  your design (see "Platform-provided User and Group"), not things
+  you redefine.

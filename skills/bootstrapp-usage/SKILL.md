@@ -83,6 +83,41 @@ reject it server-side too. If a query keeps reappearing, route through
 filter endpoint, pass them. Otherwise sort and slice client-side after
 the call. Discover, don't guess.
 
+## Authentication and authorization
+
+bootstrapp.cloud apps authenticate users through **OpenID Connect**.
+
+- **Issuer:** `https://idp.fci.cloud`. Resolve endpoints via OIDC
+  discovery (`/.well-known/openid-configuration`) — never hardcode
+  authorize / token / userinfo paths.
+- **Flow:** Authorization Code with PKCE for browsers and devices. The
+  client redirects to the issuer to log in, exchanges the code for
+  tokens, and presents the access token on every backend call.
+- **Session storage:** platform-appropriate secure store — httpOnly
+  cookies on web, OS keychain / `flutter_secure_storage` on
+  desktop/mobile, OS-standard config dir for CLIs. Refresh on expiry;
+  clear on logout.
+
+The platform already provides the **User** and **Group** classes — they
+are not part of any app's `app.<app-name>` namespace and apps must not
+redefine them.
+
+- **User** — has an `id` (UUID string) and belongs to exactly one
+  Group. Apps reference users by storing the UUID in a string field
+  (e.g. `ownerId: string`), the same way any other cross-document
+  reference works.
+- **Group** — has an `id` and a `name`. Group membership is what
+  governs access.
+- **Authorization is group-based and enforced by the backend** on
+  every object, action, and view. The client never decides what a
+  user is allowed to do; it issues the call and surfaces whatever
+  the backend returns (including authorization rejections). Do not
+  replicate the access policy on the client.
+
+When the client needs the current user (to show their name, filter
+"my X", etc.), read it from the access-token claims after login — do
+not infer it from app data.
+
 ## Default workflow
 
 For a brand-new app, run `/bootstrapp-cloud:new-app` — it orchestrates
@@ -107,8 +142,11 @@ own:
      files.
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
-6. **Wire auth first.** Login, logout, and authenticated requests should
-   work before you build feature screens.
+6. **Wire auth first.** OIDC login (Authorization Code with PKCE
+   against `https://idp.fci.cloud`), logout, and authenticated requests
+   must work end-to-end before you build feature screens. See
+   "Authentication and authorization" above for the User/Group model
+   and storage rules.
 7. **Ship a vertical slice, then iterate.** One real read + one real write
    against the backend, not stubs. Then start the dev server and stay in
    chat to extend the app.
@@ -129,7 +167,12 @@ own:
 ## Things to never do
 
 - Don't invent endpoints, field names, or auth flows. Always verify through
-  the MCP server first.
+  the MCP server first. The OIDC issuer is fixed at
+  `https://idp.fci.cloud`; everything else is discovered.
+- Don't redefine `User` or `Group` in the app namespace — they are
+  platform classes. Reference users by storing their UUID in a string
+  field. Don't reimplement group-based access control on the client;
+  the backend enforces it.
 - Don't check secrets into git. Use `.env.example` + gitignored `.env`.
 - Don't build a parallel backend on the client (local DBs, business logic).
   Push that work into bootstrapp.cloud — usually as an action.

@@ -63,9 +63,17 @@ small, working slice and then iterating with the user.
    target platform. Isolate backend access in a single module so the
    rest of the app stays framework-idiomatic.
 
-7. **Auth is load-bearing.** Wire login/logout/session handling
-   end-to-end before any feature work. A feature screen with broken auth
-   is worse than no feature screen.
+7. **Auth is load-bearing.** Wire OIDC login/logout/session handling
+   end-to-end before any feature work. The bootstrapp.cloud OIDC
+   issuer is `https://idp.fci.cloud` — resolve endpoints via discovery
+   (`/.well-known/openid-configuration`), use Authorization Code with
+   PKCE, and store tokens in platform-appropriate secure storage.
+   bootstrapp.cloud already provides the **User** (UUID `id`) and
+   **Group** (`id`, `name`) classes — never redefine them in the app
+   namespace; reference users by storing their UUID. Authorization is
+   group-based and enforced by the backend on every object, action,
+   and view; do not reimplement the policy on the client. A feature
+   screen with broken auth is worse than no feature screen.
 
 8. **One working slice, then iterate.** Deliver at minimum: auth + one
    real read + one real write against live bootstrapp.cloud data. Then
@@ -133,9 +141,15 @@ small, working slice and then iterating with the user.
    - CLI → the platform's idiomatic generator.
 
 9. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
-   client wrapping the generated SDK; load base URL + public keys from
-   env. Implement login / logout / session end-to-end against the
-   backend. Add one real read + one real write screen against live data.
+   client wrapping the generated SDK; load the backend base URL, OIDC
+   issuer (`https://idp.fci.cloud`), and OIDC client ID from env.
+   Implement OIDC login (Authorization Code with PKCE), logout, and
+   authenticated requests end-to-end. Read the current user (UUID
+   `id` and group membership) from the access-token claims — never
+   redefine a User or Group class in the app namespace. Surface
+   backend authorization rejections in the UI rather than gating
+   actions client-side. Add one real read + one real write screen
+   against live data.
    For each view in the views registry, generate a list screen named
    after the view: it calls the target class's filter endpoint with the
    view's recorded conditions, renders rows using the view's
@@ -161,7 +175,9 @@ small, working slice and then iterating with the user.
 - Missing backend capability — ask whether to add it on bootstrapp.cloud
   (re-engage the schema architect and re-run class creation) or reshape
   the feature.
-- Ambiguous auth setup (providers, redirect URIs, scopes) — ask.
+- Ambiguous auth setup beyond OIDC defaults (OIDC client ID,
+  redirect URIs, additional scopes) — ask. The issuer itself
+  (`https://idp.fci.cloud`) is fixed; don't ask about that.
 - The user requests something that would require bypassing
   bootstrapp.cloud (e.g. a parallel local database) — push back and
   propose the backend-first alternative.

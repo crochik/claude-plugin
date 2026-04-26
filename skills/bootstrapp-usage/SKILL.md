@@ -40,12 +40,18 @@ UI scaffold, and starting the dev server.
 - **Your code lives on the client.** Claude's job is to generate a thin,
   idiomatic client that talks to the bootstrapp backend — nothing more.
 - **The backend exposes two kinds of operations.** Auto-generated CRUD and
-  filter endpoints for every top-level class, plus named *actions* for
-  anything else. Actions carry the business logic: each has an input class
-  and an output class (both defined as JSON Schema in a dedicated actions
-  namespace), full read/write access to every class, and runs atomically on
-  the server. If a workflow spans multiple documents or enforces invariants,
-  it is an action, not a client-side orchestration.
+  a **filter** endpoint for every top-level class, plus named *actions*
+  for anything else. The filter endpoint takes an AND-array of conditions
+  (`{field, operator, value?}`) over the operator set
+  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`. See the
+  [`bootstrapp-schema-architect`](../../agents/bootstrapp-schema-architect.md)
+  agent for the full contract — value rules per operator, type-matching
+  against the field's JSON Schema, and `Exists`/`In` specifics. Actions
+  carry the business logic: each has an input class and an output class
+  (both defined as JSON Schema in a dedicated actions namespace), full
+  read/write access to every class, and runs atomically on the server.
+  If a workflow spans multiple documents or enforces invariants, it is
+  an action, not a client-side orchestration.
 - **Classes live in namespaces rooted at `app.<app-name>`.** The domain
   model sits under `app.<app-name>` and action I/O classes sit under
   `app.<app-name>.actions`. Reference classes in generated code with their
@@ -53,6 +59,29 @@ UI scaffold, and starting the dev server.
 - **The client handles presentation and input validation.** Rendering,
   UX state, and form-level validation belong on the client. Anything that
   decides *what is true* about the data belongs on the backend.
+
+## Named views and filter calls
+
+Named views are saved query configs recorded in `BOOTSTRAPP.md` (registry)
+and the target's namespace schemas file (full definition). A view bundles
+filter conditions, visible fields, an optional primary label field, and
+optional sort/limit. When generating UI, treat each view as a list-screen
+specification: a screen named after the view that calls the target's
+filter endpoint with the recorded conditions, renders the view's
+`visibleFields` (using `primaryField` for row labels when present), and
+applies the view's sort and limit.
+
+For **on-demand filter calls** (queries that aren't registered as a view),
+build the request body as `{ conditions: [...] }`. Each condition's
+`value` must match the target class's property type: omit it for
+`Exists`, pass an array for `In`, pass a scalar otherwise. Reject any
+condition whose `field` is not on the target class — the filter will
+reject it server-side too. If a query keeps reappearing, route through
+`/bootstrapp-cloud:design-model` to register it as a view.
+
+**Sort and limit:** if the OpenAPI spec exposes sort/limit params on the
+filter endpoint, pass them. Otherwise sort and slice client-side after
+the call. Discover, don't guess.
 
 ## Default workflow
 
@@ -108,6 +137,9 @@ own:
   chaining CRUD calls. If two or more writes must succeed together, or any
   decision depends on data the client shouldn't be trusted with, it's an
   action on the backend.
+- Don't fabricate filter conditions on fields that aren't in the target
+  class's JSON Schema. Don't invent sort/limit params on the filter
+  endpoint — discover from the OpenAPI spec or apply client-side.
 - Don't skip the OAuth flow message the first time a user runs an MCP tool —
   they need to know a browser window is coming.
 

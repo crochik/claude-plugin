@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Claude Code plugins for bootstrapp.cloud.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "bootstrapp-cloud",
       "source": "./",
-      "description": "Use bootstrapp.cloud as a backend for apps you build with Claude Code. Wires up the bootstrapp.cloud MCP server plus a scaffolding command, usage skill, and specialized architect agent."
+      "description": "Use bootstrapp.cloud as a backend for apps you build with Claude Code. Wires up the bootstrapp.cloud MCP server plus scaffolding commands, usage skills, design and implementation agents, and helpers for named views and on-demand filter calls."
     }
   ]
 }

@@ -9,9 +9,14 @@ It bundles:
   discover and drive your bootstrapp.cloud projects.
 - **Slash command** `/bootstrapp-cloud:new-app` — scaffolds a new client app
   wired to a bootstrapp backend.
-- **Skill** `bootstrapp-usage` — auto-loaded guidance for any bootstrapp work.
+- **Slash command** `/bootstrapp-cloud:design-model` — evolve the data
+  model (classes, actions, named views) of an existing app.
+- **Skill** `bootstrapp-usage` — auto-loaded guidance covering the filter
+  contract, named views, and on-demand filter calls.
 - **Agent** `bootstrapp-architect` — specialized subagent for end-to-end app
   generation.
+- **Agent** `bootstrapp-schema-architect` — design-only subagent for
+  classes, actions, and named views.
 
 ## Install
 
@@ -53,6 +58,18 @@ Use the bootstrapp-architect agent to build me a Next.js dashboard
 on top of my "acme-inventory" bootstrapp project.
 ```
 
+### Named views
+
+bootstrapp.cloud auto-generates a **filter** endpoint for every top-level
+class — an AND-array of `{field, operator, value?}` conditions over
+`Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`. The schema architect captures
+recurring queries as **named views** in `BOOTSTRAPP.md` (e.g.
+`openOrders` on `Order` with conditions `[{field:"status", operator:"Eq",
+value:"open"}]`, visible fields, and a default sort), and the
+implementation architect scaffolds one list screen per view against the
+filter endpoint. To add or change a view on an existing app, run
+`/bootstrapp-cloud:design-model`.
+
 ## Configuration
 
 The MCP endpoint lives in [`.mcp.json`](./.mcp.json):
@@ -76,15 +93,19 @@ The MCP endpoint lives in [`.mcp.json`](./.mcp.json):
 ```
 .
 ├── .claude-plugin/
-│   ├── plugin.json           # plugin manifest
-│   └── marketplace.json      # marketplace manifest (lists this plugin)
-├── .mcp.json                 # MCP server config
+│   ├── plugin.json                    # plugin manifest
+│   └── marketplace.json               # marketplace manifest (lists this plugin)
+├── .mcp.json                          # MCP server config
 ├── agents/
-│   └── bootstrapp-architect.md
+│   ├── bootstrapp-architect.md        # end-to-end implementation
+│   └── bootstrapp-schema-architect.md # design-only (classes, actions, views)
 ├── commands/
-│   └── new-app.md            # /bootstrapp-cloud:new-app
+│   ├── new-app.md                     # /bootstrapp-cloud:new-app
+│   └── design-model.md                # /bootstrapp-cloud:design-model
 ├── skills/
-│   └── bootstrapp-usage/
+│   ├── bootstrapp-usage/
+│   │   └── SKILL.md
+│   └── openapi-client-generator/
 │       └── SKILL.md
 └── README.md
 ```

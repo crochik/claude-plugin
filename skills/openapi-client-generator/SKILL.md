@@ -10,7 +10,8 @@ There are three steps, in order:
 1. Ask the `bootstrapp` MCP server for the OpenAPI spec.
 2. Download and save the spec to a local file.
 3. Run the local `generate_api.sh` script, passing the absolute path
-   to the saved spec and the output directory for the generated client.
+   to the saved spec, the output directory for the generated client,
+   and the target language.
 
 Do all three from the project root (the client app's working directory).
 
@@ -42,18 +43,25 @@ Confirm the file is non-empty and well-formed before continuing.
 
 The generator script ships with this skill at
 `${CLAUDE_PLUGIN_ROOT}/skills/openapi-client-generator/generate_api.sh`.
-Invoke it with two positional arguments:
+It is a thin wrapper that delegates to a language-specific executable
+on `PATH` named `bootstrapp-gen-<language>` (e.g.
+`bootstrapp-gen-typescript`, `bootstrapp-gen-flutter`). Invoke the
+wrapper with three positional arguments:
 
 1. The **absolute path** to the saved spec file from step 2.
 2. The path to the directory where generated client files should be
    written (e.g. `src/generated/` or `lib/api/`). Use a dedicated
    folder so the generator can overwrite on regeneration without
    touching hand-written code.
+3. The target language — the suffix that selects the
+   `bootstrapp-gen-<language>` binary. Use `typescript` for TypeScript
+   apps, `flutter` for Flutter apps.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT:-.}/skills/openapi-client-generator/generate_api.sh" \
   "$(pwd)/openapi.json" \
-  src/generated
+  src/generated \
+  typescript
 ```
 
 The first argument **must be absolute** — pass `"$(pwd)/<file>"` or
@@ -68,6 +76,9 @@ Before running anything, confirm:
 - **Output directory.** If the project already has a generated folder,
   reuse it; otherwise propose one (e.g. `src/generated/`) and confirm
   with the user before writing.
+- **Language.** Match the client app's platform — `typescript` for
+  TypeScript/web apps, `flutter` for Flutter apps. The wrapper will
+  fail fast if `bootstrapp-gen-<language>` is not on `PATH`.
 
 ## After a successful run
 
@@ -78,6 +89,17 @@ Before running anything, confirm:
   commit the output; otherwise leave it tracked.
 - If the project has type checking or a build, run it to confirm the
   generated code compiles in context.
+
+### Filter endpoints
+
+The generated client exposes one **filter** method per top-level class.
+It accepts the conditions array specified in the
+[`bootstrapp-usage`](../bootstrapp-usage/SKILL.md) skill (AND-array of
+`{field, operator, value?}` over `Eq, Ne, Gt, Gte, Lt, Lte, In,
+Exists`). Sort and limit support depends on the spec — inspect the
+generated method signature; if absent, sort and slice client-side after
+the call. Use these methods to back named views (recorded in
+`BOOTSTRAPP.md`) and ad-hoc on-demand filters alike.
 
 ## Things to never do
 
@@ -96,5 +118,8 @@ Before running anything, confirm:
   spec.
 - `generate_api.sh` is missing from the skill directory or fails to
   run — surface the exact error rather than guessing at workarounds.
+- `bootstrapp-gen-<language>` is not on `PATH` — tell the user which
+  binary is missing and ask how they want to install it; do not fall
+  back to a different language silently.
 - The spec download URL requires extra auth headers — ask the user
   how to fetch it.

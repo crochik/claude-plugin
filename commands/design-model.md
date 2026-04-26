@@ -44,13 +44,20 @@ document.
 - If the user provides enough domain description in `$ARGUMENTS`, pass it
   straight through — do not re-interview them.
 - The blueprint is two kinds of files: **`BOOTSTRAPP.md`** at the
-  project root (the index — registries of classes and actions, no JSON
-  Schemas) and **`schemas/<Namespace>.md`** files (one per namespace,
-  full class definitions; the actions namespace file also holds full
-  action definitions). The subagent reads the index plus the touched
-  schemas files first, evolves them in place, and updates both sides
-  in the same turn — the app name recorded there is preserved.
-  Confirm the touched paths back to the user.
+  project root (the index — registries of classes, actions, and named
+  views, no JSON Schemas) and **`schemas/<Namespace>.md`** files (one
+  per namespace, full class definitions; the actions namespace file
+  also holds full action definitions; a domain namespace file also
+  holds the full view definitions for views whose target lives there).
+  The subagent reads the index plus the touched schemas files first,
+  evolves them in place, and updates both sides in the same turn — the
+  app name recorded there is preserved. Confirm the touched paths back
+  to the user.
+- The schema architect also designs **named views** (saved filter
+  configurations on top-level classes — conditions, visible fields,
+  optional sort/limit). View-only changes (adding a saved query,
+  adjusting visible fields, changing sort) are valid reasons to invoke
+  this command.
 - The subagent must present its proposed design in chat and wait for the
   user's confirmation before calling `Write` or `Edit`. Do not let it
   skip that step or write the files on the first turn.

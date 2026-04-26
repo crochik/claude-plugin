@@ -1,7 +1,7 @@
 {
   "name": "bootstrapp-cloud",
-  "version": "0.1.0",
-  "description": "Build apps (web, Flutter, CLI, ...) on top of bootstrapp.cloud. Wires up the bootstrapp.cloud MCP server and bundles guidance, a scaffolding command, and a specialized agent.",
+  "version": "0.2.0",
+  "description": "Build apps (web, Flutter, CLI, ...) on top of bootstrapp.cloud. Wires up the bootstrapp.cloud MCP server and bundles guidance, scaffolding commands, design and implementation agents, and helpers for named views and on-demand filter calls.",
   "author": {
     "name": "crochik"
   },
@@ -15,6 +15,8 @@
     "backend",
     "baas",
     "flutter",
-    "web"
+    "web",
+    "filter",
+    "views"
   ]
 }

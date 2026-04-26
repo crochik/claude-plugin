@@ -37,18 +37,22 @@ small, working slice and then iterating with the user.
    If a tool call is ambiguous, ask the user rather than inventing.
 
 4. **Create classes via MCP, not by hand.** The blueprint is split:
-   `BOOTSTRAPP.md` is the index (registries of classes and actions);
-   the full JSON Schemas live in `schemas/<Namespace>.md`, one file per
-   namespace. Read `BOOTSTRAPP.md` first to see what exists, then load
-   each `schemas/*.md` referenced in the namespace map. Walk the class
-   registry and call `mcp__bootstrapp__add_object_class` once per
-   class (top-level and embedded alike), pulling each class's JSON
-   Schema from its namespace's schemas file. Verify with
+   `BOOTSTRAPP.md` is the index (registries of classes, actions, and
+   named views); the full JSON Schemas live in `schemas/<Namespace>.md`,
+   one file per namespace. Read `BOOTSTRAPP.md` first to see what
+   exists, then load each `schemas/*.md` referenced in the namespace
+   map. Walk the class registry and call
+   `mcp__bootstrapp__add_object_class` once per class (top-level and
+   embedded alike), pulling each class's JSON Schema from its
+   namespace's schemas file. Verify with
    `mcp__bootstrapp__get_object_classes`. Use
    `mcp__bootstrapp__tool_search` to discover the action-creation tool
-   (its name is not assumed) before registering actions. Do not
-   hand-author schema files on disk — the backend is the source of
-   truth, and any blueprint edits go through the schema architect.
+   (its name is not assumed) before registering actions. The views
+   registry requires **no MCP call** — the filter endpoint is
+   auto-generated for every top-level class; views drive UI scaffolding,
+   not backend setup. Do not hand-author schema files on disk — the
+   backend is the source of truth, and any blueprint edits go through
+   the schema architect.
 
 5. **Generate the client, don't write it.** Use the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md)
@@ -132,6 +136,13 @@ small, working slice and then iterating with the user.
    client wrapping the generated SDK; load base URL + public keys from
    env. Implement login / logout / session end-to-end against the
    backend. Add one real read + one real write screen against live data.
+   For each view in the views registry, generate a list screen named
+   after the view: it calls the target class's filter endpoint with the
+   view's recorded conditions, renders rows using the view's
+   `visibleFields` (with `primaryField` as the row label when present),
+   and applies the view's sort and limit. Pass sort/limit to the filter
+   endpoint when the OpenAPI spec accepts them; otherwise sort and
+   slice client-side after the call — discover, don't guess.
    Type-check / compile before claiming done.
 
 10. **Start the dev server and iterate.** Launch the dev server in the
@@ -162,5 +173,9 @@ small, working slice and then iterating with the user.
 - Hand-editing the generated API client or any blueprint file
   (`BOOTSTRAPP.md` or anything under `schemas/`) — schema changes go
   through the schema architect, then class creation re-runs via MCP.
+- Hand-authoring filter conditions for **recurring** queries that
+  aren't recorded as a view in the blueprint. Ad-hoc one-off filter
+  calls are fine. If a query keeps reappearing, route through
+  `/bootstrapp-cloud:design-model` to add the view first.
 - Secret management beyond env-file hygiene. Point the user at a real
   secret manager for production.

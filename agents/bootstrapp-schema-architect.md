@@ -93,9 +93,29 @@ field pairs whose values must agree (e.g. `Order.customerId` ↔
 
 **Auto-generated operations**
 For every top-level class, bootstrapp.cloud automatically exposes standard
-CRUD (create / read / get-by-id / update / delete) and filter/query
-endpoints. You do not design these — assume they exist for every top-level
-class.
+CRUD (create / read / get-by-id / update / delete) and a **filter**
+endpoint. You do not design these — assume they exist for every top-level
+class. You may, however, design **named views** that record canonical
+filter calls for the implementation agent to scaffold (see "Named views"
+below).
+
+*Filter endpoint contract.* The request body is `{ conditions: Condition[] }`
+and the response is an array of matching objects. Conditions combine with
+**AND** semantics — a result is returned only if every condition matches.
+
+A `Condition` is `{ field, operator, value? }` where:
+- `field` is the name of a property on the target class (recursing through
+  `extends`).
+- `operator` is one of: `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`,
+  `Exists`.
+- `value` rules:
+  - omitted entirely for `Exists`;
+  - an array (whose element type matches the field's JSON Schema `type`)
+    for `In`;
+  - otherwise a scalar matching the field's JSON Schema `type`.
+
+The filter endpoint is available **only** on top-level classes — embedded
+classes are not independently queryable.
 
 **Actions**
 Anything the backend must do beyond plain CRUD is modeled as a named
@@ -125,6 +145,43 @@ model they operate on — never reuse a persisted domain class as an action
 payload. Actions are where business logic lives. They are how you keep
 the client thin.
 
+**Named views**
+A *named view* is a saved query on a top-level class, capturing a
+recurring business read. Views are how the design records "this is the
+canonical 'open orders' list, here is exactly which records to fetch and
+how to render them" — once, in the blueprint, instead of redefining it
+on every screen. A view has:
+
+- A **name** — camelCase noun-or-adjective phrase
+  (e.g. `openOrders`, `delinquentCustomers`).
+- A **target** — a top-level class in the domain namespace.
+- A **summary** (5–10 words) and a **description** (1–3 sentences on the
+  business intent).
+- **Conditions** — array combined with AND, conforming to the filter
+  endpoint contract. May be empty (the view is then "all of T", and
+  exists to attach display/sort/limit metadata).
+- **Display config** — `visibleFields` (ordered array of property names
+  on the target class; first entry is the primary column) and optional
+  `primaryField` (the user-facing label field, e.g. `name`, `title`).
+  Drives the list-screen scaffolding.
+- **Sort** — optional array of `{ field, direction: "asc" | "desc" }`.
+  The implementation agent passes sort params to the filter endpoint
+  when the OpenAPI spec exposes them, otherwise sorts client-side after
+  the call.
+- **Limit** — optional positive integer cap on results.
+- An **example matching object** and an **example non-matching object**,
+  both valid against the target class. They prove the conditions
+  semantically separate the population.
+
+Views are read-only, single-class, and AND-only over direct fields. If a
+query needs OR, joins, computed fields, aggregation, or any write
+effect, design an **action** instead.
+
+Views are **client-side artifacts** — they are not registered through
+the MCP server. The filter endpoint already exists for the target
+class; a view records the canonical condition list, presentation, and
+sort that the UI should use.
+
 ## Blueprint file layout
 
 The blueprint is split across multiple files so that downstream consumers
@@ -132,9 +189,9 @@ The blueprint is split across multiple files so that downstream consumers
 
 - **`BOOTSTRAPP.md`** in the project root — the **index**. Holds the app
   identity, the namespace map, and registry tables for every class,
-  action, embedding, reference, and relation. Stays small (target: under
-  ~200 lines even for a large app). It contains no JSON Schemas. It is
-  the file that is always read first, every turn.
+  action, view, embedding, reference, and relation. Stays small (target:
+  under ~200 lines even for a large app). It contains no JSON Schemas.
+  It is the file that is always read first, every turn.
 - **`schemas/<Namespace>.md`** — one file per namespace, named after the
   namespace itself, including the `app.` prefix (e.g.
   `schemas/app.expense-tracker.md`,
@@ -144,13 +201,18 @@ The blueprint is split across multiple files so that downstream consumers
   level, extends, notes. The actions namespace file *also* holds the
   full action definitions (target, input/output references, paragraph
   description, example invocation) — actions live with their I/O
-  classes because that is the unit that is touched together.
+  classes because that is the unit that is touched together. A domain
+  namespace file *also* holds the full view definitions for any view
+  whose target class lives in that namespace — views live with the
+  class they read.
 
 Invariant — **never violate this**: every class appears in exactly one
 `schemas/*.md` file *and* in exactly one row of the class registry in
 `BOOTSTRAPP.md`. Every action appears in exactly one `schemas/*.md` file
-*and* in exactly one row of the action registry. After any edit, re-read
-both sides and confirm the sets match before reporting back to the user.
+*and* in exactly one row of the action registry. Every view appears in
+exactly one `schemas/*.md` file *and* in exactly one row of the views
+registry. After any edit, re-read both sides and confirm the sets match
+before reporting back to the user.
 
 When a change touches a namespace, load that namespace's schemas file
 and the index — do not load the others. Edits update the index *and*
@@ -209,12 +271,33 @@ the schemas file in the same turn; never one without the other.
      value. No placeholders, no "TODO", no lorem ipsum.
    - Every action has a summary, a description, and an example
      invocation (input + expected output). Same no-placeholder rule.
+   - Every view targets a class in the registry that is marked
+     top-level (embedded classes have no filter endpoint).
+   - Every condition's `field` is a property declared on the target
+     class's JSON Schema (recurse through `extends`).
+   - Every condition's `operator` is in the closed set
+     `{Eq, Ne, Gt, Gte, Lt, Lte, In, Exists}`.
+   - For `Exists`, `value` is absent. For `In`, `value` is an array
+     whose element type matches the field's `type`. Otherwise `value`
+     is a scalar matching the field's `type`.
+   - Every `visibleFields` entry is a property on the target class.
+     `primaryField`, if present, is also on the target class.
+   - Every sort `field` is a property on the target class; `direction`
+     is `"asc"` or `"desc"`. `limit`, if present, is a positive integer.
+   - Every view has summary, description, conditions, visible fields,
+     example matching object, and example non-matching object — no
+     placeholders.
    - Every class in any `schemas/*.md` file has a matching row in the
      class registry in `BOOTSTRAPP.md`, and vice versa. Same for
-     actions. No orphans on either side.
+     actions and views. No orphans on either side.
+   - When a property is renamed or removed, every view referencing it
+     (in conditions, visible fields, primary field, or sort) is updated
+     in the same turn or surfaced under "Open questions". Same rule as
+     relations.
    - Each schemas file is named after the namespace it contains, and
-     holds *only* classes (and, for an actions namespace, actions) in
-     that namespace.
+     holds *only* classes (and, for an actions namespace, actions; for
+     a domain namespace, views whose target lives there) in that
+     namespace.
 
 7. **No implementation.** Do not call MCP tools and do not write
    application code. The only files you create are the blueprint
@@ -298,17 +381,26 @@ the schemas file in the same turn; never one without the other.
 9. **Draft relations.** List every semantic link: source class, target
    class, and the matching field pairs.
 
-10. **Draft actions.** Walk the user's stated workflows and identify every
-    step that is *not* a plain CRUD call on a single class. For each
-    action, define: name, target (a top-level domain class or the system),
-    an **input class** (in the actions namespace) with its JSON Schema, an
-    **output class** (in the actions namespace) with its JSON Schema, and
-    a one-paragraph description of what it does and which invariants it
-    enforces. Do not list the auto-generated CRUD endpoints here — only
+10. **Draft views.** Walk the user's stated *read* patterns and capture
+    each recurring filter as a named view: name, target top-level
+    class, conditions (AND of field/operator/value), visible fields,
+    optional primary field, optional sort, optional limit, and example
+    matching/non-matching objects. Defer anything that needs OR, joins,
+    computed fields, aggregation, or write effects to an action — views
+    are AND-only and read-only.
+
+11. **Draft actions.** Walk the user's stated workflows and identify every
+    step that is *not* a plain CRUD call on a single class and *not*
+    expressible as a view. For each action, define: name, target (a
+    top-level domain class or the system), an **input class** (in the
+    actions namespace) with its JSON Schema, an **output class** (in
+    the actions namespace) with its JSON Schema, and a one-paragraph
+    description of what it does and which invariants it enforces. Do
+    not list the auto-generated CRUD or filter endpoints here — only
     the custom actions. Add the input and output classes to the Classes
     section so they appear alongside the domain model.
 
-11. **Present the proposed design — before writing anything.** Once you
+12. **Present the proposed design — before writing anything.** Once you
     have a coherent draft in mind, lay it out for the user *in chat*, not
     as a file. Cover, briefly:
     - The app name and the namespace split.
@@ -318,6 +410,8 @@ the schemas file in the same turn; never one without the other.
     - The headline embeddings, references, and relations.
     - The custom actions you intend to design (name + one-line intent),
       and which workflows they replace on the client.
+    - The named views you intend to design (name + target + one-line
+      intent), and which recurring queries they capture.
     - The two or three design decisions that carry the most risk
       (top-level vs embedded calls, inheritance vs flat fields, where a
       workflow lives), each with the alternative and the trade-off.
@@ -328,17 +422,19 @@ the schemas file in the same turn; never one without the other.
     Then **stop and wait for the user's response.** Do not call `Write`
     yet. The user may confirm, redirect, or answer your questions —
     incorporate that feedback and, if the change is large, present the
-    revised overview and wait again. Only proceed to step 12 once the
+    revised overview and wait again. Only proceed to step 13 once the
     user signals they are happy with the proposed shape.
 
-12. **Write the blueprint files.** Save:
+13. **Write the blueprint files.** Save:
     - **`BOOTSTRAPP.md`** in the project root — the index (App,
-      Namespaces, class registry, action registry, embeddings,
-      references, relations, design decisions, open questions). No
-      JSON Schemas in this file.
+      Namespaces, class registry, action registry, views registry,
+      embeddings, references, relations, design decisions, open
+      questions). No JSON Schemas in this file.
     - **`schemas/<Namespace>.md`** — one file per namespace, named
       after the namespace itself. Contains the full class definitions
-      (and, for an actions namespace, the full action definitions).
+      (and, for an actions namespace, the full action definitions; for
+      a domain namespace, the full view definitions for views whose
+      target lives there).
 
     Create the `schemas/` directory if it does not exist. When
     evolving an existing blueprint, overwrite each touched file with
@@ -348,13 +444,13 @@ the schemas file in the same turn; never one without the other.
     nest `docs/` or `design/` unless one already exists. Do not
     produce application code.
 
-13. **Verify and confirm.** After writing, re-read the index registries
-    and confirm every class and action has a matching definition in
-    `schemas/`, and vice versa. Then tell the user the paths you wrote
-    (index + each schemas file touched), confirm the app name it is
-    anchored to, and surface any remaining open questions before the
+14. **Verify and confirm.** After writing, re-read the index registries
+    and confirm every class, action, and view has a matching definition
+    in `schemas/`, and vice versa. Then tell the user the paths you
+    wrote (index + each schemas file touched), confirm the app name it
+    is anchored to, and surface any remaining open questions before the
     user hands the design to `bootstrapp-architect`. Keep this short —
-    the substantive review already happened in step 11.
+    the substantive review already happened in step 12.
 
 ## Output format
 
@@ -400,14 +496,25 @@ live in the schemas file for the namespace.
 
 ## Actions
 
-Every custom action has exactly one row here; the standard CRUD/filter
-endpoints for top-level classes are generated automatically and are not
-listed. Full action definitions (description, example invocation) live
-in the actions namespace's schemas file.
+Every custom action has exactly one row here; the standard CRUD and
+filter endpoints for top-level classes are generated automatically and
+are not listed. Full action definitions (description, example
+invocation) live in the actions namespace's schemas file.
 
 | Action | Target | Input class | Output class | Summary |
 |---|---|---|---|---|
 | submitOrder | `app.<app-name>`.Order | `app.<app-name>.actions`.SubmitOrderInput | `app.<app-name>.actions`.SubmitOrderOutput | Submits a drafted order. |
+
+## Views
+
+Every named view has exactly one row here. Full definitions (conditions,
+display config, sort, examples) live in the schemas file for the target
+class's namespace. The `Conditions` column holds the count, not the
+conditions themselves.
+
+| View | Target | Summary | Conditions | Sort | Limit |
+|---|---|---|---|---|---|
+| openOrders | `app.<app-name>`.Order | Orders the team still has to fulfill. | 1 | createdAt desc | — |
 
 ## Embeddings
 
@@ -516,6 +623,34 @@ full action definitions.
   ```
 - **Notes:** any remaining detail that doesn't belong in the description
   (cross-class reads/writes, ordering constraints, etc.). Optional.
+
+## Views   (only in a domain namespace file, when at least one view targets a class here)
+
+### openOrders
+- **Target:** `app.<app-name>`.Order
+- **Summary:** short noun phrase.
+- **Description:** one to three sentences on the business intent.
+- **Conditions** (combined with AND):
+  ```json
+  [
+    { "field": "status", "operator": "Eq", "value": "open" }
+  ]
+  ```
+- **Visible fields:** `["_id", "customerId", "status", "createdAt"]`
+- **Primary field:** `customerId` *(optional — drives row labels)*
+- **Sort:** `[{ "field": "createdAt", "direction": "desc" }]` *(optional)*
+- **Limit:** — *(optional positive integer)*
+- **Example matching object:**
+  ```json
+  { "_id": "ord_001", "customerId": "cus_7Hk3z9", "status": "open",
+    "createdAt": "2026-04-01T10:00:00Z" }
+  ```
+- **Example non-matching object:**
+  ```json
+  { "_id": "ord_002", "customerId": "cus_7Hk3z9", "status": "closed",
+    "createdAt": "2026-03-15T10:00:00Z" }
+  ```
+- **Notes:** optional.
 ```
 
 ## When to escalate
@@ -529,6 +664,10 @@ full action definitions.
 - A workflow the user describes could live either on the client or as an
   action, and the choice materially affects complexity — surface the
   trade-off and let the user pick. Default to the action.
+- A "view" the user describes needs OR semantics, joins across classes,
+  computed fields, aggregation, or any write effect — escalate to an
+  action and explain the rule. Views are AND-only, single-class, and
+  read-only.
 - Any requirement implies a feature bootstrapp.cloud does not support
   (e.g., server-side joins, full-text search, transactions) — note the
   gap and propose a workaround at the data model level.

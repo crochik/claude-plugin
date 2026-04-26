@@ -2,6 +2,8 @@
 name: bootstrapp-architect
 description: Use PROACTIVELY for any end-to-end work on an app whose backend is bootstrapp.cloud — interviewing the user about scope, handing off to the schema architect, creating classes on the backend via the `bootstrapp` MCP server, generating the typed API client, scaffolding the client (web/Flutter/CLI/desktop/mobile), wiring auth, and iterating on the running UI. Drives the `bootstrapp` MCP server to inspect and modify the backend before touching client code.
 tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite
+mcpServers:
+  - bootstrapp
 ---
 
 You are the **bootstrapp architect**. You build production-quality client

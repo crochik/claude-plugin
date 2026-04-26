@@ -90,13 +90,22 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
 - **Issuer:** `https://idp.fci.cloud`. Resolve endpoints via OIDC
   discovery (`/.well-known/openid-configuration`) — never hardcode
   authorize / token / userinfo paths.
-- **Flow:** Authorization Code with PKCE for browsers and devices. The
-  client redirects to the issuer to log in, exchanges the code for
-  tokens, and presents the access token on every backend call.
-- **Session storage:** platform-appropriate secure store — httpOnly
-  cookies on web, OS keychain / `flutter_secure_storage` on
-  desktop/mobile, OS-standard config dir for CLIs. Refresh on expiry;
-  clear on logout.
+- **Flow — TypeScript clients (web/Vite/React/Next/etc.):** OAuth 2.0
+  **Implicit** grant. The client redirects to the issuer's authorize
+  endpoint with `response_type=token id_token`, receives tokens in the
+  redirect fragment, and presents the access token on every backend
+  call. The OIDC **`client_id` is the app name** (the same kebab-case
+  identifier that anchors `app.<app-name>`) — do not invent a separate
+  client ID and do not load it from env.
+- **Flow — every other platform (Flutter, mobile, desktop, CLI):**
+  Authorization Code with PKCE. Load the OIDC `client_id` from env.
+- **Session storage:** platform-appropriate. For TypeScript web apps,
+  the implicit-flow access token lives in memory plus
+  `sessionStorage` (cleared on tab close) — not `localStorage`, and
+  not exposed to third-party scripts. For Flutter/mobile/desktop, use
+  the OS keychain or `flutter_secure_storage`. For CLIs, an
+  OS-standard config dir. Refresh on expiry where the flow allows;
+  clear on logout in every case.
 
 The platform already provides the **User** and **Group** classes — they
 are not part of any app's `app.<app-name>` namespace and apps must not
@@ -117,6 +126,12 @@ redefine them.
 When the client needs the current user (to show their name, filter
 "my X", etc.), read it from the access-token claims after login — do
 not infer it from app data.
+
+**Every app must expose a user-initiated way to start the login
+flow** — a Login button on web, a sign-in screen on mobile/desktop,
+a `login` subcommand on a CLI. Unauthenticated users (first visit,
+expired session, post-logout) must always see an obvious affordance
+to begin authentication; do not rely on automatic redirects alone.
 
 ## Default workflow
 
@@ -142,11 +157,13 @@ own:
      files.
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
-6. **Wire auth first.** OIDC login (Authorization Code with PKCE
-   against `https://idp.fci.cloud`), logout, and authenticated requests
-   must work end-to-end before you build feature screens. See
-   "Authentication and authorization" above for the User/Group model
-   and storage rules.
+6. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
+   (Implicit flow with `client_id = <app-name>` for TypeScript
+   clients; Authorization Code with PKCE for everything else),
+   logout, and authenticated requests must work end-to-end before you
+   build feature screens. See "Authentication and authorization"
+   above for the per-platform flow, the `client_id` rule, the
+   User/Group model, and storage rules.
 7. **Ship a vertical slice, then iterate.** One real read + one real write
    against the backend, not stubs. Then start the dev server and stay in
    chat to extend the app.

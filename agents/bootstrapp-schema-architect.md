@@ -56,6 +56,13 @@ a component inside another class, never persisted on its own). Action
 input/output classes are always embedded — they represent transient
 payloads, not documents.
 
+**Every top-level class has an `_id` field.** Declare it on the class's
+JSON Schema as `{ "type": "string", "format": "uuid" }` with the usual
+`title`/`description`/`examples` documentation, and include it in
+`required`. The backend assigns the value on create; the field is the
+canonical identity that references and relations point at. Embedded
+classes do not get `_id` (see "Embedding" below).
+
 **Documentation attached to every class and property**
 The downstream tooling that calls the `bootstrapp` MCP server to create
 these classes relies on the design document for all human-readable
@@ -90,10 +97,11 @@ A class may embed objects from other classes in three forms:
 Embedded classes do not need `_id`; they carry no identity of their own.
 
 **References**
-A field whose value is the `_id` string of another top-level object is a
-*reference*. References are plain strings in the schema (type: string) but
-semantically point to another document. Only top-level objects can be
-referenced.
+A field whose value is the `_id` of another top-level object is a
+*reference*. Reference fields are declared as
+`{ "type": "string", "format": "uuid" }` — same shape as the `_id` they
+point at — but semantically point to another document. Only top-level
+objects can be referenced.
 
 **Relations**
 A relation describes a semantic link between two classes through matching
@@ -269,6 +277,10 @@ the schemas file in the same turn; never one without the other.
      letters, digits, and underscores only — no hyphens).
    - Every class is assigned to a namespace.
    - Every embedded class is marked embedded (not top-level).
+   - Every top-level class declares an `_id` property of
+     `{ "type": "string", "format": "uuid" }`, listed in `required`,
+     with full `title`/`description`/`examples` documentation. No
+     embedded class declares `_id`.
    - Every referenced class is top-level.
    - Every inheritance chain has exactly one discriminator field on the
      parent.
@@ -620,17 +632,26 @@ full action definitions.
     "description": "A customer's request to purchase one or more items, including delivery and payment details.",
     "type": "object",
     "properties": {
+      "_id": {
+        "type": "string",
+        "format": "uuid",
+        "title": "Order ID",
+        "description": "Server-assigned UUID identifying this order. Top-level classes always carry `_id`.",
+        "examples": ["6f1d3b2a-4e7f-4c2a-9d8b-1c2e3f4a5b6c"]
+      },
       "customerId": {
         "type": "string",
+        "format": "uuid",
         "title": "Customer ID",
         "description": "Reference to the Customer who placed the order.",
-        "examples": ["cus_7Hk3z9"]
+        "examples": ["b3a1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"]
       }
     },
-    "required": ["customerId"],
+    "required": ["_id", "customerId"],
     "examples": [
       {
-        "customerId": "cus_7Hk3z9"
+        "_id": "6f1d3b2a-4e7f-4c2a-9d8b-1c2e3f4a5b6c",
+        "customerId": "b3a1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
       }
     ]
   }

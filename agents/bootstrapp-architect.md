@@ -40,25 +40,34 @@ small, working slice and then iterating with the user.
    If a tool call is ambiguous, ask the user rather than inventing.
 
 4. **Create classes via MCP, not by hand.** The blueprint is split:
-   `BOOTSTRAPP.md` is the index (registries of classes, actions, and
-   named views); the full JSON Schemas live in `schemas/<Namespace>.md`,
-   one file per namespace. Read `BOOTSTRAPP.md` first to see what
-   exists, then load each `schemas/*.md` referenced in the namespace
-   map. Walk the class registry and call
-   `mcp__bootstrapp__add_object_class` once per class (top-level and
-   embedded alike). For each call, pass:
+   `BOOTSTRAPP.md` is the index (registries of classes, actions,
+   references, and named views); the full JSON Schemas live in
+   `schemas/<Namespace>.md`, one file per namespace. Read
+   `BOOTSTRAPP.md` first to see what exists, then load each
+   `schemas/*.md` referenced in the namespace map. Walk the class
+   registry and call `mcp__bootstrapp__add_object_class` once per
+   class (top-level and embedded alike). For each call, pass:
    - `appName` — the snake_case app name from the App section of
      `BOOTSTRAPP.md`.
    - `fullObjectType` — the namespace-qualified class name.
    - `type` — `TopLevel` or `Embedded`, mirroring the registry's
      Level column.
    - `schema` — the class's JSON Schema, pulled from its namespace's
-     schemas file.
+     schemas file. **Both the schema root and every property must
+     carry `title` and `description`** — the backend uses them for
+     the OpenAPI surface; missing values yield an unusable client.
    - `indexedFields` — the list recorded under "Indexed fields" in
      the schemas file. Top-level classes carry the actual list;
      embedded classes pass `[]`. **Only indexed fields can be
      filtered**, so missing entries here will silently break filter
      calls and named views downstream — copy the list verbatim.
+   - `foreignKeys` — every row in the References registry whose
+     **source class** is this class. Each becomes one entry of the
+     form `{ "key": "<sourceField>", "value": { "objectType":
+     "<target.FullClassName>", "keyFieldName": "<targetField>" } }`.
+     Pass an empty array (or omit) when the class has no references.
+     Pass the reference rows verbatim — the registry is the source
+     of truth.
    - `baseObjectType` — only when the class extends another (single
      inheritance with a discriminator).
 
@@ -66,16 +75,23 @@ small, working slice and then iterating with the user.
    `mcp__bootstrapp__get_class_schema` / `mcp__bootstrapp__get_namespaces`
    when you need to inspect what's already on the backend). Register
    each custom action with `mcp__bootstrapp__register_action`,
-   passing `fullObjectType` (the action's target class), the
-   recorded `actionSummary`, and the `actionInputObjectType` /
-   `actionOutputObjectType` from the action registry; if a future
-   tool name is unknown, fall back to
+   passing:
+   - `fullObjectType` — the action's target class (a top-level
+     domain class).
+   - `actionName` — the action name from the registry.
+   - `actionSummary` — the recorded short verb phrase.
+   - `actionDescription` — the recorded paragraph description.
+   - `actionInputObjectType` / `actionOutputObjectType` — the
+     fully-qualified input and output class names from the action
+     registry.
+
+   If a future tool name is unknown, fall back to
    `mcp__bootstrapp__tool_search` to discover it. The views
    registry requires **no MCP call** — the filter endpoint is
-   auto-generated for every top-level class; views drive UI scaffolding,
-   not backend setup. Do not hand-author schema files on disk — the
-   backend is the source of truth, and any blueprint edits go through
-   the schema architect.
+   auto-generated for every top-level class; views drive UI
+   scaffolding, not backend setup. Do not hand-author schema files
+   on disk — the backend is the source of truth, and any blueprint
+   edits go through the schema architect.
 
 5. **Generate the client, don't write it.** Use the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md)
@@ -164,16 +180,20 @@ small, working slice and then iterating with the user.
    classes), pulling each class's JSON Schema and recorded
    `Indexed fields` list from its namespace's schemas file. Call
    `mcp__bootstrapp__add_object_class` per class with `appName`
-   (from BOOTSTRAPP.md), `fullObjectType`, `type`, `schema`,
+   (from BOOTSTRAPP.md), `fullObjectType`, `type`, `schema` (with
+   `title` + `description` on the root and on every property),
    `indexedFields` (verbatim from the schemas file — `[]` for
-   embedded classes), and `baseObjectType` when the class extends
+   embedded classes), `foreignKeys` (built from every References
+   registry row whose source is this class — see principle 4 for
+   the entry shape), and `baseObjectType` when the class extends
    another. Verify with `mcp__bootstrapp__get_object_classes`
    against each namespace (use `mcp__bootstrapp__get_namespaces`
    first if you need to see which namespaces already exist, and
    `mcp__bootstrapp__get_class_schema` to inspect a single class's
    schema). Then walk the action registry and call
    `mcp__bootstrapp__register_action` once per action with
-   `fullObjectType`, `actionSummary`, `actionInputObjectType`, and
+   `fullObjectType`, `actionName`, `actionSummary`,
+   `actionDescription`, `actionInputObjectType`, and
    `actionOutputObjectType`.
 
 6. **Generate the API client** via the

@@ -114,15 +114,20 @@ Hand back to the **`bootstrapp-architect`**. It will:
   walk the class registry and call
   `mcp__bootstrapp__add_object_class` once per class — passing
   `appName` (from `BOOTSTRAPP.md`), `fullObjectType`, `type`
-  (`TopLevel` / `Embedded`), `schema`, `indexedFields` (verbatim
-  from the schemas file — `[]` for embedded classes), and
+  (`TopLevel` / `Embedded`), `schema` (with `title` + `description`
+  on the root and on every property), `indexedFields` (verbatim
+  from the schemas file — `[]` for embedded classes), `foreignKeys`
+  (built from the References registry rows whose source is this
+  class — entries of `{ key: <sourceField>, value: { objectType:
+  <target.FullClassName>, keyFieldName: <targetField> } }`), and
   `baseObjectType` for classes that extend another.
 - Verify with `mcp__bootstrapp__get_object_classes` (and
   `mcp__bootstrapp__get_class_schema` /
   `mcp__bootstrapp__get_namespaces` when finer-grained checks help).
 - Walk the action registry and call
   `mcp__bootstrapp__register_action` once per action — passing
-  `fullObjectType`, `actionSummary`, `actionInputObjectType`, and
+  `fullObjectType`, `actionName`, `actionSummary`,
+  `actionDescription`, `actionInputObjectType`, and
   `actionOutputObjectType`.
 
 ## Phase 6 — Generate the API client

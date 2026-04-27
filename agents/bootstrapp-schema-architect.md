@@ -103,6 +103,13 @@ A field whose value is the `_id` of another top-level object is a
 point at — but semantically point to another document. Only top-level
 objects can be referenced.
 
+Every reference must be recorded in the **References** registry in
+`BOOTSTRAPP.md` (source class, source field, target class + target
+field). The implementation agent reads that registry verbatim and
+passes it to `mcp__bootstrapp__add_object_class` as the `foreignKeys`
+argument when creating the source class — so missing rows here mean
+missing foreign keys on the backend.
+
 **Relations**
 A relation describes a semantic link between two classes through matching
 field values. Each relation entry names the two classes and lists the
@@ -174,17 +181,15 @@ pass `[]`).
 **Actions**
 Anything the backend must do beyond plain CRUD is modeled as a named
 *action*. An action has:
-- A name (verb-phrased, e.g. `submitOrder`, `cancelReservation`).
-- A **summary** (5–10 words) — passed verbatim to the MCP server as
-  `actionSummary` when the action is registered. The summary is the
-  only free-text the registration call accepts, so it is the action's
-  public handle in API docs.
+- A **name** (verb-phrased, e.g. `submitOrder`, `cancelReservation`) —
+  passed to the MCP server as `actionName` when the action is
+  registered.
+- A **summary** (5–10 words) — passed to the MCP server as
+  `actionSummary`. The action's public handle in API docs.
 - A **description** (1–3 sentences covering purpose, side effects, and
-  the invariants the action enforces) — written into the **input
-  class's** JSON Schema `description`, since `register_action` has no
-  separate description slot. The input class is what surfaces in the
-  generated OpenAPI as the action's request body, so its description
-  is the natural carrier for the longer prose.
+  the invariants the action enforces) — passed to the MCP server as
+  `actionDescription`. Carries the longer prose on the action itself,
+  not on the input class.
 - A target — either a specific top-level class (the action operates on an
   instance) or the system at large (no specific target).
 - An **input class** — a class in an actions namespace whose JSON Schema
@@ -342,11 +347,15 @@ the schemas file in the same turn; never one without the other.
    - Every class has a summary, description, and a complete example
      object. Every property has a summary, description, and an example
      value. No placeholders, no "TODO", no lorem ipsum.
-   - Every action has a summary (the value passed to
-     `register_action` as `actionSummary`), a description (recorded on
-     the input class's JSON Schema, since the registration call has no
-     separate description slot), and an example invocation (input +
-     expected output). Same no-placeholder rule.
+   - Every action has a name (`actionName`), a summary
+     (`actionSummary`), a description (`actionDescription`), and an
+     example invocation (input + expected output). All three text
+     fields are passed verbatim to `register_action`. Same
+     no-placeholder rule.
+   - Every JSON Schema (class root *and* every property) carries
+     `title` and `description`. These are non-optional — the MCP
+     server uses them for the OpenAPI surface, and missing values
+     produce an unusable client.
    - Every view targets a class in the registry that is marked
      top-level (embedded classes have no filter endpoint).
    - Every condition's `field` is a property declared on the target
@@ -730,12 +739,12 @@ full action definitions.
 ## Actions   (only in an actions namespace file)
 
 ### submitOrder
+- **Name:** `submitOrder` — passed to the MCP server as `actionName`.
 - **Summary:** short verb phrase, passed to the MCP server as
-  `actionSummary` — the action's only free-text registration field.
+  `actionSummary`.
 - **Description:** one to three sentences explaining what the action
-  does, its side effects, and the invariants it enforces. The
-  registration call has no description slot, so this prose lives on
-  the **input class's** JSON Schema `description`.
+  does, its side effects, and the invariants it enforces. Passed to
+  the MCP server as `actionDescription`.
 - **Target:** `app.<app_name>`.ClassName | system
 - **Input class:** `app.<app_name>.actions`.SubmitOrderInput
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput

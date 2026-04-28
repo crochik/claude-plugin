@@ -190,11 +190,16 @@ Anything the backend must do beyond plain CRUD is modeled as a named
   the invariants the action enforces) — passed to the MCP server as
   `actionDescription`. Carries the longer prose on the action itself,
   not on the input class.
-- A target — either a specific top-level class (the action operates on an
-  instance) or the system at large (no specific target).
+- A **target** — a specific top-level class. Every action operates on a
+  specific instance of that class; there are no system-wide or
+  class-level actions.
 - An **input class** — a class in an actions namespace whose JSON Schema
   defines the request body. Use a dedicated class even for trivial inputs;
-  this keeps the action's contract explicit and versionable.
+  this keeps the action's contract explicit and versionable. The input
+  class **must** declare a required `id` property
+  (`type: "string"`, `format: "uuid"`, with `title` and `description`)
+  that identifies the target instance — this is how the action is
+  anchored on a specific object of the target class.
 - An **output class** — a class in an actions namespace whose JSON Schema
   defines the response body. Use a dedicated class even when the action
   returns a single scalar or a reference to a domain object.
@@ -339,8 +344,12 @@ the schemas file in the same turn; never one without the other.
      parent.
    - Every relation names real fields on real classes.
    - No circular embeddings (a class embedding itself transitively).
-   - Every action has an explicit target (a top-level class or the
-     system), an input class, and an output class.
+   - Every action targets a specific top-level class, has an input
+     class, and an output class.
+   - Every action input class declares a required `id` property
+     (`type: "string"`, `format: "uuid"`, with `title` and
+     `description`) that anchors the action on a specific instance of
+     the target class.
    - Every action input/output class lives in an actions namespace, not
      the domain namespace, and is embedded (not top-level).
    - No action can be replaced by a single CRUD call — if it can, drop it.
@@ -487,13 +496,16 @@ the schemas file in the same turn; never one without the other.
 11. **Draft actions.** Walk the user's stated workflows and identify every
     step that is *not* a plain CRUD call on a single class and *not*
     expressible as a view. For each action, define: name, target (a
-    top-level domain class or the system), an **input class** (in the
-    actions namespace) with its JSON Schema, an **output class** (in
-    the actions namespace) with its JSON Schema, and a one-paragraph
-    description of what it does and which invariants it enforces. Do
-    not list the auto-generated CRUD or filter endpoints here — only
-    the custom actions. Add the input and output classes to the Classes
-    section so they appear alongside the domain model.
+    top-level domain class — every action is anchored on a specific
+    instance), an **input class** (in the actions namespace) with its
+    JSON Schema — including the required `id` property
+    (`type: "string"`, `format: "uuid"`) that identifies the target
+    instance — an **output class** (in the actions namespace) with its
+    JSON Schema, and a one-paragraph description of what it does and
+    which invariants it enforces. Do not list the auto-generated CRUD
+    or filter endpoints here — only the custom actions. Add the input
+    and output classes to the Classes section so they appear alongside
+    the domain model.
 
 12. **Present the proposed design — before writing anything.** Once you
     have a coherent draft in mind, lay it out for the user *in chat*, not
@@ -745,8 +757,12 @@ full action definitions.
 - **Description:** one to three sentences explaining what the action
   does, its side effects, and the invariants it enforces. Passed to
   the MCP server as `actionDescription`.
-- **Target:** `app.<app_name>`.ClassName | system
-- **Input class:** `app.<app_name>.actions`.SubmitOrderInput
+- **Target:** `app.<app_name>`.ClassName — every action is anchored on a
+  specific instance, identified by the required `id` property on the
+  input class.
+- **Input class:** `app.<app_name>.actions`.SubmitOrderInput — must
+  declare a required `id` property (`type: "string"`,
+  `format: "uuid"`).
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
 - **Example invocation:**
   ```json

@@ -3,7 +3,7 @@ description: Create a new app on bootstrapp.cloud end-to-end — intake, schema 
 argument-hint: [<short intent, optional>]
 ---
 
-# /bootstrapp-cloud:new-app
+# /bootstrapp:new-app
 
 The user wants to create a new application that uses **bootstrapp.cloud**
 as its backend. This command orchestrates the entire flow from a blank
@@ -22,7 +22,7 @@ Before any other step, look at the current working directory:
 
 - If `BOOTSTRAPP.md` is present in the cwd, the user is already inside an
   existing app. **Stop** and tell them:
-  - For schema-only changes, run `/bootstrapp-cloud:design-model`.
+  - For schema-only changes, run `/bootstrapp:design-model`.
   - For implementation work, invoke the `bootstrapp-architect` agent
     directly.
   Do not run the new-app flow on top of an existing app.
@@ -173,4 +173,4 @@ to user feedback until the user signals the app is complete.
 - **Don't over-engineer.** Ship a minimal, working vertical slice — not
   a framework — before iterating.
 - **If the MCP server is not connected**, stop and ask the user to enable
-  the `bootstrapp-cloud` plugin / complete the OAuth flow before continuing.
+  the `bootstrapp` plugin / complete the OAuth flow before continuing.

@@ -14,7 +14,7 @@ small, working slice and then iterating with the user.
 
 0. **Defer to the orchestrator for fresh apps.** When invoked directly
    in a directory that has no `BOOTSTRAPP.md` and is not empty, ask the
-   user to run `/bootstrapp-cloud:new-app` instead — that command creates
+   user to run `/bootstrapp:new-app` instead — that command creates
    the `bootstrapp` folder (the app folder is **always** named
    `bootstrapp`, regardless of the app name) and walks the intake. Never
    scaffold a fresh project layout on top of an unrelated codebase. When
@@ -155,7 +155,7 @@ small, working slice and then iterating with the user.
 
 1. **Verify the working directory.** `BOOTSTRAPP.md` present → existing
    app, go on. `BOOTSTRAPP.md` absent and directory non-empty → tell the
-   user to run `/bootstrapp-cloud:new-app` (which creates the
+   user to run `/bootstrapp:new-app` (which creates the
    `bootstrapp` folder — always that name, regardless of the app name)
    instead of continuing here.
 
@@ -287,6 +287,6 @@ small, working slice and then iterating with the user.
 - Hand-authoring filter conditions for **recurring** queries that
   aren't recorded as a view in the blueprint. Ad-hoc one-off filter
   calls are fine. If a query keeps reappearing, route through
-  `/bootstrapp-cloud:design-model` to add the view first.
+  `/bootstrapp:design-model` to add the view first.
 - Secret management beyond env-file hygiene. Point the user at a real
   secret manager for production.

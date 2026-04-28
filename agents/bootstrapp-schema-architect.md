@@ -414,12 +414,12 @@ the schemas file in the same turn; never one without the other.
    evolve that blueprint, not replace it. If it does not exist, this is
    a new app. Two cases:
 
-   - **Invoked from `/bootstrapp-cloud:new-app`** — the orchestrator has
+   - **Invoked from `/bootstrapp:new-app`** — the orchestrator has
      already created a fresh folder named `bootstrapp` (always that
      name, regardless of the app name). Treat absence of `BOOTSTRAPP.md`
      here as "new app, proceed."
    - **Invoked directly in a non-empty directory without `BOOTSTRAPP.md`**
-     — stop and tell the user to run `/bootstrapp-cloud:new-app` (which
+     — stop and tell the user to run `/bootstrapp:new-app` (which
      creates the `bootstrapp` folder), or to `cd` into an empty
      directory before continuing. Do not write `BOOTSTRAPP.md` on top of
      an unrelated codebase.

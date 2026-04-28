@@ -1,4 +1,4 @@
-# bootstrapp-cloud plugin for Claude Code
+# bootstrapp plugin for Claude Code
 
 A Claude Code plugin that lets you build apps (web, Flutter, CLI, mobile, ...)
 on top of [bootstrapp.cloud](https://bootstrapp.cloud) as the backend.
@@ -7,9 +7,9 @@ It bundles:
 
 - **MCP server** (`bootstrapp`) — streamable HTTP, OAuth login — so Claude can
   discover and drive your bootstrapp.cloud projects.
-- **Slash command** `/bootstrapp-cloud:new-app` — scaffolds a new client app
+- **Slash command** `/bootstrapp:new-app` — scaffolds a new client app
   wired to a bootstrapp backend.
-- **Slash command** `/bootstrapp-cloud:design-model` — evolve the data
+- **Slash command** `/bootstrapp:design-model` — evolve the data
   model (classes, actions, named views) of an existing app.
 - **Skill** `bootstrapp-usage` — auto-loaded guidance covering the filter
   contract, named views, and on-demand filter calls.
@@ -24,7 +24,7 @@ From any Claude Code session:
 
 ```
 /plugin marketplace add crochik/claude-plugin
-/plugin install bootstrapp-cloud@bootstrapp
+/plugin install bootstrapp@bootstrapp
 ```
 
 That's it — the MCP server, slash command, skill, and agent are now available.
@@ -48,7 +48,7 @@ session is cached and subsequent calls are silent.
 Kick off a new app:
 
 ```
-/bootstrapp-cloud:new-app flutter expense_tracker
+/bootstrapp:new-app flutter expense_tracker
 ```
 
 Or just describe what you want and let the architect agent handle it:
@@ -68,7 +68,7 @@ recurring queries as **named views** in `BOOTSTRAPP.md` (e.g.
 value:"open"}]`, visible fields, and a default sort), and the
 implementation architect scaffolds one list screen per view against the
 filter endpoint. To add or change a view on an existing app, run
-`/bootstrapp-cloud:design-model`.
+`/bootstrapp:design-model`.
 
 ## Configuration
 
@@ -100,8 +100,8 @@ The MCP endpoint lives in [`.mcp.json`](./.mcp.json):
 │   ├── bootstrapp-architect.md        # end-to-end implementation
 │   └── bootstrapp-schema-architect.md # design-only (classes, actions, views)
 ├── commands/
-│   ├── new-app.md                     # /bootstrapp-cloud:new-app
-│   └── design-model.md                # /bootstrapp-cloud:design-model
+│   ├── new-app.md                     # /bootstrapp:new-app
+│   └── design-model.md                # /bootstrapp:design-model
 ├── skills/
 │   ├── bootstrapp-usage/
 │   │   └── SKILL.md

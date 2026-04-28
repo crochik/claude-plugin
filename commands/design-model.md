@@ -1,14 +1,14 @@
 ---
-description: Evolve the bootstrapp.cloud data model of an existing app — classes, inheritance, embeddings, references, relations, and actions — without implementing anything. For brand-new apps, use /bootstrapp-cloud:new-app instead.
+description: Evolve the bootstrapp.cloud data model of an existing app — classes, inheritance, embeddings, references, relations, and actions — without implementing anything. For brand-new apps, use /bootstrapp:new-app instead.
 argument-hint: [<topic>]
 ---
 
-# /bootstrapp-cloud:design-model
+# /bootstrapp:design-model
 
 The user wants to design or update the data model for an existing
 **bootstrapp.cloud** app. This command is the entry point for
 **schema-only changes**; brand-new apps go through
-`/bootstrapp-cloud:new-app`, which orchestrates intake, schema design,
+`/bootstrapp:new-app`, which orchestrates intake, schema design,
 class creation, client generation, and scaffolding end-to-end.
 
 Arguments passed by the user: `$ARGUMENTS`
@@ -20,7 +20,7 @@ Arguments passed by the user: `$ARGUMENTS`
 - If `BOOTSTRAPP.md` is present, this is an existing app — proceed; the
   subagent will read it and evolve it in place.
 - If `BOOTSTRAPP.md` is absent, this is not the right entry point. Tell
-  the user to run `/bootstrapp-cloud:new-app` instead — that command
+  the user to run `/bootstrapp:new-app` instead — that command
   creates the `bootstrapp` folder (always that name, regardless of the
   app name), runs intake, and orchestrates the full flow. Do not invoke
   the schema architect from a directory with no `BOOTSTRAPP.md`.

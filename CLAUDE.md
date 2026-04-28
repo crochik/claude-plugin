@@ -41,7 +41,7 @@ layout.
   tool list minimal — a design-only agent should not have Bash or Write access
   to source files.
 - **[commands/](./commands/)** — slash commands invoked as
-  `/bootstrapp-cloud:<name>`. Frontmatter declares `description` and
+  `/bootstrapp:<name>`. Frontmatter declares `description` and
   `argument-hint`. The body is instructions to Claude; `$ARGUMENTS` interpolates
   user input.
 - **[skills/](./skills/)** — auto-loaded guidance. Each skill is a directory
@@ -57,8 +57,8 @@ The two agents are intentionally separate and should stay that way:
   relations, and server-side actions — each with an input class and output
   class in a dedicated actions namespace). Never calls MCP tools, never
   writes application code. Invoked from
-  [/bootstrapp-cloud:new-app](./commands/new-app.md) (Phase 4) for new apps,
-  and from [/bootstrapp-cloud:design-model](./commands/design-model.md) for
+  [/bootstrapp:new-app](./commands/new-app.md) (Phase 4) for new apps,
+  and from [/bootstrapp:design-model](./commands/design-model.md) for
   schema-only changes on existing apps.
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
   discovery, implementation, and iteration. Runs the upfront discovery
@@ -67,7 +67,7 @@ The two agents are intentionally separate and should stay that way:
   invokes the [openapi-client-generator skill](./skills/openapi-client-generator/SKILL.md)
   to emit the typed client, scaffolds the UI app, wires auth, then starts
   the dev server and stays in chat to iterate with the user. Driven
-  end-to-end by [/bootstrapp-cloud:new-app](./commands/new-app.md).
+  end-to-end by [/bootstrapp:new-app](./commands/new-app.md).
 
 Design flows *through* the schema architect *into* the implementation architect
 — do not collapse the two. The architect handles app-concept discovery
@@ -112,7 +112,7 @@ extending:
 - **Top-level vs embedded is load-bearing.** In the data model, promote to
   top-level only when a class must be queried independently or referenced by
   multiple parents.
-- **`/bootstrapp-cloud:new-app` creates the app folder.** The orchestrator
+- **`/bootstrapp:new-app` creates the app folder.** The orchestrator
   runs intake (name, platform, description) from a parent directory, then
   `mkdir bootstrapp && cd bootstrapp` before invoking any agent. The
   folder is **always** named `bootstrapp` — it is decoupled from the
@@ -122,7 +122,7 @@ extending:
   are detected by the presence of `BOOTSTRAPP.md`; running new-app
   inside an existing app stops and redirects the user to `design-model`
   or direct architect invocation. The empty-folder guard now applies only
-  to `/bootstrapp-cloud:design-model` and to direct invocation of either
+  to `/bootstrapp:design-model` and to direct invocation of either
   agent — those entry points still refuse to write into a non-empty
   directory without `BOOTSTRAPP.md`. Preserve this split when editing
   commands or agents.

@@ -20,12 +20,12 @@ Before doing any bootstrapp work, check the project root for a file named
   `app.<app_name>` under which every class lives (`app.<app_name>.Order`,
   `app.<app_name>.actions.SubmitOrderInput`, etc.). Do not rename it. Keep
   all new classes consistent with this namespace.
-- Schema changes go through `/bootstrapp-cloud:design-model`, which
+- Schema changes go through `/bootstrapp:design-model`, which
   delegates to the `bootstrapp-schema-architect` to evolve the same
   `BOOTSTRAPP.md` in place.
 
 If `BOOTSTRAPP.md` does not exist, this is a new app. Run
-`/bootstrapp-cloud:new-app` — that command handles the full flow: intake
+`/bootstrapp:new-app` — that command handles the full flow: intake
 (name, platform, description), folder creation, discovery, schema design,
 class creation on the backend via the MCP server, API client generation,
 UI scaffold, and starting the dev server.
@@ -91,7 +91,7 @@ whose `field` is not on the target class **or is not in the class's
 `indexedFields` list** — the filter will reject it server-side too.
 Reject any entry in `fields` that is not a property of the target
 class for the same reason. If a query needs a non-indexed field, route through
-`/bootstrapp-cloud:design-model` to add the field to `indexedFields`
+`/bootstrapp:design-model` to add the field to `indexedFields`
 and re-run class creation; if the same query keeps reappearing,
 register it as a named view at the same time.
 
@@ -162,7 +162,7 @@ to begin authentication; do not rely on automatic redirects alone.
 
 ## Default workflow
 
-For a brand-new app, run `/bootstrapp-cloud:new-app` — it orchestrates
+For a brand-new app, run `/bootstrapp:new-app` — it orchestrates
 intake → folder creation → discovery → schema design → backend class
 creation → client generation → scaffold → auth + slice → dev server +
 iteration. The steps below apply when you are working directly on an

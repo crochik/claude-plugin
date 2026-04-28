@@ -106,30 +106,34 @@ bootstrapp.cloud apps authenticate users through **OpenID Connect**.
 - **Issuer:** `https://idp.fci.cloud`. Resolve endpoints via OIDC
   discovery (`/.well-known/openid-configuration`) — never hardcode
   authorize / token / userinfo paths.
-- **Flow — TypeScript clients (web/Vite/React/Next/etc.):** OAuth 2.0
-  **Implicit** grant. The client redirects to the issuer's authorize
-  endpoint with `response_type=token id_token`, receives tokens in the
-  redirect fragment, and presents the access token on every backend
-  call. The OIDC **`client_id` is the app name** (the same snake_case
-  identifier that anchors `app.<app_name>` — lowercase letters, digits,
-  and underscores only; no hyphens) — do not invent a separate client
-  ID and do not load it from env.
-- **Flow — every other platform (Flutter, mobile, desktop, CLI):**
-  Authorization Code with PKCE. Load the OIDC `client_id` from env.
+- **Flow:** OAuth 2.0 **Authorization Code grant with PKCE** on every
+  platform. The Implicit grant is deprecated and must not be used.
+  The client redirects to the issuer's authorize endpoint with
+  `response_type=code` and a PKCE `code_challenge`, receives a code
+  on the redirect, and exchanges it at the token endpoint with the
+  matching `code_verifier` for an access token (and refresh token
+  when issued). The access token is presented on every backend call.
+- **`client_id` — TypeScript clients (web/Vite/React/Next/etc.):**
+  the OIDC `client_id` **is the app name** (the same snake_case
+  identifier that anchors `app.<app_name>` — lowercase letters,
+  digits, and underscores only; no hyphens). Do not invent a separate
+  client ID and do not load it from env.
+- **`client_id` — every other platform (Flutter, mobile, desktop,
+  CLI):** load the OIDC `client_id` from env.
 - **Scopes:** the issuer **does not accept the `email` scope** (or
   any other profile-style scope) in the authorize request — asking
-  for it will fail the flow. Request only `openid` (plus `id_token`
-  via `response_type` for the Implicit flow). User profile data
+  for it will fail the flow. Request only `openid`. User profile data
   (`name`, `email`, group membership, etc.) is already embedded as
   claims in the access token; decode the JWT and read claims directly
   rather than calling a userinfo endpoint or asking for extra scopes.
 - **Session storage:** platform-appropriate. For TypeScript web apps,
-  the implicit-flow access token lives in memory plus
-  `sessionStorage` (cleared on tab close) — not `localStorage`, and
-  not exposed to third-party scripts. For Flutter/mobile/desktop, use
-  the OS keychain or `flutter_secure_storage`. For CLIs, an
-  OS-standard config dir. Refresh on expiry where the flow allows;
-  clear on logout in every case.
+  keep the access token in memory and the PKCE `code_verifier` in
+  `sessionStorage` for the duration of the redirect round-trip — not
+  `localStorage`, and never exposed to third-party scripts. For
+  Flutter/mobile/desktop, use the OS keychain or
+  `flutter_secure_storage`. For CLIs, an OS-standard config dir.
+  Refresh on expiry using the refresh token where issued; clear on
+  logout in every case.
 
 The platform already provides the **User** and **Group** classes — they
 are not part of any app's `app.<app_name>` namespace and apps must not
@@ -185,12 +189,12 @@ own:
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
 5. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
-   (Implicit flow with `client_id = <app_name>` for TypeScript
-   clients; Authorization Code with PKCE for everything else),
-   logout, and authenticated requests must work end-to-end before you
-   build feature screens. See "Authentication and authorization"
-   above for the per-platform flow, the `client_id` rule, the
-   User/Group model, and storage rules.
+   (Authorization Code with PKCE on every platform — Implicit is
+   deprecated; `client_id = <app_name>` for TypeScript clients,
+   `client_id` from env elsewhere), logout, and authenticated
+   requests must work end-to-end before you build feature screens.
+   See "Authentication and authorization" above for the `client_id`
+   rule, the User/Group model, and storage rules.
 6. **Ship a vertical slice, then iterate.** One real read + one real write
    against the backend, not stubs. Then start the dev server and stay in
    chat to extend the app.

@@ -114,21 +114,20 @@ small, working slice and then iterating with the user.
 7. **Auth is load-bearing.** Wire OIDC login/logout/session handling
    end-to-end before any feature work. The bootstrapp.cloud OIDC
    issuer is `https://idp.fci.cloud` — resolve endpoints via discovery
-   (`/.well-known/openid-configuration`). For **TypeScript clients**
-   (web/Vite/React/Next/etc.), use the OAuth 2.0 **Implicit** grant
-   (`response_type=token id_token`) and set the `client_id` to the app
-   name itself (the same snake_case identifier that anchors
-   `app.<app_name>` — lowercase letters, digits, and underscores only,
-   no hyphens); do not load the client ID from env. For every
-   other platform (Flutter, mobile, desktop, CLI), use Authorization
-   Code with PKCE and load the `client_id` from env. Store tokens in
-   platform-appropriate storage. **The issuer does not accept the
-   `email` scope (or any other profile-style scope) — request only
-   `openid` (plus `id_token` via `response_type` for the Implicit
-   flow). User profile data (`name`, `email`, group membership) is
-   already embedded as claims in the access token; decode the JWT
-   instead of asking for extra scopes or calling a userinfo
-   endpoint.** bootstrapp.cloud already provides the **User** (UUID
+   (`/.well-known/openid-configuration`). Use the OAuth 2.0
+   **Authorization Code grant with PKCE** on every platform — the
+   Implicit grant is deprecated and must not be used. For
+   **TypeScript clients** (web/Vite/React/Next/etc.), set the
+   `client_id` to the app name itself (the same snake_case identifier
+   that anchors `app.<app_name>` — lowercase letters, digits, and
+   underscores only, no hyphens); do not load the client ID from env.
+   For every other platform (Flutter, mobile, desktop, CLI), load the
+   `client_id` from env. Store tokens in platform-appropriate storage.
+   **The issuer does not accept the `email` scope (or any other
+   profile-style scope) — request only `openid`. User profile data
+   (`name`, `email`, group membership) is already embedded as claims
+   in the access token; decode the JWT instead of asking for extra
+   scopes or calling a userinfo endpoint.** bootstrapp.cloud already provides the **User** (UUID
    `id`) and **Group** (`id`, `name`) classes — never redefine them
    in the app namespace; reference users by storing their UUID. Authorization is group-based and enforced by
    the backend on every object, action, and view; do not reimplement
@@ -220,14 +219,13 @@ small, working slice and then iterating with the user.
 8. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
    client wrapping the generated SDK; load the backend base URL and
    OIDC issuer (`https://idp.fci.cloud`) from env. Implement OIDC
-   login, logout, and authenticated requests end-to-end. **For
-   TypeScript clients**, use the Implicit grant
-   (`response_type=token id_token`) with `client_id` set to the app
-   name (the same snake_case identifier that anchors
-   `app.<app_name>` — lowercase letters, digits, and underscores only,
-   no hyphens) — do not load the client ID from env. **For
-   every other platform**, use Authorization Code with PKCE and load
-   the `client_id` from env. Read the current user (UUID `id`, `name`,
+   login, logout, and authenticated requests end-to-end using the
+   **Authorization Code grant with PKCE** (the Implicit grant is
+   deprecated and must not be used). **For TypeScript clients**, set
+   the `client_id` to the app name (the same snake_case identifier
+   that anchors `app.<app_name>` — lowercase letters, digits, and
+   underscores only, no hyphens) — do not load the client ID from
+   env. **For every other platform**, load the `client_id` from env. Read the current user (UUID `id`, `name`,
    `email`, group membership) by decoding the access-token JWT claims
    — the issuer rejects `email`/profile scopes, so do not request
    them and do not call a userinfo endpoint; everything you need is
@@ -264,10 +262,11 @@ small, working slice and then iterating with the user.
   the feature.
 - Ambiguous auth setup beyond the defaults (redirect URIs,
   non-TypeScript `client_id`) — ask. The issuer
-  (`https://idp.fci.cloud`), the TypeScript flow (Implicit), the
-  TypeScript `client_id` (the app name), and the scope set
-  (`openid` only — `email`/profile scopes are rejected by the
-  issuer) are all fixed; don't ask about those.
+  (`https://idp.fci.cloud`), the flow (Authorization Code with PKCE
+  on every platform — Implicit is deprecated), the TypeScript
+  `client_id` (the app name), and the scope set (`openid` only —
+  `email`/profile scopes are rejected by the issuer) are all fixed;
+  don't ask about those.
 - The user requests something that would require bypassing
   bootstrapp.cloud (e.g. a parallel local database) — push back and
   propose the backend-first alternative.

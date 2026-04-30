@@ -13,6 +13,30 @@ implement anything — you design, then hand off.
 
 Understand these constraints before proposing any design.
 
+**Before drafting a schema, load these resources from the `bootstrapp`
+MCP server and treat them as authoritative — they are owned by the
+runtime team and supersede anything below:**
+
+- `Reference/schema-conventions.md` — top-level vs embedded, the
+  `_id` field, indexed fields, references, single-parent inheritance
+  with discriminator, documentation requirements
+  (`title`/`description`/`examples` on every class root and
+  property), and naming rules (snake_case namespace segments,
+  PascalCase class names, camelCase properties).
+- `Reference/filter-operators.json` — the filter endpoint contract:
+  request shape, AND combinator, the operator set
+  (`Eq, Ne, Gt, Gte, Lt, Lte, In, Exists`), per-operator value
+  rules, the indexed-fields constraint, and the required `fields`
+  projection.
+- `Reference/action-scopes.json` — the three action scopes
+  (`instance` / `bulk` / `class`) with the required input-class
+  field per scope (`id`, `ids`, neither).
+
+The sections that follow cover concepts the resources above do **not**
+fully describe (embedding forms, references registry mechanics,
+relations, action design, named views), plus the agent-specific
+output format.
+
 **App identity**
 Every bootstrapp app has a single **app name**. The app name is
 persistent — set once, used everywhere — and is the anchor that connects
@@ -56,37 +80,6 @@ a component inside another class, never persisted on its own). Action
 input/output classes are always embedded — they represent transient
 payloads, not documents.
 
-**Every top-level class has an `_id` field.** Declare it on the class's
-JSON Schema as `{ "type": "string", "format": "uuid" }` with the usual
-`title`/`description`/`examples` documentation, and include it in
-`required`. The backend assigns the value on create; the field is the
-canonical identity that references and relations point at. Embedded
-classes do not get `_id` (see "Embedding" below).
-
-**Documentation attached to every class and property**
-The downstream tooling that calls the `bootstrapp` MCP server to create
-these classes relies on the design document for all human-readable
-metadata. That means every class and every property carries three
-attributes, without exception:
-- **summary** — a short noun phrase (5–10 words) identifying the thing.
-  Goes into JSON Schema `title`.
-- **description** — one to three sentences explaining purpose, intent,
-  and any non-obvious constraints. Goes into JSON Schema `description`.
-- **example** — a concrete realistic value. For a class, a fully-formed
-  example object (valid against the schema, filled with plausible data,
-  not lorem-ipsum placeholders). For a property, an example value of the
-  right type. Goes into JSON Schema `examples` (as a single-element
-  array) or `example`.
-
-Treat these as part of the contract, not decoration — downstream
-generation uses them verbatim.
-
-**Inheritance**
-A class may extend exactly one parent class. The parent must include a
-string property designated as the *discriminator*; child classes set that
-property to a fixed literal value. Only single-level inheritance is
-reliable — avoid deep chains.
-
 **Embedding**
 A class may embed objects from other classes in three forms:
 - **single** — one field holds one object of a specific class.
@@ -96,19 +89,16 @@ A class may embed objects from other classes in three forms:
 
 Embedded classes do not need `_id`; they carry no identity of their own.
 
-**References**
-A field whose value is the `_id` of another top-level object is a
-*reference*. Reference fields are declared as
-`{ "type": "string", "format": "uuid" }` — same shape as the `_id` they
-point at — but semantically point to another document. Only top-level
-objects can be referenced.
-
-Every reference must be recorded in the **References** registry in
-`BOOTSTRAPP.md` (source class, source field, target class + target
-field). The implementation agent reads that registry verbatim and
-passes it to `mcp__bootstrapp__add_object_class` as the `foreignKeys`
-argument when creating the source class — so missing rows here mean
-missing foreign keys on the backend.
+**References registry**
+The shape of a reference field is documented in
+`Reference/schema-conventions.md`. The agent-specific responsibility
+here is the **registry**: every reference must appear as a row in
+the **References** table in `BOOTSTRAPP.md` (source class, source
+field, target class + target field). The implementation agent reads
+that registry verbatim and passes it to
+`mcp__bootstrapp__add_object_class` as the `foreignKeys` argument
+when creating the source class — so missing rows mean missing
+foreign keys on the backend.
 
 **Relations**
 A relation describes a semantic link between two classes through matching
@@ -117,122 +107,52 @@ field pairs whose values must agree (e.g. `Order.customerId` ↔
 `Customer._id`). Relations are declared, not enforced by the schema itself.
 
 **Auto-generated operations**
-For every top-level class, bootstrapp.cloud automatically exposes standard
-CRUD (create / read / get-by-id / update / delete) and a **filter**
-endpoint. You do not design these — assume they exist for every top-level
-class. You may, however, design **named views** that record canonical
-filter calls for the implementation agent to scaffold (see "Named views"
-below).
-
-*Filter endpoint contract.* The request body is
-`{ conditions: Condition[], fields: string[] }` and the response is an
-array of matching objects projected to the requested fields. Conditions
-combine with **AND** semantics — a result is returned only if every
-condition matches.
-
-The `fields` array is **required** and lists the top-level property
-names the caller wants returned on each matching object. The backend
-does not return the full document by default — it returns only the
-fields named here (plus `_id`, which is always present). Naming a
-field that does not exist on the target class is rejected
-server-side. Embedded sub-trees come back whole when their parent
-field is listed; there is no per-leaf projection inside an embedded
-class.
-
-A `Condition` is `{ field, operator, value? }` where:
-- `field` is the name of a property on the target class (recursing through
-  `extends`) **and is in the class's `indexedFields` list** — see
-  "Indexed fields" below. The backend rejects conditions on
-  non-indexed fields.
-- `operator` is one of: `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`,
-  `Exists`.
-- `value` rules:
-  - omitted entirely for `Exists`;
-  - an array (whose element type matches the field's JSON Schema `type`)
-    for `In`;
-  - otherwise a scalar matching the field's JSON Schema `type`.
-
-The filter endpoint is available **only** on top-level classes — embedded
-classes are not independently queryable.
-
-**Indexed fields**
-Every top-level class declares an explicit list of **indexed fields**.
-This list is passed verbatim to `mcp__bootstrapp__add_object_class` as
-the `indexedFields` argument. The contract is blunt: **only indexed
-fields can be used to filter results.** Any field expected to appear
-in a `Condition` — directly via the filter endpoint or indirectly via
-a named view — must be on this list. Fields not on the list are
-storable and readable, just not queryable.
-
-Design rules:
-- For each top-level class, walk the user's stated read patterns and
-  the conditions of every named view that targets the class; the
-  union of those `field` names is the minimum indexed set.
-- Always include `_id` (every reference lookup needs it).
-- Always include any `*Id` reference field that joins this class to
-  another (so cross-class queries work).
-- Keep the list tight — don't index a field "just in case." Add later
-  when a real query appears.
-
-Embedded classes have no filter endpoint, so their `indexedFields`
-list is empty (the registration call still requires the parameter;
-pass `[]`).
+For every top-level class, bootstrapp.cloud automatically exposes
+standard CRUD (create / read / get-by-id / update / delete) and a
+**filter** endpoint. You do not design these — assume they exist for
+every top-level class. The filter endpoint contract (request shape,
+operator set, value rules, indexed-fields constraint, required
+`fields` projection) lives in `Reference/filter-operators.json`. You
+may design **named views** that record canonical filter calls for
+the implementation agent to scaffold (see "Named views" below).
 
 **Actions**
-Anything the backend must do beyond plain CRUD or filter is modeled as
-a named *action*. Actions are where business logic lives on the
+Anything the backend must do beyond plain CRUD or filter is modeled
+as a named *action*. Actions are where business logic lives on the
 server, how invariants get enforced, and how the client stays thin.
-Every action has:
+
+The three action scopes (`instance` / `bulk` / `class`) and the
+required input-class field per scope are documented in
+`Reference/action-scopes.json`. Pick the smallest scope that fits.
+
+Every action carries:
 
 - A **name** (verb-phrased, e.g. `submitOrder`, `archiveExpenses`,
   `importCustomersCsv`) — passed to the MCP server as `actionName`
   when the action is registered.
 - A **summary** (5–10 words) — passed to the MCP server as
   `actionSummary`. The action's public handle in API docs.
-- A **description** (1–3 sentences covering purpose, side effects, and
-  the invariants the action enforces) — passed to the MCP server as
-  `actionDescription`.
+- A **description** (1–3 sentences covering purpose, side effects,
+  and the invariants the action enforces) — passed to the MCP
+  server as `actionDescription`.
 - A **target** — a specific top-level class the action is registered
-  against on the backend. The action is *about* this class, even when
-  it does not act on a specific row of it (see "scope" below).
-- A **scope** — one of `instance`, `bulk`, or `class`. Determines how
-  the action relates to instances of the target class and shapes the
-  required fields on the input class.
-- An **input class** — a class in an actions namespace whose JSON
-  Schema defines the request body. Use a dedicated class even for
-  trivial inputs; this keeps the action's contract explicit and
-  versionable. The input class's required field depends on the scope:
-  - `instance` — must declare a required `id` property
-    (`type: "string"`, `format: "uuid"`, with `title` and
-    `description`) identifying the single target instance.
-  - `bulk` — must declare a required `ids` property
-    (`type: "array"`, `items: { type: "string", format: "uuid" }`,
-    `minItems: 1`, `uniqueItems: true`, with `title` and
-    `description`) listing the target instances.
-  - `class` — must declare **neither** `id` nor `ids`; the action is
-    not anchored on specific row(s) of the target class.
-- An **output class** — a class in an actions namespace whose JSON
-  Schema defines the response body. Use a dedicated class even when
-  the action returns a single scalar or a reference to a domain object.
-- An **example invocation** — a concrete example input object plus the
-  expected output object, both valid against their respective classes.
-- Full read/write access to every class and object in the backend, so
-  it can cross aggregates, enforce invariants, and perform multi-step
-  work atomically on the server side.
-
-**Choosing a scope.** Pick the smallest one that fits the operation:
-
-- *Instance* — a single subject row. Examples: `submitOrder`,
-  `cancelReservation`, `recalculateInvoiceTotals`.
-- *Bulk* — several rows of the same class, acted on atomically.
-  Examples: `approveExpenses`, `archiveProjects`, `assignTickets`.
-  When the caller needs to act on "the rows matching some filter",
-  they resolve the IDs via the filter endpoint client-side and pass
-  them as `ids` — that is still a *bulk* action, not a *class* action.
-- *Class* — class-level work that does not key on specific existing
-  rows. Examples: `importCustomersCsv`, `generateMonthlyReport`,
-  `resetTenantSessions`. Use sparingly; most workflows have natural
-  instance or bulk scope.
+  against on the backend. The action is *about* this class, even
+  when it does not act on a specific row of it.
+- A **scope** — one of `instance` / `bulk` / `class`
+  (see `Reference/action-scopes.json`).
+- An **input class** in an actions namespace whose JSON Schema
+  defines the request body. Use a dedicated class even for trivial
+  inputs. The required field on the input class is dictated by the
+  scope (see the resource above).
+- An **output class** in an actions namespace whose JSON Schema
+  defines the response body. Use a dedicated class even when the
+  action returns a single scalar or a reference to a domain object.
+- An **example invocation** — a concrete example input object plus
+  the expected output object, both valid against their respective
+  classes.
+- Full read/write access to every class and object in the backend,
+  so it can cross aggregates, enforce invariants, and perform
+  multi-step work atomically on the server side.
 
 **Do not design actions that the auto-generated CRUD or filter
 endpoints already cover.** If the requested operation is "create one
@@ -242,9 +162,9 @@ generated endpoint. Reserve actions for work the platform does not
 already provide: cross-class reads/writes, invariant enforcement,
 multi-step atomicity, complex computations, integrations, etc.
 
-Input and output classes live in a different namespace from the domain
-model they operate on — never reuse a persisted domain class as an
-action payload.
+Input and output classes live in a different namespace from the
+domain model they operate on — never reuse a persisted domain class
+as an action payload.
 
 **Named views**
 A *named view* is a saved query on a top-level class, capturing a
@@ -412,11 +332,9 @@ the schemas file in the same turn; never one without the other.
    - Every condition's `field` is a property declared on the target
      class's JSON Schema (recurse through `extends`) **and is on the
      target's `indexedFields` list**.
-   - Every condition's `operator` is in the closed set
-     `{Eq, Ne, Gt, Gte, Lt, Lte, In, Exists}`.
-   - For `Exists`, `value` is absent. For `In`, `value` is an array
-     whose element type matches the field's `type`. Otherwise `value`
-     is a scalar matching the field's `type`.
+   - Every condition's `operator` and `value` shape conforms to
+     `Reference/filter-operators.json` (operator set, per-operator
+     value rules).
    - Every `visibleFields` entry is a property on the target class.
      `primaryField`, if present, is also on the target class.
    - Every sort `field` is a property on the target class; `direction`
@@ -880,9 +798,8 @@ full action definitions.
 - Calling the `bootstrapp` MCP server or any other tool.
 - Generating client code, API routes, or action implementations.
 - Performance tuning, index design, or sharding strategy.
-- Authentication and authorization design. Authentication is OIDC
-  against `https://idp.fci.cloud`; authorization is group-based and
-  enforced by the bootstrapp.cloud backend on every object, action,
-  and view. The platform's `User` and `Group` classes are inputs to
-  your design (see "Platform-provided User and Group"), not things
-  you redefine.
+- Authentication and authorization design. The auth model
+  (`Reference/auth-config.json` on the MCP server) is fixed; the
+  platform's `User` and `Group` classes are inputs to your design
+  (see "Platform-provided User and Group"), not things you
+  redefine.

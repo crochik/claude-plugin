@@ -29,93 +29,32 @@ through the schema architect; you only consume the design.
 
 ## ApiScript — the language you emit
 
-ApiScript is a subset of TypeScript. Stay inside it — anything outside the
-grammar below will be rejected by the runtime. The full grammar lives at
-[ApiScript.g4](../ApiScript.g4) in the plugin repo; the relevant rules:
+ApiScript is a deliberately small TypeScript subset that the
+bootstrapp.cloud runtime executes. Anything outside it is rejected at
+deploy time. **Before drafting any script, load these resources from
+the `bootstrapp` MCP server and treat them as authoritative:**
 
-**Allowed at the top of a file:**
+- `Reference/api-script.md` — the curated "what's allowed / not
+  allowed" rule book (statements, expressions, type annotations,
+  forbidden constructs).
+- `Reference/platform-modules.d.ts` — the canonical TypeScript
+  declarations for every runtime helper module
+  (`platform/objects`, `platform/auth`, `platform/email`,
+  `platform/time`, `platform/uuid`, `platform/errors`,
+  `platform/log`, `platform/http`) including JSDoc on argument
+  semantics (e.g. `find`'s required `fields` array, the
+  fully-qualified-class-name convention).
+- `Reference/api-script.g4` — the canonical ANTLR4 grammar, for any
+  syntax question the rule book doesn't answer.
 
-- `import "<module-path>" as <alias>;` — bring in runtime helpers. The string
-  literal is the module path; the alias is how you reference its exports.
-- `function <name>(<params>): <returnType> { ... }` — top-level function
-  declarations. The script's entry point is `function execute(input: <Input>):
-  <Output>`. Use it for every action.
+If an action genuinely needs a capability the declared modules don't
+expose, invent a sensibly-named import (e.g.
+`import "platform/payments" as payments;`) and call it out in the
+action's **External functions used** line so the architect can flag
+imports the runtime hasn't yet implemented.
 
-**Allowed statements:**
-
-- `const x = expr;` / `let x = expr;` — variable declaration. Prefer `const`;
-  use `let` only when reassigning.
-- `<expr>;` — expression statement (function calls, assignments).
-- `if (cond) { ... } else { ... }` — `else` is optional.
-- `for (let i = 0; i < n; i = i + 1) { ... }` — C-style; no `for…of` /
-  `for…in`. Iterate arrays with an index or with a helper from
-  `platform/arrays`.
-- `while (cond) { ... }`.
-- `return <expr>;` — every `execute` must return something matching the
-  output class.
-
-**Allowed expressions:** member access (`a.b`), index (`a[i]`), function
-call (`f(x, y)`), unary (`!`, `+`, `-`), arithmetic (`+ - * / %`),
-comparison (`< > <= >=`), equality (`== !=`), logical (`&& ||`), null
-coalescing (`a ?? b`), ternary (`c ? a : b`), assignment to identifiers,
-member targets, or index targets. Object literals (`{ a: 1, ...rest }`)
-and array literals (`[1, 2, ...rest]`) with spread are supported.
-Primaries: `IDENTIFIER`, `NUMBER`, `STRING`, `true`, `false`, `null`.
-
-**Type annotations on parameters and return types** are allowed and
-encouraged: `number`, `string`, `boolean`, `any`, `T[]`, or any
-`IDENTIFIER` (treat namespace-qualified class names as the trailing
-identifier, e.g. annotate `SubmitOrderInput` rather than
-`app.expense_tracker.actions.SubmitOrderInput`).
-
-**Not allowed:**
-
-- `class`, `interface`, `enum`, `type`, generics, decorators, `async` /
-  `await`, `try` / `catch` / `throw`, `switch`, arrow functions, default
-  parameters, destructuring in declarations, template literals, the
-  `new` operator, optional chaining (`?.`), `for…of` / `for…in`.
-- Comments are stripped (`//` and `/* */`) — they're fine to include in
-  the markdown script for readers, but do not rely on them at runtime.
-
-When in doubt, write it the boring C-style way. Pseudo-code that reads
-slightly clunky to a TypeScript developer is exactly right.
-
-## Conventional runtime imports
-
-The runtime exposes a small set of platform modules. Use these names by
-default — they are stable and read well across actions. If an action
-genuinely needs a capability not on this list, invent a sensibly named
-import (e.g. `import "platform/payments" as payments;`) and document it
-in the action's **External functions used** line so the architect can
-flag any that are not yet implemented on the runtime.
-
-| Import | Alias | Typical functions |
-|---|---|---|
-| `"platform/objects"`  | `objects`  | `objects.load(type, id)`, `objects.save(obj)`, `objects.create(type, data)`, `objects.delete(type, id)`, `objects.find(type, conditions, fields)` |
-| `"platform/auth"`     | `auth`     | `auth.currentUser()`, `auth.currentGroup()` |
-| `"platform/email"`    | `email`    | `email.create({ to, subject, body })`, `email.send(msg)` |
-| `"platform/time"`     | `time`     | `time.now()` (ISO-8601 string), `time.todayIso()` |
-| `"platform/uuid"`     | `uuid`     | `uuid.v4()` |
-| `"platform/errors"`   | `errors`   | `errors.fail(code, message)` (terminates the action with a structured failure) |
-| `"platform/log"`      | `log`      | `log.info(...)`, `log.warn(...)`, `log.error(...)` |
-| `"platform/http"`     | `http`     | `http.get(url, headers)`, `http.post(url, body, headers)` |
-
-Conventions:
-
-- Pass **fully-qualified class names** to `objects.load`, `objects.create`,
-  `objects.delete`, and `objects.find` — `"app.<app_name>.Order"`, not
-  `"Order"`. The runtime resolves on the fully-qualified name.
-- `objects.find`'s third argument is the same `fields` array the filter
-  endpoint requires. Never omit it.
-- `objects.find`'s second argument is a `Condition[]` — the same
-  `{ field, operator, value? }` shape the filter endpoint takes — combined
-  with **AND**. Honor the indexed-fields constraint: every condition
-  must hit a property on the target's `indexedFields` list (look it up
-  in `BOOTSTRAPP.md` / the relevant schemas file).
-- Use `errors.fail("code", "message")` — not `return` — when the action
-  must abort. Reserve `return` for the success path.
-- Decode user/group context through `auth.currentUser()` /
-  `auth.currentGroup()`; don't pass them in via the input class.
+When in doubt, write it the boring C-style way. Pseudo-code that
+reads slightly clunky to a TypeScript developer is exactly right.
 
 ## Output format — `scripts/<ActionsNamespace>.md`
 

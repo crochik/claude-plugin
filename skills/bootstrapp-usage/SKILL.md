@@ -39,35 +39,26 @@ UI scaffold, and starting the dev server.
   client will call.
 - **Your code lives on the client.** Claude's job is to generate a thin,
   idiomatic client that talks to the bootstrapp backend — nothing more.
-- **The backend exposes two kinds of operations.** Auto-generated CRUD and
-  a **filter** endpoint for every top-level class, plus named *actions*
-  for anything else. The filter endpoint takes an AND-array of conditions
-  (`{field, operator, value?}`) over the operator set
-  `Eq, Ne, Gt, Gte, Lt, Lte, In, Exists` **and a required `fields`
-  array** naming the top-level properties to return on each match
-  (the backend projects to that list — it does not return the full
-  document by default; `_id` is always included). **Conditions are
-  only valid on a class's indexed fields** (declared at registration
-  time via `add_object_class`'s `indexedFields` argument and recorded
-  in the schemas file); the backend rejects conditions on non-indexed
-  properties. See the
-  [`bootstrapp-schema-architect`](../../agents/bootstrapp-schema-architect.md)
-  agent for the full contract — value rules per operator, type-matching
-  against the field's JSON Schema, and `Exists`/`In` specifics. Actions
-  carry the business logic: each has an input class and an output class
-  (both defined as JSON Schema in a dedicated actions namespace), full
-  read/write access to every class, and runs atomically on the server.
-  Actions come in three **scopes** depending on how they relate to the
-  target class: `instance` (input has a required `id` — one row),
-  `bulk` (input has a required `ids` array — many rows of the same
-  class, acted on atomically), or `class` (input has neither — class-
-  level work not keyed on specific rows). Pick the smallest scope that
-  fits. **Do not design actions that the auto-generated CRUD or filter
-  endpoints already cover** — reserve actions for cross-class work,
-  invariant enforcement, multi-step atomicity, or anything else the
-  platform doesn't already provide. If a workflow spans multiple
-  documents, enforces invariants, or needs atomicity, it is an action,
-  not a client-side orchestration.
+- **The backend exposes two kinds of operations.** Auto-generated
+  CRUD and a **filter** endpoint for every top-level class, plus
+  named *actions* for anything else. The full filter contract —
+  request shape, AND combinator, the operator set, per-operator
+  value rules, the indexed-fields constraint, and the required
+  `fields` projection — lives in `Reference/filter-operators.json`
+  on the `bootstrapp` MCP server; load it before generating any
+  filter call. Actions carry the business logic: each has an input
+  class and an output class (both defined as JSON Schema in a
+  dedicated actions namespace), full read/write access to every
+  class, and runs atomically on the server. Actions come in three
+  **scopes** (`instance` / `bulk` / `class`); the per-scope
+  required-input-field rules and selection guidance live in
+  `Reference/action-scopes.json`. **Do not design actions that the
+  auto-generated CRUD or filter endpoints already cover** — reserve
+  actions for cross-class work, invariant enforcement, multi-step
+  atomicity, or anything else the platform doesn't already
+  provide. If a workflow spans multiple documents, enforces
+  invariants, or needs atomicity, it is an action, not a
+  client-side orchestration.
 - **Classes live in namespaces rooted at `app.<app_name>`.** The domain
   model sits under `app.<app_name>` and action I/O classes sit under
   `app.<app_name>.actions`. Reference classes in generated code with their
@@ -89,20 +80,14 @@ any sort/label field that the screen needs but is not already in the
 list), renders those fields (using `primaryField` for row labels when
 present), and applies the view's sort and limit.
 
-For **on-demand filter calls** (queries that aren't registered as a view),
-build the request body as `{ conditions: [...], fields: [...] }`. Each
-condition's `value` must match the target class's property type: omit
-it for `Exists`, pass an array for `In`, pass a scalar otherwise. The
-`fields` array is required and must explicitly list every top-level
-property the caller intends to read on the response (`_id` always comes
-back; everything else only comes back if named). Reject any condition
-whose `field` is not on the target class **or is not in the class's
-`indexedFields` list** — the filter will reject it server-side too.
-Reject any entry in `fields` that is not a property of the target
-class for the same reason. If a query needs a non-indexed field, route through
-`/bootstrapp:design-model` to add the field to `indexedFields`
-and re-run class creation; if the same query keeps reappearing,
-register it as a named view at the same time.
+For **on-demand filter calls** (queries that aren't registered as a
+view), follow the contract in `Reference/filter-operators.json`
+verbatim — request shape, condition shape, per-operator value
+rules, and the indexed-fields / `fields` projection requirements
+all live there. If a query needs a non-indexed field, route
+through `/bootstrapp:design-model` to add the field to
+`indexedFields` and re-run class creation; if the same query
+keeps reappearing, register it as a named view at the same time.
 
 **Sort and limit:** if the OpenAPI spec exposes sort/limit params on the
 filter endpoint, pass them. Otherwise sort and slice client-side after
@@ -111,67 +96,30 @@ the call. Discover, don't guess.
 ## Authentication and authorization
 
 bootstrapp.cloud apps authenticate users through **OpenID Connect**.
+The canonical configuration — issuer, OIDC discovery endpoint,
+grant type, scope policy (which scopes to request, which the
+issuer rejects), `client_id` derivation rules per platform, token
+storage guidance, the platform-provided User/Group classes, the
+group-based authorization model, and the user-initiated login
+entry-point requirement — lives in **`Reference/auth-config.json`**
+on the `bootstrapp` MCP server. Load that resource before wiring
+auth and treat it as authoritative; do not invent or hardcode any
+of it.
 
-- **Issuer:** `https://idp.fci.cloud`. Resolve endpoints via OIDC
-  discovery (`/.well-known/openid-configuration`) — never hardcode
-  authorize / token / userinfo paths.
-- **Flow:** OAuth 2.0 **Authorization Code grant with PKCE** on every
-  platform. The Implicit grant is deprecated and must not be used.
-  The client redirects to the issuer's authorize endpoint with
-  `response_type=code` and a PKCE `code_challenge`, receives a code
-  on the redirect, and exchanges it at the token endpoint with the
-  matching `code_verifier` for an access token (and refresh token
-  when issued). The access token is presented on every backend call.
-- **`client_id` — TypeScript clients (web/Vite/React/Next/etc.):**
-  the OIDC `client_id` **is the app name** (the same snake_case
-  identifier that anchors `app.<app_name>` — lowercase letters,
-  digits, and underscores only; no hyphens). Do not invent a separate
-  client ID and do not load it from env.
-- **`client_id` — every other platform (Flutter, mobile, desktop,
-  CLI):** load the OIDC `client_id` from env.
-- **Scopes:** the issuer **does not accept the `email` scope** (or
-  any other profile-style scope) in the authorize request — asking
-  for it will fail the flow. Request only `openid`. User profile data
-  (`name`, `email`, group membership, etc.) is already embedded as
-  claims in the access token; decode the JWT and read claims directly
-  rather than calling a userinfo endpoint or asking for extra scopes.
-- **Session storage:** platform-appropriate. For TypeScript web apps,
-  keep the access token in memory and the PKCE `code_verifier` in
-  `sessionStorage` for the duration of the redirect round-trip — not
-  `localStorage`, and never exposed to third-party scripts. For
-  Flutter/mobile/desktop, use the OS keychain or
-  `flutter_secure_storage`. For CLIs, an OS-standard config dir.
-  Refresh on expiry using the refresh token where issued; clear on
-  logout in every case.
+The mental model that surrounds the resource:
 
-The platform already provides the **User** and **Group** classes — they
-are not part of any app's `app.<app_name>` namespace and apps must not
-redefine them.
-
-- **User** — has an `id` (UUID string) and belongs to exactly one
-  Group. Apps reference users by storing the UUID in a string field
+- Authorization is enforced by the backend on every object, action,
+  and view. The client never decides what a user is allowed to do;
+  it issues the call and surfaces whatever the backend returns
+  (including authorization rejections). Do not replicate the access
+  policy on the client.
+- Reference users by storing their UUID in a string field
   (e.g. `ownerId: string`), the same way any other cross-document
-  reference works.
-- **Group** — has an `id` and a `name`. Group membership is what
-  governs access.
-- **Authorization is group-based and enforced by the backend** on
-  every object, action, and view. The client never decides what a
-  user is allowed to do; it issues the call and surfaces whatever
-  the backend returns (including authorization rejections). Do not
-  replicate the access policy on the client.
-
-When the client needs the current user (to show their name or
-email, filter "my X", etc.), decode the access-token JWT and read
-it from the claims after login — do not infer it from app data, do
-not request extra scopes (the issuer rejects `email`/profile
-scopes), and do not call a userinfo endpoint. `name`, `email`, and
-group membership all arrive as claims on the token.
-
-**Every app must expose a user-initiated way to start the login
-flow** — a Login button on web, a sign-in screen on mobile/desktop,
-a `login` subcommand on a CLI. Unauthenticated users (first visit,
-expired session, post-logout) must always see an obvious affordance
-to begin authentication; do not rely on automatic redirects alone.
+  reference works. Never redefine `User` or `Group` in the app
+  namespace.
+- Decode current-user info from access-token JWT claims after login;
+  the resource explains why (extra scopes are rejected by the
+  issuer, profile claims are already on the token).
 
 ## Default workflow
 
@@ -197,13 +145,12 @@ own:
      files.
    - Isolate backend access in a `bootstrapp/` module or package.
    - Load the base URL and any public keys from env vars — never hardcode.
-5. **Wire auth first.** OIDC login against `https://idp.fci.cloud`
-   (Authorization Code with PKCE on every platform — Implicit is
-   deprecated; `client_id = <app_name>` for TypeScript clients,
-   `client_id` from env elsewhere), logout, and authenticated
+5. **Wire auth first.** OIDC login, logout, and authenticated
    requests must work end-to-end before you build feature screens.
-   See "Authentication and authorization" above for the `client_id`
-   rule, the User/Group model, and storage rules.
+   Follow `Reference/auth-config.json` (issuer, grant, scopes,
+   `client_id` rule, token storage, User/Group model) — see the
+   "Authentication and authorization" section above for the
+   surrounding mental model.
 6. **Ship a vertical slice, then iterate.** One real read + one real write
    against the backend, not stubs. Then start the dev server and stay in
    chat to extend the app.
@@ -223,9 +170,10 @@ own:
 
 ## Things to never do
 
-- Don't invent endpoints, field names, or auth flows. Always verify through
-  the MCP server first. The OIDC issuer is fixed at
-  `https://idp.fci.cloud`; everything else is discovered.
+- Don't invent endpoints, field names, or auth flows. Always
+  verify through the MCP server first. The OIDC config (issuer,
+  grant, scopes, `client_id` rule) is fixed by
+  `Reference/auth-config.json`; everything else is discovered.
 - Don't redefine `User` or `Group` in the app namespace — they are
   platform classes. Reference users by storing their UUID in a string
   field. Don't reimplement group-based access control on the client;

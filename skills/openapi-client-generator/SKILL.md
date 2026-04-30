@@ -152,20 +152,18 @@ relocate it.
 
 ### Filter endpoints
 
-The generated client exposes one **filter** method per top-level class.
-It accepts the conditions array specified in the
-[`bootstrapp-usage`](../bootstrapp-usage/SKILL.md) skill (AND-array of
-`{field, operator, value?}` over `Eq, Ne, Gt, Gte, Lt, Lte, In,
-Exists`) **and a required `fields` array** that names the top-level
-properties to project onto the response — the backend returns only
-those fields (plus `_id`), so callers must list every property the
-caller will read. For named views, pass the view's `visibleFields`
-(plus any sort/label field the screen needs that isn't already in
-the list); for ad-hoc calls, pass the explicit list the caller needs.
-Sort and limit support depends on the spec — inspect the generated
-method signature; if absent, sort and slice client-side after the
-call. Use these methods to back named views (recorded in
-`BOOTSTRAPP.md`) and ad-hoc on-demand filters alike.
+The generated client exposes one **filter** method per top-level
+class. The request shape, operator set, value rules, and the
+required `fields` projection are documented authoritatively in
+`Reference/filter-operators.json` on the `bootstrapp` MCP server —
+load it before generating call sites. For named views, pass the
+view's `visibleFields` (plus any sort/label field the screen needs
+that isn't already in the list); for ad-hoc calls, pass the
+explicit list the caller needs. Sort and limit support depends on
+the spec — inspect the generated method signature; if absent,
+sort and slice client-side after the call. Use these methods to
+back named views (recorded in `BOOTSTRAPP.md`) and ad-hoc on-demand
+filters alike.
 
 ## Things to never do
 

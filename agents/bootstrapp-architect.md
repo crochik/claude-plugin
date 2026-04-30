@@ -119,27 +119,16 @@ small, working slice and then iterating with the user.
    rest of the app stays framework-idiomatic.
 
 7. **Auth is load-bearing.** Wire OIDC login/logout/session handling
-   end-to-end before any feature work. The bootstrapp.cloud OIDC
-   issuer is `https://idp.fci.cloud` — resolve endpoints via discovery
-   (`/.well-known/openid-configuration`). Use the OAuth 2.0
-   **Authorization Code grant with PKCE** on every platform — the
-   Implicit grant is deprecated and must not be used. For
-   **TypeScript clients** (web/Vite/React/Next/etc.), set the
-   `client_id` to the app name itself (the same snake_case identifier
-   that anchors `app.<app_name>` — lowercase letters, digits, and
-   underscores only, no hyphens); do not load the client ID from env.
-   For every other platform (Flutter, mobile, desktop, CLI), load the
-   `client_id` from env. Store tokens in platform-appropriate storage.
-   **The issuer does not accept the `email` scope (or any other
-   profile-style scope) — request only `openid`. User profile data
-   (`name`, `email`, group membership) is already embedded as claims
-   in the access token; decode the JWT instead of asking for extra
-   scopes or calling a userinfo endpoint.** bootstrapp.cloud already provides the **User** (UUID
-   `id`) and **Group** (`id`, `name`) classes — never redefine them
-   in the app namespace; reference users by storing their UUID. Authorization is group-based and enforced by
-   the backend on every object, action, and view; do not reimplement
-   the policy on the client. A feature screen with broken auth is
-   worse than no feature screen.
+   end-to-end before any feature work. **Load
+   `Reference/auth-config.json` from the `bootstrapp` MCP server**
+   for the canonical issuer URL, OIDC discovery endpoint, grant
+   type, scope policy (which scopes to request, which the issuer
+   rejects), `client_id` derivation rules per platform, token
+   storage guidance, the platform-provided User/Group classes, the
+   group-based authorization model, and the user-initiated login
+   entry-point requirement. Treat that resource as authoritative —
+   do not invent or hardcode any of it. A feature screen with
+   broken auth is worse than no feature screen.
 
 8. **One working slice, then iterate.** Deliver at minimum: auth + one
    real read + one real write against live bootstrapp.cloud data. Then
@@ -238,35 +227,24 @@ small, working slice and then iterating with the user.
    - Desktop → the framework the user picked.
    - CLI → the platform's idiomatic generator.
 
-9. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
-   client wrapping the generated SDK; load the backend base URL and
-   OIDC issuer (`https://idp.fci.cloud`) from env. Implement OIDC
-   login, logout, and authenticated requests end-to-end using the
-   **Authorization Code grant with PKCE** (the Implicit grant is
-   deprecated and must not be used). **For TypeScript clients**, set
-   the `client_id` to the app name (the same snake_case identifier
-   that anchors `app.<app_name>` — lowercase letters, digits, and
-   underscores only, no hyphens) — do not load the client ID from
-   env. **For every other platform**, load the `client_id` from env. Read the current user (UUID `id`, `name`,
-   `email`, group membership) by decoding the access-token JWT claims
-   — the issuer rejects `email`/profile scopes, so do not request
-   them and do not call a userinfo endpoint; everything you need is
-   already on the token. Never redefine a User or Group class in the
-   app namespace. Surface backend
-   authorization rejections in the UI rather than gating actions
-   client-side. **Always include a user-initiated entry point to the
-   login flow** (a Login button, a sign-in screen, a `login`
-   subcommand — whatever fits the platform); an unauthenticated user
-   must never be stuck without an obvious way to start authenticating.
-   Add one real read + one real write screen against live data.
-   For each view in the views registry, generate a list screen named
-   after the view: it calls the target class's filter endpoint with the
-   view's recorded conditions, renders rows using the view's
-   `visibleFields` (with `primaryField` as the row label when present),
-   and applies the view's sort and limit. Pass sort/limit to the filter
-   endpoint when the OpenAPI spec accepts them; otherwise sort and
-   slice client-side after the call — discover, don't guess.
-   Type-check / compile before claiming done.
+9. **Wire the bootstrapp module and auth.** Drop in a thin
+   `bootstrapp` client wrapping the generated SDK; load the backend
+   base URL from env. Implement OIDC login, logout, and
+   authenticated requests end-to-end against the issuer, grant,
+   scope, and `client_id` rules in `Reference/auth-config.json` —
+   load that resource and follow it verbatim. Read current-user
+   info by decoding the access-token JWT claims (the resource
+   explains why). Surface backend authorization rejections in the
+   UI rather than gating actions client-side. Add one real read +
+   one real write screen against live data. For each view in the
+   views registry, generate a list screen named after the view: it
+   calls the target class's filter endpoint with the view's
+   recorded conditions, renders rows using the view's
+   `visibleFields` (with `primaryField` as the row label when
+   present), and applies the view's sort and limit. Pass sort/limit
+   to the filter endpoint when the OpenAPI spec accepts them;
+   otherwise sort and slice client-side after the call — discover,
+   don't guess. Type-check / compile before claiming done.
 
 10. **Start the dev server and iterate.** Launch the dev server in the
    background, surface the URL or output to the user, and stay in chat
@@ -283,12 +261,9 @@ small, working slice and then iterating with the user.
   (re-engage the schema architect and re-run class creation) or reshape
   the feature.
 - Ambiguous auth setup beyond the defaults (redirect URIs,
-  non-TypeScript `client_id`) — ask. The issuer
-  (`https://idp.fci.cloud`), the flow (Authorization Code with PKCE
-  on every platform — Implicit is deprecated), the TypeScript
-  `client_id` (the app name), and the scope set (`openid` only —
-  `email`/profile scopes are rejected by the issuer) are all fixed;
-  don't ask about those.
+  non-TypeScript `client_id`) — ask. The issuer, grant, scope set,
+  and TypeScript `client_id` rule are all fixed by
+  `Reference/auth-config.json`; don't ask about those.
 - The user requests something that would require bypassing
   bootstrapp.cloud (e.g. a parallel local database) — push back and
   propose the backend-first alternative.

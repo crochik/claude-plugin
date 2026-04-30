@@ -66,3 +66,9 @@ document.
   whether the user wants the `bootstrapp-architect` to apply the
   schema changes to the backend (re-running class creation via the
   MCP server and regenerating the API client) or to defer until later.
+- If the change touched the action registry (added, renamed, removed,
+  or reshaped any action), also offer to invoke the
+  **`bootstrapp-action-scripter`** subagent to refresh the matching
+  `scripts/<ActionsNamespace>.md` file(s) before the architect applies
+  the schema. The scripter is design-only and can run independently of
+  any backend work.

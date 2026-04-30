@@ -49,7 +49,7 @@ layout.
 
 ## Agent responsibility split
 
-The two agents are intentionally separate and should stay that way:
+The three agents are intentionally separate and should stay that way:
 
 - **[bootstrapp-schema-architect](./agents/bootstrapp-schema-architect.md)** —
   design-only. Produces a backend blueprint (namespaces, classes, inheritance
@@ -60,19 +60,34 @@ The two agents are intentionally separate and should stay that way:
   [/bootstrapp:new-app](./commands/new-app.md) (Phase 4) for new apps,
   and from [/bootstrapp:design-model](./commands/design-model.md) for
   schema-only changes on existing apps.
+- **[bootstrapp-action-scripter](./agents/bootstrapp-action-scripter.md)** —
+  design-only, action-implementation layer. Reads `BOOTSTRAPP.md` and the
+  actions-namespace schemas files, then writes one
+  `scripts/<ActionsNamespace>.md` per actions namespace with an ApiScript
+  pseudo-implementation of each action. ApiScript is a simplified TypeScript
+  dialect (grammar at [ApiScript.g4](./ApiScript.g4)) that the
+  bootstrapp.cloud runtime executes server-side. The agent uses a small
+  set of conventional runtime imports (`platform/objects`,
+  `platform/email`, `platform/auth`, `platform/time`, `platform/errors`,
+  `platform/log`, `platform/http`, `platform/uuid`) and may invent
+  additional ones when an action genuinely needs them — flagging the new
+  helpers in the script's **External functions used** line. Never touches
+  the MCP server, the schemas files, or client code.
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
   discovery, implementation, and iteration. Runs the upfront discovery
-  exchange (clarifying scope, offering feedback), drives the `bootstrapp`
+  exchange (clarifying scope, offering feedback), hands off to the schema
+  architect, then to the action scripter, then drives the `bootstrapp`
   MCP server to create classes from `BOOTSTRAPP.md` and register actions,
   invokes the [openapi-client-generator skill](./skills/openapi-client-generator/SKILL.md)
   to emit the typed client, scaffolds the UI app, wires auth, then starts
   the dev server and stays in chat to iterate with the user. Driven
   end-to-end by [/bootstrapp:new-app](./commands/new-app.md).
 
-Design flows *through* the schema architect *into* the implementation architect
-— do not collapse the two. The architect handles app-concept discovery
-(features, scope, users); the schema architect handles model design
-(classes, relations, actions).
+Design flows *through* the schema architect, then *through* the action
+scripter, *into* the implementation architect — do not collapse them. The
+architect handles app-concept discovery (features, scope, users); the
+schema architect handles model design (classes, relations, actions); the
+action scripter handles each action's pseudo-code body.
 
 ## Operating conventions encoded in the plugin
 
@@ -91,20 +106,24 @@ extending:
   in separate namespaces, both rooted at `app.<app_name>` (the literal
   prefix `app.` followed by the app name); action payload classes are
   never reused domain classes.
-- **`BOOTSTRAPP.md` anchors the app; `schemas/` holds the definitions.**
-  The blueprint is split: `BOOTSTRAPP.md` at the project root is the
-  **index** (app identity + registry tables for classes, actions,
-  embeddings, references, relations — no JSON Schemas), and one
-  `schemas/<Namespace>.md` file per namespace holds the full class
-  definitions (the actions namespace file also holds the full action
-  definitions). The schema architect writes and evolves both sides;
-  the implementation architect and any other reader load the index
-  first, then only the schemas files relevant to the change.
-  Invariant: every class and action appears in exactly one schemas
-  file *and* exactly one row of the matching registry — never one
-  without the other. When a user's project already has a
-  `BOOTSTRAPP.md`, the index plus schemas files are the source of
-  truth — read them before proposing changes, and never rename the
+- **`BOOTSTRAPP.md` anchors the app; `schemas/` holds the definitions;
+  `scripts/` holds the action bodies.** The blueprint is split:
+  `BOOTSTRAPP.md` at the project root is the **index** (app identity +
+  registry tables for classes, actions, embeddings, references, relations
+  — no JSON Schemas), one `schemas/<Namespace>.md` file per namespace
+  holds the full class definitions (the actions namespace file also holds
+  the full action definitions), and one `scripts/<ActionsNamespace>.md`
+  per actions namespace holds the ApiScript pseudo-implementation of
+  each action. The schema architect writes the index and schemas files;
+  the action scripter writes the script files; the implementation
+  architect and any other reader load the index first, then only the
+  schemas/scripts files relevant to the change. Invariant: every class
+  and action appears in exactly one schemas file *and* exactly one row
+  of the matching registry — never one without the other. Every action
+  also appears in exactly one script file (in the namespace matching
+  its input/output classes). When a user's project already has a
+  `BOOTSTRAPP.md`, the index plus schemas/scripts files are the source
+  of truth — read them before proposing changes, and never rename the
   app silently.
 - **One working vertical slice.** Auth + one real read + one real write beats
   elaborate stubs.

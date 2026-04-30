@@ -106,6 +106,18 @@ It will:
   JSON Schemas (and, for an actions namespace, full action
   definitions).
 
+## Phase 4b — Action scripts via `bootstrapp-action-scripter`
+
+Once the schema is settled, the `bootstrapp-architect` invokes the
+**`bootstrapp-action-scripter`** subagent. It reads `BOOTSTRAPP.md`
+plus every `schemas/app.<app_name>[.<sub>].actions.md`, drafts an
+ApiScript pseudo-implementation for each action in the registry,
+presents the drafts in chat for confirmation, and writes
+`scripts/<ActionsNamespace>.md` — one file per actions namespace,
+parallel to `schemas/`. The scripts are design artifacts that travel
+with the blueprint; they are not compiled into the client and do not
+require the backend to be live yet.
+
 ## Phase 5 — Create classes on the backend
 
 Hand back to the **`bootstrapp-architect`**. It will:

@@ -180,7 +180,19 @@ small, working slice and then iterating with the user.
    `schemas/<Namespace>.md` per namespace. Do not draft the schema
    yourself.
 
-5. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
+5. **Hand off to `bootstrapp-action-scripter`.** Once the schema
+   architect has settled the action registry, invoke
+   `bootstrapp-action-scripter` and pass it the app name plus the
+   list of actions namespaces touched (or "all" for a new app). It
+   will read the blueprint, draft an ApiScript pseudo-implementation
+   for every action in scope, present the drafts in chat for
+   confirmation, and write `scripts/<ActionsNamespace>.md` — one
+   file per actions namespace, parallel to the schemas folder. Treat
+   these scripts as design artifacts that travel with the blueprint;
+   they are not code you compile or ship to the client. Do not draft
+   the scripts yourself.
+
+6. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
    `schemas/*.md` it references. Walk the class registry in order
    (top-level classes first, then embedded, then action input/output
    classes), pulling each class's JSON Schema and recorded
@@ -205,12 +217,12 @@ small, working slice and then iterating with the user.
    `register_action` parameter — inspect the tool's schema once for
    the exact parameter name rather than guessing.
 
-6. **Generate the API client** via the
+7. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).
    The skill's three steps are strictly ordered and each depends on
    the previous one: (a) call
    `mcp__bootstrapp__generate_openapi_spec` with `applicationName`
-   set to the app name from `BOOTSTRAPP.md` — only after step 5 has
+   set to the app name from `BOOTSTRAPP.md` — only after step 6 has
    created every class and action on the backend, since the spec
    reflects current backend state; (b) download and save the returned
    spec to a local file; (c) run `generate_api.sh` against the saved
@@ -219,14 +231,14 @@ small, working slice and then iterating with the user.
    `generate_openapi_spec` before the classes exist — both produce a
    stale or empty client.
 
-7. **Scaffold the UI app** with the platform's official generator:
+8. **Scaffold the UI app** with the platform's official generator:
    - Web → `npm create vite@latest` (TypeScript + React unless the user
      asked otherwise).
    - Mobile → `flutter create`.
    - Desktop → the framework the user picked.
    - CLI → the platform's idiomatic generator.
 
-8. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
+9. **Wire the bootstrapp module and auth.** Drop in a thin `bootstrapp`
    client wrapping the generated SDK; load the backend base URL and
    OIDC issuer (`https://idp.fci.cloud`) from env. Implement OIDC
    login, logout, and authenticated requests end-to-end using the
@@ -256,13 +268,13 @@ small, working slice and then iterating with the user.
    slice client-side after the call — discover, don't guess.
    Type-check / compile before claiming done.
 
-9. **Start the dev server and iterate.** Launch the dev server in the
+10. **Start the dev server and iterate.** Launch the dev server in the
    background, surface the URL or output to the user, and stay in chat
    to extend the app: add features, fix bugs, regenerate the client
    when the schema changes, and respond to user feedback until the user
    signals the app is complete.
 
-10. **Leave a README** explaining how to run the app and the env vars
+11. **Leave a README** explaining how to run the app and the env vars
     required. Keep `.env.example` in sync.
 
 ## When to escalate
@@ -293,6 +305,11 @@ small, working slice and then iterating with the user.
 - Hand-editing any blueprint file (`BOOTSTRAPP.md` or anything under
   `schemas/`) — schema changes go through the schema architect, then
   class creation re-runs via MCP.
+- Hand-authoring action scripts under `scripts/`. The
+  `bootstrapp-action-scripter` agent owns those files; if a script
+  needs to change (action logic shifts, a new external helper is
+  needed, indexed-fields gap surfaced), invoke that agent rather than
+  editing the file in place.
 - Hand-authoring filter conditions for **recurring** queries that
   aren't recorded as a view in the blueprint. Ad-hoc one-off filter
   calls are fine. If a query keeps reappearing, route through

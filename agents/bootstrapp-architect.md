@@ -100,13 +100,22 @@ small, working slice and then iterating with the user.
    - `actionInputObjectType` / `actionOutputObjectType` — the
      fully-qualified input and output class names from the action
      registry.
-   - The action's **scope** — `instance` (input has required `id`),
-     `bulk` (input has required `ids`), or `class` (input has
-     neither) — passed through the corresponding `register_action`
-     parameter for the scope. The tool's parameter list may evolve;
-     inspect the live tool schema (or use
-     `mcp__bootstrapp__tool_search`) once at the start of the run to
-     confirm the exact parameter name rather than guessing.
+   - `scope` — the action's scope as recorded in the registry,
+     **capitalized** to match the tool's enum: `Instance`, `Bulk`,
+     or `Class`. The registry stores it lowercase
+     (`instance`/`bulk`/`class`); convert when calling.
+   - `actionScript` — the **ApiScript body** for this action,
+     pulled from `scripts/<ActionsNamespace>.md`. That file is
+     written by `bootstrapp-action-scripter` and contains one
+     section per action with a fenced ```typescript code block
+     under the `**Script:**` line — pass that block's contents
+     verbatim (the `import` statements and the `execute` function).
+     This is what the runtime executes when the action is invoked;
+     skipping it ships a registered-but-empty action that fails at
+     call time. If the action has no matching section in
+     `scripts/`, stop and invoke `bootstrapp-action-scripter`
+     before retrying — never register an action without its
+     script.
 
    If a future tool name is unknown, fall back to
    `mcp__bootstrapp__tool_search` to discover it. The views
@@ -199,13 +208,15 @@ small, working slice and then iterating with the user.
    architect has settled the action registry, invoke
    `bootstrapp-action-scripter` and pass it the app name plus the
    list of actions namespaces touched (or "all" for a new app). It
-   will read the blueprint, draft an ApiScript pseudo-implementation
-   for every action in scope, present the drafts in chat for
+   will read the blueprint, draft an ApiScript implementation for
+   every action in scope, present the drafts in chat for
    confirmation, and write `scripts/<ActionsNamespace>.md` — one
-   file per actions namespace, parallel to the schemas folder. Treat
-   these scripts as design artifacts that travel with the blueprint;
-   they are not code you compile or ship to the client. Do not draft
-   the scripts yourself.
+   file per actions namespace, parallel to the schemas folder.
+   These scripts are **server-side action bodies** — you pass each
+   action's script verbatim to `mcp__bootstrapp__register_action`
+   as `actionScript` in step 6, and the bootstrapp.cloud runtime
+   executes it when the action is invoked. Do not draft the
+   scripts yourself; do not register an action without its script.
 
 6. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
    `schemas/*.md` it references.
@@ -239,10 +250,14 @@ small, working slice and then iterating with the user.
    `mcp__bootstrapp__register_action` once per action with
    `fullObjectType`, `actionName`, `actionSummary`,
    `actionDescription`, `actionInputObjectType`,
-   `actionOutputObjectType`, and the action's **scope**
-   (`instance` / `bulk` / `class`) on the corresponding
-   `register_action` parameter — inspect the tool's schema once for
-   the exact parameter name rather than guessing.
+   `actionOutputObjectType`, `scope` (capitalized — `Instance`,
+   `Bulk`, or `Class` — to match the tool's enum), and
+   `actionScript` (the fenced ```typescript block from the action's
+   section in `scripts/<ActionsNamespace>.md`, passed verbatim).
+   The script is what the runtime executes; an action registered
+   without it fails at invocation. If a `scripts/*.md` file is
+   missing or has no matching section for an action, stop and
+   invoke `bootstrapp-action-scripter` before retrying.
 
 7. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).

@@ -114,9 +114,12 @@ plus every `schemas/app.<app_name>[.<sub>].actions.md`, drafts an
 ApiScript pseudo-implementation for each action in the registry,
 presents the drafts in chat for confirmation, and writes
 `scripts/<ActionsNamespace>.md` — one file per actions namespace,
-parallel to `schemas/`. The scripts are design artifacts that travel
-with the blueprint; they are not compiled into the client and do not
-require the backend to be live yet.
+parallel to `schemas/`. These scripts are **server-side action
+bodies**: in Phase 5 the architect passes each action's script
+verbatim to `mcp__bootstrapp__register_action` as `actionScript`,
+and the bootstrapp.cloud runtime executes it when the action is
+invoked. The scripter does not need the backend to be live yet —
+the architect is the only step that touches the backend.
 
 ## Phase 5 — Create classes on the backend
 
@@ -150,9 +153,13 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `mcp__bootstrapp__register_action` once per action — passing
   `fullObjectType`, `actionName`, `actionSummary`,
   `actionDescription`, `actionInputObjectType`,
-  `actionOutputObjectType`, and the action's **scope**
-  (`instance` / `bulk` / `class`) on the corresponding
-  `register_action` parameter.
+  `actionOutputObjectType`, `scope` (capitalized to match the
+  tool's enum: `Instance` / `Bulk` / `Class`), and `actionScript`
+  (the ApiScript body pulled verbatim from the action's section in
+  `scripts/<ActionsNamespace>.md`, written by
+  `bootstrapp-action-scripter` in Phase 4b). The script is what
+  the runtime executes — registering an action without it ships a
+  no-op endpoint.
 
 ## Phase 6 — Generate the API client
 

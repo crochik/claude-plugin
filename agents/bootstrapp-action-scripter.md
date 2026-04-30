@@ -255,4 +255,6 @@ exact action name as the section header.
 - Designing new classes, actions, or views — those go through the
   schema architect.
 - Running, deploying, or otherwise executing the scripts you write.
-  They are pseudo-code design artifacts.
+  `bootstrapp-architect` ships them to the runtime by passing each
+  script verbatim to `mcp__bootstrapp__register_action` as
+  `actionScript` — you only author the file.

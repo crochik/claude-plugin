@@ -97,11 +97,17 @@ extending:
 - **Backend-first, discover-don't-guess.** Client code only emits endpoints,
   fields, and auth flows that the MCP server confirmed. Never invent API
   shapes.
-- **Thin client, fat backend.** Business logic lives in bootstrapp.cloud
-  actions (named server-side operations with an input class and an output
-  class, and full access to every class). The client handles presentation
-  and input validation; it does not orchestrate multi-step workflows by
-  chaining CRUD calls.
+- **Default to the client; reach for actions only when forced.** The
+  client is free to orchestrate multi-step workflows by chaining the
+  auto-generated CRUD and filter calls — even when those workflows
+  span multiple classes. Reach for an action only when the client
+  genuinely cannot do the work that way: server-side side effects
+  (email, third-party APIs, file processing), atomic multi-write
+  transactions where partial failure would corrupt state, or
+  computations over data the client shouldn't or can't reasonably
+  fetch. Authorization is **not** a reason for an action — the
+  backend enforces access rules on every CRUD, filter, and action
+  call equally.
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
   in separate namespaces, both rooted at `app.<app_name>` (the literal
   prefix `app.` followed by the app name); action payload classes are

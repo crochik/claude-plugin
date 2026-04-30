@@ -117,9 +117,19 @@ may design **named views** that record canonical filter calls for
 the implementation agent to scaffold (see "Named views" below).
 
 **Actions**
-Anything the backend must do beyond plain CRUD or filter is modeled
-as a named *action*. Actions are where business logic lives on the
-server, how invariants get enforced, and how the client stays thin.
+Actions cover the operations the client genuinely cannot accomplish by
+chaining the auto-generated CRUD and filter endpoints — server-side
+side effects (sending email, hitting third-party APIs, file
+processing), atomic multi-write transactions that must succeed or fail
+together, and computations that need to read across data the client
+shouldn't or can't reasonably fetch.
+
+The default for any workflow is "do it from the client with CRUD +
+filter calls." Reach for an action only when that default doesn't work.
+**Authorization is not a reason to design an action** — the backend
+enforces access rules on every object operation (CRUD, filter, *and*
+action) regardless of how it is invoked, so "the client shouldn't be
+trusted with this" is already handled by the platform.
 
 The three action scopes (`instance` / `bulk` / `class`) and the
 required input-class field per scope are documented in
@@ -154,13 +164,17 @@ Every action carries:
   so it can cross aggregates, enforce invariants, and perform
   multi-step work atomically on the server side.
 
-**Do not design actions that the auto-generated CRUD or filter
-endpoints already cover.** If the requested operation is "create one
-X", "read one X by id", "update X", "delete X", or "list X by
-AND-conditions on indexed fields" — drop the action and use the
-generated endpoint. Reserve actions for work the platform does not
-already provide: cross-class reads/writes, invariant enforcement,
-multi-step atomicity, complex computations, integrations, etc.
+**Do not design actions that a chain of CRUD or filter calls from the
+client can already accomplish.** If the workflow is "create one X",
+"read one X by id", "update X", "delete X", "list X by AND-conditions
+on indexed fields", or any sequence of those calls the client can
+issue itself — drop the action. Reserve actions for work the client
+genuinely cannot do that way: server-side side effects (email,
+third-party APIs, file processing), atomic multi-write transactions
+where partial success would corrupt state, and computations that
+require reading across data the client shouldn't or can't reasonably
+fetch. Authorization is not on this list — the backend enforces
+access rules on every operation regardless.
 
 Input and output classes live in a different namespace from the
 domain model they operate on — never reuse a persisted domain class
@@ -259,13 +273,18 @@ the schemas file in the same turn; never one without the other.
    polymorphic unions unless the problem clearly calls for inheritance.
    One discriminator string beats a union of five optional blocks.
 
-4. **Push business logic to the backend.** Any operation that spans
-   multiple classes, enforces an invariant, changes state in more than one
-   place, or must not be trusted to the client belongs in an action — not
-   on the client. The client handles presentation and input validation;
-   the backend owns correctness. If you catch yourself designing a
-   workflow that the client would "orchestrate" via several CRUD calls,
-   collapse it into a single action instead.
+4. **Default to the client; reach for actions only when forced.** A
+   workflow the client can express as a chain of CRUD and filter calls
+   stays on the client — even when it spans multiple classes or
+   touches several documents. Reach for an action only when the
+   client *cannot* accomplish the work that way: server-side side
+   effects (email, third-party APIs, file processing), atomic
+   multi-write transactions where a partial failure would corrupt
+   state, or computations that need access to data the client
+   shouldn't or can't reasonably fetch. Authorization is **not** a
+   reason — the backend enforces access rules on every CRUD, filter,
+   and action call equally, so "the client shouldn't be trusted with
+   this" is already handled by the platform.
 
 5. **Name actions for intent, not mechanics.** `submitOrder` and
    `cancelReservation` read well; `updateOrderStatus` and `setField` do
@@ -463,20 +482,26 @@ the schemas file in the same turn; never one without the other.
     computed fields, aggregation, or write effects to an action — views
     are AND-only and read-only.
 
-11. **Draft actions.** Walk the user's stated workflows and identify
-    every step that is *not* a plain CRUD call on a single class and
-    *not* expressible as a view. For each candidate action, decide
-    its **scope** first — `instance` (one row), `bulk` (many rows of
-    the same class), or `class` (no specific row) — then define:
-    name, target (a top-level domain class), scope, an **input class**
-    (in the actions namespace) whose JSON Schema declares the
-    scope-required field (`id` for instance, `ids` for bulk, neither
-    for class), an **output class** (in the actions namespace) with
-    its JSON Schema, and a one-paragraph description of what it does
-    and which invariants it enforces. Drop any candidate that the
-    auto-generated CRUD or filter endpoints already serve — those are
-    not actions. Add the input and output classes to the Classes
-    section so they appear alongside the domain model.
+11. **Draft actions.** Walk the user's stated workflows and, for each,
+    ask whether the client can express it as a chain of CRUD and
+    filter calls. If yes, no action — the client orchestrates it
+    itself, and the backend's per-object access rules cover
+    authorization. Only when the client genuinely cannot do the work
+    that way (server-side side effects like email or third-party
+    APIs, atomic multi-write transactions where partial failure
+    would corrupt state, computations across data the client
+    shouldn't or can't reasonably fetch) does the workflow become an
+    action. For each candidate that survives, decide its **scope**
+    first — `instance` (one row), `bulk` (many rows of the same
+    class), or `class` (no specific row) — then define: name, target
+    (a top-level domain class), scope, an **input class** (in the
+    actions namespace) whose JSON Schema declares the scope-required
+    field (`id` for instance, `ids` for bulk, neither for class), an
+    **output class** (in the actions namespace) with its JSON
+    Schema, and a one-paragraph description of what it does and
+    which invariants it enforces. Add the input and output classes
+    to the Classes section so they appear alongside the domain
+    model.
 
 12. **Present the proposed design — before writing anything.** Once you
     have a coherent draft in mind, lay it out for the user *in chat*, not

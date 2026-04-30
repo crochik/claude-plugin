@@ -41,24 +41,27 @@ UI scaffold, and starting the dev server.
   idiomatic client that talks to the bootstrapp backend — nothing more.
 - **The backend exposes two kinds of operations.** Auto-generated
   CRUD and a **filter** endpoint for every top-level class, plus
-  named *actions* for anything else. The full filter contract —
-  request shape, AND combinator, the operator set, per-operator
-  value rules, the indexed-fields constraint, and the required
-  `fields` projection — lives in `Reference/filter-operators.json`
-  on the `bootstrapp` MCP server; load it before generating any
-  filter call. Actions carry the business logic: each has an input
-  class and an output class (both defined as JSON Schema in a
-  dedicated actions namespace), full read/write access to every
-  class, and runs atomically on the server. Actions come in three
-  **scopes** (`instance` / `bulk` / `class`); the per-scope
-  required-input-field rules and selection guidance live in
-  `Reference/action-scopes.json`. **Do not design actions that the
-  auto-generated CRUD or filter endpoints already cover** — reserve
-  actions for cross-class work, invariant enforcement, multi-step
-  atomicity, or anything else the platform doesn't already
-  provide. If a workflow spans multiple documents, enforces
-  invariants, or needs atomicity, it is an action, not a
-  client-side orchestration.
+  named *actions* for the work the client cannot accomplish by
+  chaining those calls. The full filter contract — request shape,
+  AND combinator, the operator set, per-operator value rules, the
+  indexed-fields constraint, and the required `fields` projection
+  — lives in `Reference/filter-operators.json` on the `bootstrapp`
+  MCP server; load it before generating any filter call. Actions
+  each have an input class and an output class (both defined as
+  JSON Schema in a dedicated actions namespace), full read/write
+  access to every class, and run atomically on the server. Actions
+  come in three **scopes** (`instance` / `bulk` / `class`); the
+  per-scope required-input-field rules and selection guidance live
+  in `Reference/action-scopes.json`. **The default is to do the
+  work from the client with CRUD + filter calls** — even when the
+  workflow spans multiple classes or several writes. Reach for an
+  action only when the client genuinely cannot do the work that
+  way: server-side side effects (email, third-party APIs, file
+  processing), atomic multi-write transactions where partial
+  failure would corrupt state, or computations over data the
+  client shouldn't or can't reasonably fetch. Authorization is
+  **not** a reason — the backend enforces access rules on every
+  CRUD, filter, and action call equally.
 - **Classes live in namespaces rooted at `app.<app_name>`.** The domain
   model sits under `app.<app_name>` and action I/O classes sit under
   `app.<app_name>.actions`. Reference classes in generated code with their
@@ -188,10 +191,16 @@ own:
 - Don't check secrets into git. Use `.env.example` + gitignored `.env`.
 - Don't build a parallel backend on the client (local DBs, business logic).
   Push that work into bootstrapp.cloud — usually as an action.
-- Don't orchestrate multi-step business workflows from the client by
-  chaining CRUD calls. If two or more writes must succeed together, or any
-  decision depends on data the client shouldn't be trusted with, it's an
-  action on the backend.
+- Don't reach for an action when a chain of CRUD + filter calls from
+  the client can do the same work — the client is allowed to
+  orchestrate multi-step workflows, including across multiple
+  classes. Reserve actions for the cases the client genuinely
+  cannot cover: server-side side effects (email, third-party APIs,
+  file processing), atomic multi-write transactions where partial
+  failure would corrupt state, or computations over data the client
+  shouldn't or can't reasonably fetch. Authorization is not on
+  that list — the backend enforces access rules on every call
+  regardless.
 - Don't fabricate filter conditions on fields that aren't in the target
   class's JSON Schema, and don't filter on a property that isn't in the
   class's `indexedFields` list — both are server-side rejections.

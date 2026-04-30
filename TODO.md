@@ -1,10 +1,3 @@
-While searching I noticed two things worth flagging before I get to the suggestions:
-
-Two plugin bugs surfaced from the live tool schemas:
-
-The foreignKeys shape in agents/bootstrapp-architect.md:67 and agents/bootstrapp-schema-architect.md describes entries as {key, value: {objectType, keyFieldName}}, but the actual add_object_class tool expects {localFieldName, referenceObjectType, referenceFieldName}. Means class registrations probably fail or silently skip foreign keys today.
-The register_action tool does not accept a scope parameter — only fullObjectType, actionName, actionSummary, actionDescription, actionInputObjectType, actionOutputObjectType. The architect agent and Reference/action-scopes.json both treat scope as a registration field. Either scope is supposed to be inferred from the input class shape (id → instance, ids → bulk, neither → class), or it's a missing parameter.
-
 Suggestions to evolve the MCP server
 Ordered by impact:
 

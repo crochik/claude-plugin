@@ -117,6 +117,18 @@ small, working slice and then iterating with the user.
      before retrying — never register an action without its
      script.
 
+   **`add_object_class` and `register_action` calls are independent
+   of each other and of class-to-class dependencies — issue them in
+   parallel.** The backend resolves inheritance, embeddings,
+   references, and action input/output/target links after the fact,
+   so no class has to exist before another references it, no parent
+   has to be registered before its children, and no action has to
+   wait for its input/output/target classes. Once `init_app` has
+   completed, fan out one MCP call per registry row in a single
+   batch (or as many parallel batches as the tool host allows)
+   rather than serializing them. Verify with `get_object_classes`
+   only after the batch finishes.
+
    If a future tool name is unknown, fall back to
    `mcp__bootstrapp__tool_search` to discover it. The views
    registry requires **no MCP call** — the filter endpoint is
@@ -231,33 +243,39 @@ small, working slice and then iterating with the user.
    established project), skip this step — `init_app` was already
    called at app-creation time and is not idempotent.
 
-   Then walk the class registry in order (top-level classes first,
-   then embedded, then action input/output classes), pulling each
-   class's JSON Schema and recorded `Indexed fields` list from its
-   namespace's schemas file. Call
-   `mcp__bootstrapp__add_object_class` per class with `appName`
-   (from BOOTSTRAPP.md), `fullObjectType`, `type`, `schema` (with
-   `title` + `description` on the root and on every property),
-   `indexedFields` (verbatim from the schemas file — `[]` for
-   embedded classes), `foreignKeys` (built from every References
-   registry row whose source is this class — see principle 4 for
-   the entry shape), and `baseObjectType` when the class extends
-   another. Verify with `mcp__bootstrapp__get_object_classes`
-   against each namespace (use `mcp__bootstrapp__get_namespaces`
+   Then call `mcp__bootstrapp__add_object_class` once per row in
+   the class registry, pulling each class's JSON Schema and
+   recorded `Indexed fields` list from its namespace's schemas
+   file. Pass `appName` (from BOOTSTRAPP.md), `fullObjectType`,
+   `type`, `schema` (with `title` + `description` on the root and
+   on every property), `indexedFields` (verbatim from the schemas
+   file — `[]` for embedded classes), `foreignKeys` (built from
+   every References registry row whose source is this class — see
+   principle 4 for the entry shape), and `baseObjectType` when the
+   class extends another. **Order does not matter and there are no
+   inter-call dependencies — fire every `add_object_class` and
+   `register_action` call in parallel.** The backend resolves
+   inheritance parents, embedding targets, references, and action
+   input/output/target links after the fact, so top-level vs
+   embedded vs action-payload classes can all be registered in a
+   single batch, and actions can be registered in the same batch as
+   their target/input/output classes. Verify with
+   `mcp__bootstrapp__get_object_classes` against each namespace
+   only after the batch returns (use `mcp__bootstrapp__get_namespaces`
    first if you need to see which namespaces already exist, and
    `mcp__bootstrapp__get_class_schema` to inspect a single class's
-   schema). Then walk the action registry and call
-   `mcp__bootstrapp__register_action` once per action with
-   `fullObjectType`, `actionName`, `actionSummary`,
-   `actionDescription`, `actionInputObjectType`,
-   `actionOutputObjectType`, `scope` (capitalized — `Instance`,
-   `Bulk`, or `Class` — to match the tool's enum), and
-   `actionScript` (the fenced ```typescript block from the action's
-   section in `scripts/<ActionsNamespace>.md`, passed verbatim).
-   The script is what the runtime executes; an action registered
-   without it fails at invocation. If a `scripts/*.md` file is
-   missing or has no matching section for an action, stop and
-   invoke `bootstrapp-action-scripter` before retrying.
+   schema). For actions, call `mcp__bootstrapp__register_action`
+   once per row in the action registry with `fullObjectType`,
+   `actionName`, `actionSummary`, `actionDescription`,
+   `actionInputObjectType`, `actionOutputObjectType`, `scope`
+   (capitalized — `Instance`, `Bulk`, or `Class` — to match the
+   tool's enum), and `actionScript` (the fenced ```typescript block
+   from the action's section in `scripts/<ActionsNamespace>.md`,
+   passed verbatim). The script is what the runtime executes; an
+   action registered without it fails at invocation. If a
+   `scripts/*.md` file is missing or has no matching section for an
+   action, stop and invoke `bootstrapp-action-scripter` before
+   retrying.
 
 7. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).

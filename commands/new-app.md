@@ -135,31 +135,38 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `/bootstrapp:design-model` and incremental architect runs on an
   existing app must skip it.
 - Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
-  walk the class registry and call
-  `mcp__bootstrapp__add_object_class` once per class — passing
-  `appName` (from `BOOTSTRAPP.md`), `fullObjectType`, `type`
-  (`TopLevel` / `Embedded`), `schema` (with `title` + `description`
-  on the root and on every property), `indexedFields` (verbatim
-  from the schemas file — `[]` for embedded classes), `foreignKeys`
-  (built from the References registry rows whose source is this
-  class — entries of `{ localFieldName: <sourceField>,
+  call `mcp__bootstrapp__add_object_class` once per row of the class
+  registry — passing `appName` (from `BOOTSTRAPP.md`),
+  `fullObjectType`, `type` (`TopLevel` / `Embedded`), `schema` (with
+  `title` + `description` on the root and on every property),
+  `indexedFields` (verbatim from the schemas file — `[]` for
+  embedded classes), `foreignKeys` (built from the References
+  registry rows whose source is this class — entries of
+  `{ localFieldName: <sourceField>,
   referenceObjectType: <target.FullClassName>,
-  referenceFieldName: <targetField> }`), and
-  `baseObjectType` for classes that extend another.
-- Verify with `mcp__bootstrapp__get_object_classes` (and
-  `mcp__bootstrapp__get_class_schema` /
-  `mcp__bootstrapp__get_namespaces` when finer-grained checks help).
-- Walk the action registry and call
-  `mcp__bootstrapp__register_action` once per action — passing
-  `fullObjectType`, `actionName`, `actionSummary`,
-  `actionDescription`, `actionInputObjectType`,
+  referenceFieldName: <targetField> }`), and `baseObjectType` for
+  classes that extend another. Then call
+  `mcp__bootstrapp__register_action` once per row of the action
+  registry — passing `fullObjectType`, `actionName`,
+  `actionSummary`, `actionDescription`, `actionInputObjectType`,
   `actionOutputObjectType`, `scope` (capitalized to match the
   tool's enum: `Instance` / `Bulk` / `Class`), and `actionScript`
   (the ApiScript body pulled verbatim from the action's section in
   `scripts/<ActionsNamespace>.md`, written by
   `bootstrapp-action-scripter` in Phase 4b). The script is what
   the runtime executes — registering an action without it ships a
-  no-op endpoint.
+  no-op endpoint. **All `add_object_class` and `register_action`
+  calls in this phase are independent of each other and of
+  class-to-class dependencies — fire them in parallel.** The
+  backend resolves inheritance, embeddings, references, and action
+  input/output/target links after the fact, so order does not
+  matter; a class does not need to exist before another references
+  it, and an action does not need to wait for its target/input/output
+  classes.
+- Verify with `mcp__bootstrapp__get_object_classes` (and
+  `mcp__bootstrapp__get_class_schema` /
+  `mcp__bootstrapp__get_namespaces` when finer-grained checks help)
+  only after the parallel batch finishes.
 
 ## Phase 6 — Generate the API client
 

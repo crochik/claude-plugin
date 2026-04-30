@@ -120,6 +120,13 @@ The mental model that surrounds the resource:
 - Decode current-user info from access-token JWT claims after login;
   the resource explains why (extra scopes are rejected by the
   issuer, profile claims are already on the token).
+- The OIDC client itself is provisioned automatically when the app
+  is initialized (`mcp__bootstrapp__init_app`). Each redirect URL
+  the client uses (dev origin, deployed origins) must be added to
+  the client's allow-list via
+  `mcp__bootstrapp__add_oidc_client_redirect` before login will
+  succeed against that URL — the issuer rejects redirects that
+  aren't on the list.
 
 ## Default workflow
 

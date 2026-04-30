@@ -277,6 +277,11 @@ the schemas file in the same turn; never one without the other.
      underscores only; no hyphens), recorded in the App section of the
      blueprint, and matches the name in any pre-existing
      `BOOTSTRAPP.md` when evolving a blueprint.
+   - The app **Title** is set (human-readable; defaults to the
+     title-cased name) and the **Description** is a real paragraph,
+     not a placeholder. Both are passed to
+     `mcp__bootstrapp__init_app` by the implementation agent —
+     missing values block app creation.
    - Every namespace is rooted at `app.<app_name>` (the literal prefix
      `app.` followed by the app name), and every segment of every
      namespace path is itself a snake_case identifier (lowercase
@@ -393,17 +398,22 @@ the schemas file in the same turn; never one without the other.
      directory before continuing. Do not write `BOOTSTRAPP.md` on top of
      an unrelated codebase.
 
-2. **Establish the app name.** When the orchestrator passed in a name
-   (and platform, and description), use them as-is — do not re-ask. When
-   invoked directly for a new app, ask for a short snake_case name
-   (e.g., `franchisor`, `expense_tracker`) if not already provided —
-   lowercase letters, digits, and underscores only; no hyphens. If the
-   user supplies a name with disallowed characters, normalize it
-   (replace hyphens with underscores, drop other punctuation) and
-   confirm the corrected name before recording it. For an existing
-   app, use the name already recorded in `BOOTSTRAPP.md` — never
-   rename it silently; if a rename is genuinely needed, flag it as an
-   open question.
+2. **Establish the app name and title.** When the orchestrator
+   passed in a name (and platform, and description), use them as-is
+   — do not re-ask. When invoked directly for a new app, ask for a
+   short snake_case name (e.g., `franchisor`, `expense_tracker`) if
+   not already provided — lowercase letters, digits, and underscores
+   only; no hyphens. If the user supplies a name with disallowed
+   characters, normalize it (replace hyphens with underscores, drop
+   other punctuation) and confirm the corrected name before recording
+   it. Derive a default **Title** by title-casing the name and
+   replacing underscores with spaces (`expense_tracker` → "Expense
+   Tracker"); surface it in the design overview (step 12) so the user
+   can override. The Title is what shows on the OIDC consent screen,
+   so favor a clean human-readable phrase over a literal restatement.
+   For an existing app, use the name and title already recorded in
+   `BOOTSTRAPP.md` — never rename it silently; if a rename is
+   genuinely needed, flag it as an open question.
 
 3. **Gather requirements.** When the orchestrator handed you a
    clarified description, skip the app-concept interview and jump
@@ -534,9 +544,15 @@ per-namespace schemas file under `schemas/`.
 
 - **Name:** `<app_name>` (snake_case — lowercase letters, digits, and
   underscores only; no hyphens. The base namespace is `app.<app_name>`).
+- **Title:** human-readable display name (e.g. "Expense Tracker"). Used
+  by the implementation agent as the `appTitle` argument to
+  `mcp__bootstrapp__init_app` and as the app's branding in the OIDC
+  consent screen. Default to the title-cased name with underscores
+  replaced by spaces; let the user override.
 - **Summary:** one sentence describing what the app does.
 - **Description:** one short paragraph: the domain, the intended users,
-  and the scope boundaries.
+  and the scope boundaries. Passed verbatim to
+  `mcp__bootstrapp__init_app` as `appDescription`.
 
 ## Namespaces
 

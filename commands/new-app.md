@@ -122,6 +122,14 @@ require the backend to be live yet.
 
 Hand back to the **`bootstrapp-architect`**. It will:
 
+- **Initialize the app on the backend** by calling
+  `mcp__bootstrapp__init_app` exactly once with `appName`,
+  `appTitle`, and `appDescription` from the App section of
+  `BOOTSTRAPP.md`. This must run **before** any
+  `add_object_class` or `register_action` call — it provisions the
+  app record and its OIDC client. The architect skips this step if
+  `mcp__bootstrapp__get_namespaces` already shows the app's
+  namespace (i.e. the app was initialized in a prior run).
 - Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
   walk the class registry and call
   `mcp__bootstrapp__add_object_class` once per class — passing
@@ -171,7 +179,11 @@ folder:
 
 Then it drops in the generated client + a thin `bootstrapp` module,
 wires login / logout / session against the backend, and adds one real
-read + one real write screen against live data.
+read + one real write screen against live data. As part of auth
+wiring it calls `mcp__bootstrapp__add_oidc_client_redirect` once
+per redirect URL the client will use (the dev server URL plus
+OIDC callback path, and any production origin the user names) so
+the OIDC issuer accepts login redirects.
 
 ## Phase 8 — Start the UI and iterate
 

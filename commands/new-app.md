@@ -130,8 +130,9 @@ Hand back to the **`bootstrapp-architect`**. It will:
   on the root and on every property), `indexedFields` (verbatim
   from the schemas file — `[]` for embedded classes), `foreignKeys`
   (built from the References registry rows whose source is this
-  class — entries of `{ key: <sourceField>, value: { objectType:
-  <target.FullClassName>, keyFieldName: <targetField> } }`), and
+  class — entries of `{ localFieldName: <sourceField>,
+  referenceObjectType: <target.FullClassName>,
+  referenceFieldName: <targetField> }`), and
   `baseObjectType` for classes that extend another.
 - Verify with `mcp__bootstrapp__get_object_classes` (and
   `mcp__bootstrapp__get_class_schema` /

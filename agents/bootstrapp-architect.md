@@ -63,11 +63,11 @@ small, working slice and then iterating with the user.
      calls and named views downstream — copy the list verbatim.
    - `foreignKeys` — every row in the References registry whose
      **source class** is this class. Each becomes one entry of the
-     form `{ "key": "<sourceField>", "value": { "objectType":
-     "<target.FullClassName>", "keyFieldName": "<targetField>" } }`.
-     Pass an empty array (or omit) when the class has no references.
-     Pass the reference rows verbatim — the registry is the source
-     of truth.
+     form `{ "localFieldName": "<sourceField>",
+     "referenceObjectType": "<target.FullClassName>",
+     "referenceFieldName": "<targetField>" }`. Pass an empty array
+     (or omit) when the class has no references. Pass the reference
+     rows verbatim — the registry is the source of truth.
    - `baseObjectType` — only when the class extends another (single
      inheritance with a discriminator).
 

@@ -84,6 +84,13 @@ small, working slice and then iterating with the user.
    - `actionInputObjectType` / `actionOutputObjectType` — the
      fully-qualified input and output class names from the action
      registry.
+   - The action's **scope** — `instance` (input has required `id`),
+     `bulk` (input has required `ids`), or `class` (input has
+     neither) — passed through the corresponding `register_action`
+     parameter for the scope. The tool's parameter list may evolve;
+     inspect the live tool schema (or use
+     `mcp__bootstrapp__tool_search`) once at the start of the run to
+     confirm the exact parameter name rather than guessing.
 
    If a future tool name is unknown, fall back to
    `mcp__bootstrapp__tool_search` to discover it. The views
@@ -192,8 +199,11 @@ small, working slice and then iterating with the user.
    schema). Then walk the action registry and call
    `mcp__bootstrapp__register_action` once per action with
    `fullObjectType`, `actionName`, `actionSummary`,
-   `actionDescription`, `actionInputObjectType`, and
-   `actionOutputObjectType`.
+   `actionDescription`, `actionInputObjectType`,
+   `actionOutputObjectType`, and the action's **scope**
+   (`instance` / `bulk` / `class`) on the corresponding
+   `register_action` parameter — inspect the tool's schema once for
+   the exact parameter name rather than guessing.
 
 6. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md).

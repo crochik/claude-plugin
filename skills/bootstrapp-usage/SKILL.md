@@ -57,8 +57,17 @@ UI scaffold, and starting the dev server.
   carry the business logic: each has an input class and an output class
   (both defined as JSON Schema in a dedicated actions namespace), full
   read/write access to every class, and runs atomically on the server.
-  If a workflow spans multiple documents or enforces invariants, it is
-  an action, not a client-side orchestration.
+  Actions come in three **scopes** depending on how they relate to the
+  target class: `instance` (input has a required `id` — one row),
+  `bulk` (input has a required `ids` array — many rows of the same
+  class, acted on atomically), or `class` (input has neither — class-
+  level work not keyed on specific rows). Pick the smallest scope that
+  fits. **Do not design actions that the auto-generated CRUD or filter
+  endpoints already cover** — reserve actions for cross-class work,
+  invariant enforcement, multi-step atomicity, or anything else the
+  platform doesn't already provide. If a workflow spans multiple
+  documents, enforces invariants, or needs atomicity, it is an action,
+  not a client-side orchestration.
 - **Classes live in namespaces rooted at `app.<app_name>`.** The domain
   model sits under `app.<app_name>` and action I/O classes sit under
   `app.<app_name>.actions`. Reference classes in generated code with their

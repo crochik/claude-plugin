@@ -179,40 +179,72 @@ list is empty (the registration call still requires the parameter;
 pass `[]`).
 
 **Actions**
-Anything the backend must do beyond plain CRUD is modeled as a named
-*action*. An action has:
-- A **name** (verb-phrased, e.g. `submitOrder`, `cancelReservation`) —
-  passed to the MCP server as `actionName` when the action is
-  registered.
+Anything the backend must do beyond plain CRUD or filter is modeled as
+a named *action*. Actions are where business logic lives on the
+server, how invariants get enforced, and how the client stays thin.
+Every action has:
+
+- A **name** (verb-phrased, e.g. `submitOrder`, `archiveExpenses`,
+  `importCustomersCsv`) — passed to the MCP server as `actionName`
+  when the action is registered.
 - A **summary** (5–10 words) — passed to the MCP server as
   `actionSummary`. The action's public handle in API docs.
 - A **description** (1–3 sentences covering purpose, side effects, and
   the invariants the action enforces) — passed to the MCP server as
-  `actionDescription`. Carries the longer prose on the action itself,
-  not on the input class.
-- A **target** — a specific top-level class. Every action operates on a
-  specific instance of that class; there are no system-wide or
-  class-level actions.
-- An **input class** — a class in an actions namespace whose JSON Schema
-  defines the request body. Use a dedicated class even for trivial inputs;
-  this keeps the action's contract explicit and versionable. The input
-  class **must** declare a required `id` property
-  (`type: "string"`, `format: "uuid"`, with `title` and `description`)
-  that identifies the target instance — this is how the action is
-  anchored on a specific object of the target class.
-- An **output class** — a class in an actions namespace whose JSON Schema
-  defines the response body. Use a dedicated class even when the action
-  returns a single scalar or a reference to a domain object.
+  `actionDescription`.
+- A **target** — a specific top-level class the action is registered
+  against on the backend. The action is *about* this class, even when
+  it does not act on a specific row of it (see "scope" below).
+- A **scope** — one of `instance`, `bulk`, or `class`. Determines how
+  the action relates to instances of the target class and shapes the
+  required fields on the input class.
+- An **input class** — a class in an actions namespace whose JSON
+  Schema defines the request body. Use a dedicated class even for
+  trivial inputs; this keeps the action's contract explicit and
+  versionable. The input class's required field depends on the scope:
+  - `instance` — must declare a required `id` property
+    (`type: "string"`, `format: "uuid"`, with `title` and
+    `description`) identifying the single target instance.
+  - `bulk` — must declare a required `ids` property
+    (`type: "array"`, `items: { type: "string", format: "uuid" }`,
+    `minItems: 1`, `uniqueItems: true`, with `title` and
+    `description`) listing the target instances.
+  - `class` — must declare **neither** `id` nor `ids`; the action is
+    not anchored on specific row(s) of the target class.
+- An **output class** — a class in an actions namespace whose JSON
+  Schema defines the response body. Use a dedicated class even when
+  the action returns a single scalar or a reference to a domain object.
 - An **example invocation** — a concrete example input object plus the
   expected output object, both valid against their respective classes.
-- Full read/write access to every class and object in the backend, so it
-  can cross aggregates, enforce invariants, and perform multi-step work
-  atomically on the server side.
+- Full read/write access to every class and object in the backend, so
+  it can cross aggregates, enforce invariants, and perform multi-step
+  work atomically on the server side.
+
+**Choosing a scope.** Pick the smallest one that fits the operation:
+
+- *Instance* — a single subject row. Examples: `submitOrder`,
+  `cancelReservation`, `recalculateInvoiceTotals`.
+- *Bulk* — several rows of the same class, acted on atomically.
+  Examples: `approveExpenses`, `archiveProjects`, `assignTickets`.
+  When the caller needs to act on "the rows matching some filter",
+  they resolve the IDs via the filter endpoint client-side and pass
+  them as `ids` — that is still a *bulk* action, not a *class* action.
+- *Class* — class-level work that does not key on specific existing
+  rows. Examples: `importCustomersCsv`, `generateMonthlyReport`,
+  `resetTenantSessions`. Use sparingly; most workflows have natural
+  instance or bulk scope.
+
+**Do not design actions that the auto-generated CRUD or filter
+endpoints already cover.** If the requested operation is "create one
+X", "read one X by id", "update X", "delete X", or "list X by
+AND-conditions on indexed fields" — drop the action and use the
+generated endpoint. Reserve actions for work the platform does not
+already provide: cross-class reads/writes, invariant enforcement,
+multi-step atomicity, complex computations, integrations, etc.
 
 Input and output classes live in a different namespace from the domain
-model they operate on — never reuse a persisted domain class as an action
-payload. Actions are where business logic lives. They are how you keep
-the client thin.
+model they operate on — never reuse a persisted domain class as an
+action payload.
 
 **Named views**
 A *named view* is a saved query on a top-level class, capturing a
@@ -344,15 +376,25 @@ the schemas file in the same turn; never one without the other.
      parent.
    - Every relation names real fields on real classes.
    - No circular embeddings (a class embedding itself transitively).
-   - Every action targets a specific top-level class, has an input
-     class, and an output class.
-   - Every action input class declares a required `id` property
-     (`type: "string"`, `format: "uuid"`, with `title` and
-     `description`) that anchors the action on a specific instance of
-     the target class.
+   - Every action targets a specific top-level class, declares a
+     scope (`instance` | `bulk` | `class`), and has an input class
+     and an output class.
+   - Every action's input class declares the field its scope requires,
+     and only that one:
+     - `instance` scope → required `id`
+       (`type: "string"`, `format: "uuid"`, with `title` and
+       `description`) anchoring the action on one row of the target
+       class.
+     - `bulk` scope → required `ids`
+       (`type: "array"`, `items: { type: "string", format: "uuid" }`,
+       `minItems: 1`, `uniqueItems: true`, with `title` and
+       `description`) listing the target rows.
+     - `class` scope → neither `id` nor `ids`. The action is not
+       anchored on a specific row of the target class.
    - Every action input/output class lives in an actions namespace, not
      the domain namespace, and is embedded (not top-level).
-   - No action can be replaced by a single CRUD call — if it can, drop it.
+   - No action can be replaced by a single auto-generated endpoint
+     (CRUD or filter) — if it can, drop it.
    - Every class has a summary, description, and a complete example
      object. Every property has a summary, description, and an example
      value. No placeholders, no "TODO", no lorem ipsum.
@@ -493,19 +535,20 @@ the schemas file in the same turn; never one without the other.
     computed fields, aggregation, or write effects to an action — views
     are AND-only and read-only.
 
-11. **Draft actions.** Walk the user's stated workflows and identify every
-    step that is *not* a plain CRUD call on a single class and *not*
-    expressible as a view. For each action, define: name, target (a
-    top-level domain class — every action is anchored on a specific
-    instance), an **input class** (in the actions namespace) with its
-    JSON Schema — including the required `id` property
-    (`type: "string"`, `format: "uuid"`) that identifies the target
-    instance — an **output class** (in the actions namespace) with its
-    JSON Schema, and a one-paragraph description of what it does and
-    which invariants it enforces. Do not list the auto-generated CRUD
-    or filter endpoints here — only the custom actions. Add the input
-    and output classes to the Classes section so they appear alongside
-    the domain model.
+11. **Draft actions.** Walk the user's stated workflows and identify
+    every step that is *not* a plain CRUD call on a single class and
+    *not* expressible as a view. For each candidate action, decide
+    its **scope** first — `instance` (one row), `bulk` (many rows of
+    the same class), or `class` (no specific row) — then define:
+    name, target (a top-level domain class), scope, an **input class**
+    (in the actions namespace) whose JSON Schema declares the
+    scope-required field (`id` for instance, `ids` for bulk, neither
+    for class), an **output class** (in the actions namespace) with
+    its JSON Schema, and a one-paragraph description of what it does
+    and which invariants it enforces. Drop any candidate that the
+    auto-generated CRUD or filter endpoints already serve — those are
+    not actions. Add the input and output classes to the Classes
+    section so they appear alongside the domain model.
 
 12. **Present the proposed design — before writing anything.** Once you
     have a coherent draft in mind, lay it out for the user *in chat*, not
@@ -606,11 +649,15 @@ live in the schemas file for the namespace.
 Every custom action has exactly one row here; the standard CRUD and
 filter endpoints for top-level classes are generated automatically and
 are not listed. Full action definitions (description, example
-invocation) live in the actions namespace's schemas file.
+invocation) live in the actions namespace's schemas file. The Scope
+column is one of `instance` / `bulk` / `class` and dictates the
+required field on the input class (`id`, `ids`, or neither).
 
-| Action | Target | Input class | Output class | Summary |
-|---|---|---|---|---|
-| submitOrder | `app.<app_name>`.Order | `app.<app_name>.actions`.SubmitOrderInput | `app.<app_name>.actions`.SubmitOrderOutput | Submits a drafted order. |
+| Action | Target | Scope | Input class | Output class | Summary |
+|---|---|---|---|---|---|
+| submitOrder        | `app.<app_name>`.Order     | instance | `app.<app_name>.actions`.SubmitOrderInput        | `app.<app_name>.actions`.SubmitOrderOutput        | Submits a drafted order.              |
+| approveExpenses    | `app.<app_name>`.Expense   | bulk     | `app.<app_name>.actions`.ApproveExpensesInput    | `app.<app_name>.actions`.ApproveExpensesOutput    | Approves several expenses at once.    |
+| importCustomersCsv | `app.<app_name>`.Customer  | class    | `app.<app_name>.actions`.ImportCustomersCsvInput | `app.<app_name>.actions`.ImportCustomersCsvOutput | Imports customers from a CSV file.    |
 
 ## Views
 
@@ -757,13 +804,19 @@ full action definitions.
 - **Description:** one to three sentences explaining what the action
   does, its side effects, and the invariants it enforces. Passed to
   the MCP server as `actionDescription`.
-- **Target:** `app.<app_name>`.ClassName — every action is anchored on a
-  specific instance, identified by the required `id` property on the
-  input class.
-- **Input class:** `app.<app_name>.actions`.SubmitOrderInput — must
-  declare a required `id` property (`type: "string"`,
-  `format: "uuid"`).
-- **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
+- **Target:** `app.<app_name>`.ClassName — the top-level class this
+  action is registered against on the backend.
+- **Scope:** `instance` | `bulk` | `class`. Determines the required
+  field on the input class (and is passed verbatim to
+  `register_action` on the corresponding parameter).
+- **Input class:** `app.<app_name>.actions`.<Name>Input. Required
+  field depends on scope:
+  - `instance` → required `id` (`type: "string"`, `format: "uuid"`).
+  - `bulk` → required `ids`
+    (`type: "array"`, `items: { type: "string", format: "uuid" }`,
+    `minItems: 1`, `uniqueItems: true`).
+  - `class` → neither `id` nor `ids`.
+- **Output class:** `app.<app_name>.actions`.<Name>Output
 - **Example invocation:**
   ```json
   {

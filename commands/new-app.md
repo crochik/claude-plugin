@@ -127,8 +127,10 @@ Hand back to the **`bootstrapp-architect`**. It will:
 - Walk the action registry and call
   `mcp__bootstrapp__register_action` once per action — passing
   `fullObjectType`, `actionName`, `actionSummary`,
-  `actionDescription`, `actionInputObjectType`, and
-  `actionOutputObjectType`.
+  `actionDescription`, `actionInputObjectType`,
+  `actionOutputObjectType`, and the action's **scope**
+  (`instance` / `bulk` / `class`) on the corresponding
+  `register_action` parameter.
 
 ## Phase 6 — Generate the API client
 

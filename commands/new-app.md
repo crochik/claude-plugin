@@ -127,9 +127,10 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `appTitle`, and `appDescription` from the App section of
   `BOOTSTRAPP.md`. This must run **before** any
   `add_object_class` or `register_action` call — it provisions the
-  app record and its OIDC client. The architect skips this step if
-  `mcp__bootstrapp__get_namespaces` already shows the app's
-  namespace (i.e. the app was initialized in a prior run).
+  app record and its OIDC client. `init_app` is a one-time
+  creation step; only `/bootstrapp:new-app` calls it.
+  `/bootstrapp:design-model` and incremental architect runs on an
+  existing app must skip it.
 - Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
   walk the class registry and call
   `mcp__bootstrapp__add_object_class` once per class — passing

@@ -39,23 +39,21 @@ small, working slice and then iterating with the user.
    emit in client code must come from something the MCP server told you.
    If a tool call is ambiguous, ask the user rather than inventing.
 
-4. **Initialize the app exactly once.** Before the first
-   `add_object_class` or `register_action` call against a brand-new
-   app, call `mcp__bootstrapp__init_app` once with `appName`,
-   `appTitle`, and `appDescription` from `BOOTSTRAPP.md` (snake_case
-   Name, human-readable Title, paragraph Description). This
-   provisions the app record and its OIDC client on the backend;
-   class and action registration will fail until it has run. **Do
-   not call `init_app` on an existing app** — when working from a
-   `BOOTSTRAPP.md` whose classes are already on the backend (the
-   design-model flow, or a re-run after a schema change), skip
-   straight to class creation. Detect "already initialized" by
-   calling `mcp__bootstrapp__get_namespaces` first: if
-   `app.<app_name>` (or any sub-namespace) is already visible, the
-   app exists — do not re-initialize. If it is missing, run
-   `init_app` once and proceed. Treat a re-init failure as a hint
-   that the app is already there, not a fatal error — verify with
-   `get_namespaces` and continue.
+4. **Initialize the app exactly once, on creation only.** When
+   building a brand-new app end-to-end (the `/bootstrapp:new-app`
+   flow), call `mcp__bootstrapp__init_app` exactly once before the
+   first `add_object_class` or `register_action` call, passing
+   `appName`, `appTitle`, and `appDescription` from `BOOTSTRAPP.md`
+   (snake_case Name, human-readable Title, paragraph Description).
+   This provisions the app record and its OIDC client on the
+   backend; class and action registration will fail until it has
+   run. **Never call `init_app` on an existing app.** When
+   `BOOTSTRAPP.md` is already on disk and you are evolving the
+   schema (the `/bootstrapp:design-model` flow, a re-run after a
+   schema change, or any direct invocation on an established
+   project), skip `init_app` entirely and go straight to class
+   creation — the orchestrator entry point tells you which case
+   you are in.
 
 5. **Create classes via MCP, not by hand.** The blueprint is split:
    `BOOTSTRAPP.md` is the index (registries of classes, actions,
@@ -212,15 +210,15 @@ small, working slice and then iterating with the user.
 6. **Create classes on the backend.** Read `BOOTSTRAPP.md` and every
    `schemas/*.md` it references.
 
-   **First, initialize the app if needed.** Call
-   `mcp__bootstrapp__get_namespaces` and check whether
-   `app.<app_name>` (from `BOOTSTRAPP.md`) is already visible. If
-   it is **not** visible, this is a fresh app — call
-   `mcp__bootstrapp__init_app` exactly once, passing `appName`,
-   `appTitle`, and `appDescription` from the App section of
-   `BOOTSTRAPP.md`. If it is already visible, skip this step and
-   proceed straight to class creation. Never call `init_app` on an
-   already-initialized app.
+   **If this is a fresh app being built end-to-end (the
+   `/bootstrapp:new-app` flow), call `mcp__bootstrapp__init_app`
+   exactly once first**, passing `appName`, `appTitle`, and
+   `appDescription` from the App section of `BOOTSTRAPP.md`. Class
+   and action registration will fail until this has run. **If you
+   are evolving an existing app** (`/bootstrapp:design-model`, a
+   re-run after a schema change, or any direct invocation on an
+   established project), skip this step — `init_app` was already
+   called at app-creation time and is not idempotent.
 
    Then walk the class registry in order (top-level classes first,
    then embedded, then action input/output classes), pulling each

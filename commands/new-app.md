@@ -106,22 +106,7 @@ It will:
   JSON Schemas (and, for an actions namespace, full action
   definitions).
 
-## Phase 4b — Action scripts via `bootstrapp-action-scripter`
-
-Once the schema is settled, the `bootstrapp-architect` invokes the
-**`bootstrapp-action-scripter`** subagent. It reads `BOOTSTRAPP.md`
-plus every `schemas/app.<app_name>[.<sub>].actions.md`, drafts an
-ApiScript pseudo-implementation for each action in the registry,
-presents the drafts in chat for confirmation, and writes
-`scripts/<ActionsNamespace>.md` — one file per actions namespace,
-parallel to `schemas/`. These scripts are **server-side action
-bodies**: in Phase 5 the architect passes each action's script
-verbatim to `mcp__bootstrapp__register_action` as `actionScript`,
-and the bootstrapp.cloud runtime executes it when the action is
-invoked. The scripter does not need the backend to be live yet —
-the architect is the only step that touches the backend.
-
-## Phase 5 — Create classes on the backend
+## Phase 5 — Create classes and register actions on the backend
 
 Hand back to the **`bootstrapp-architect`**. It will:
 
@@ -149,16 +134,16 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `mcp__bootstrapp__register_action` once per row of the action
   registry — passing `fullObjectType`, `actionName`,
   `actionSummary`, `actionDescription`, `actionInputObjectType`,
-  `actionOutputObjectType`, `scope` (capitalized to match the
-  tool's enum: `Instance` / `Bulk` / `Class`), and `actionScript`
-  (the ApiScript body pulled verbatim from the action's section in
-  `scripts/<ActionsNamespace>.md`, written by
-  `bootstrapp-action-scripter` in Phase 4b). The script is what
-  the runtime executes — registering an action without it ships a
-  no-op endpoint. **All `add_object_class` and `register_action`
-  calls in this phase are independent of each other and of
-  class-to-class dependencies — fire them in parallel.** The
-  backend resolves inheritance, embeddings, references, and action
+  `actionOutputObjectType`, and `scope` (capitalized to match the
+  tool's enum: `Instance` / `Bulk` / `Class`). **`register_action`
+  no longer takes `actionScript`** — the body is attached
+  separately in Phase 9 via `mcp__bootstrapp__update_action_script`,
+  after the OpenAPI spec has been refreshed so the scripter can
+  draft against an up-to-date `Reference/platform-modules.d.ts`.
+  **All `add_object_class` and `register_action` calls in this
+  phase are independent of each other and of class-to-class
+  dependencies — fire them in parallel.** The backend resolves
+  inheritance, embeddings, references, and action
   input/output/target links after the fact, so order does not
   matter; a class does not need to exist before another references
   it, and an action does not need to wait for its target/input/output
@@ -168,21 +153,73 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `mcp__bootstrapp__get_namespaces` when finer-grained checks help)
   only after the parallel batch finishes.
 
-## Phase 6 — Generate the API client
+## Phase 6 — Generate the OpenAPI spec
 
-The architect invokes the
+Once Phase 5 has registered every class and action, the architect
+calls `mcp__bootstrapp__generate_openapi_spec` with
+`applicationName` set to the app name in `BOOTSTRAPP.md`. This
+call returns a URL pointing at the freshly regenerated spec for
+the app, **and** as a side effect refreshes the
+`Reference/platform-modules.d.ts` MCP resource so it includes the
+typed runtime helpers for the app's classes — the action scripter
+will read it in Phase 8. The architect downloads the spec to a
+local file (default: `openapi.json` at the project root) and
+confirms the file is non-empty and well-formed.
+
+## Phase 7 — Generate the typed API client
+
+The architect resumes the
 [openapi-client-generator](../skills/openapi-client-generator/SKILL.md)
-skill. Phase 6 strictly depends on Phase 5: the OpenAPI spec is
-generated from current backend state, so every class and action must
-already be registered before calling
-`mcp__bootstrapp__generate_openapi_spec` (with `applicationName` set
-to the app name in `BOOTSTRAPP.md`). The skill then downloads and
-saves the spec locally, and **only after the spec file is on disk**
-runs `generate_api.sh` against it to emit the typed client. Do not
-collapse these into one step or run the generator against a stale
-file.
+skill from the saved-spec step: it runs `generate_api.sh` against
+the spec file written in Phase 6 to emit the typed client. The
+spec already reflects every class and action (registered in
+Phase 5); action scripts are server-side bodies that do not
+appear in the API surface, so client generation does not depend
+on them and a second `generate_openapi_spec` call is never
+needed.
 
-## Phase 7 — Scaffold the UI app
+## Phase 8 — Action scripts via `bootstrapp-action-scripter`
+
+With the spec generated in Phase 6 (and therefore
+`Reference/platform-modules.d.ts` refreshed), the
+`bootstrapp-architect` invokes the **`bootstrapp-action-scripter`**
+subagent. It reads `BOOTSTRAPP.md`, every
+`schemas/app.<app_name>[.<sub>].actions.md`,
+`Reference/platform-modules.d.ts`, and any domain schemas the
+actions touch. It drafts an ApiScript pseudo-implementation for
+each action in the registry, presents the drafts in chat for
+confirmation, and writes `scripts/<ActionsNamespace>.md` — one
+file per actions namespace, parallel to `schemas/`. These scripts
+are **server-side action bodies** that Phase 9 ships to the
+backend via `mcp__bootstrapp__update_action_script`. The scripter
+does not call any MCP tool that mutates the backend.
+
+Phases 7 (client generation), 8 (scripter), and 9 (attach scripts)
+are independent of each other — nothing in client generation or UI
+scaffolding depends on action scripts being on disk or attached,
+and the scripter only needs `Reference/platform-modules.d.ts` to
+have been refreshed in Phase 6. The architect can run Phases 7–9
+in any order (or in parallel) as long as Phase 9 follows Phase 8
+and all three precede the user invoking any action. The order
+shown is the canonical readable default.
+
+## Phase 9 — Attach action scripts to the backend
+
+The `bootstrapp-architect` walks the action registry and calls
+`mcp__bootstrapp__update_action_script` once per action — passing
+`fullObjectType` (the action's target class), `actionName`, and
+`actionScript` (the fenced ```typescript block from the action's
+section in `scripts/<ActionsNamespace>.md`, passed verbatim — the
+`import` statements and the `execute` function). **Fire every
+`update_action_script` call in parallel** — they are independent
+of each other. Until a script is attached, the action endpoint
+exists in the OpenAPI spec but executing it is a no-op; this
+phase must therefore complete before the user invokes any action.
+If a `scripts/*.md` file is missing or has no matching section
+for an action, stop and re-invoke `bootstrapp-action-scripter`
+before retrying.
+
+## Phase 10 — Scaffold the UI app
 
 The architect runs the platform's official scaffolder in the project
 folder:
@@ -200,7 +237,7 @@ per redirect URL the client will use (the dev server URL plus
 OIDC callback path, and any production origin the user names) so
 the OIDC issuer accepts login redirects.
 
-## Phase 8 — Start the UI and iterate
+## Phase 11 — Start the UI and iterate
 
 The architect starts the dev server in the background, surfaces the URL
 or output, and **stays in chat** to add features, fix issues, and respond

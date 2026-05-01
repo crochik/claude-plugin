@@ -64,11 +64,20 @@ document.
 - Once the subagent returns the updated blueprint, present the touched
   paths, the app name, and a short summary of what changed. Then ask
   whether the user wants the `bootstrapp-architect` to apply the
-  schema changes to the backend (re-running class creation via the
-  MCP server and regenerating the API client) or to defer until later.
+  schema changes to the backend (registering the new/changed classes
+  and actions, regenerating the OpenAPI spec, and regenerating the
+  API client) or to defer until later.
 - If the change touched the action registry (added, renamed, removed,
-  or reshaped any action), also offer to invoke the
-  **`bootstrapp-action-scripter`** subagent to refresh the matching
-  `scripts/<ActionsNamespace>.md` file(s) before the architect applies
-  the schema. The scripter is design-only and can run independently of
-  any backend work.
+  or reshaped any action), the architect must also refresh the
+  matching `scripts/<ActionsNamespace>.md` file(s) and attach the
+  updated scripts via `mcp__bootstrapp__update_action_script`. The
+  ordering matters because the **`bootstrapp-action-scripter`**
+  subagent drafts against `Reference/platform-modules.d.ts` from the
+  MCP server, and that resource is only refreshed when the architect
+  calls `mcp__bootstrapp__generate_openapi_spec` — so the canonical
+  flow is: architect registers the class/action changes → architect
+  calls `generate_openapi_spec` → invoke the scripter to rewrite the
+  affected scripts → architect calls `update_action_script` for each
+  updated action. The scripter itself is design-only and never
+  touches the backend, but it should run after the spec regen, not
+  before.

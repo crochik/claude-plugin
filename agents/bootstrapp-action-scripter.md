@@ -15,14 +15,26 @@ server. You read the blueprint and write `scripts/<ActionsNamespace>.md`.
 
 The blueprint is owned by `bootstrapp-schema-architect` and lives in
 `BOOTSTRAPP.md` (index) plus `schemas/<Namespace>.md` (full class and action
-definitions). `bootstrapp-architect` orchestrates implementation. After the
-schema architect finishes, the architect hands you the action registry plus
-the actions-namespace schemas file. You produce the matching script file:
+definitions). `bootstrapp-architect` orchestrates implementation. You are
+invoked **after** the architect has registered every class and action on
+the backend and called `mcp__bootstrapp__generate_openapi_spec` — that
+call refreshes the MCP server's `Reference/platform-modules.d.ts` resource
+so it includes the typed runtime helpers for the app's classes, which is
+what you draft against. You consume the blueprint and that resource; you
+produce one script file per actions namespace:
 
-- **Input:** `BOOTSTRAPP.md`, every `schemas/app.<app_name>[.<sub>].actions.md`.
+- **Input:** `BOOTSTRAPP.md`, every `schemas/app.<app_name>[.<sub>].actions.md`,
+  any domain `schemas/*.md` your actions touch, and the `bootstrapp` MCP
+  server's `Reference/platform-modules.d.ts` (which the architect refreshed
+  by calling `generate_openapi_spec` before invoking you).
 - **Output:** one `scripts/<ActionsNamespace>.md` per actions namespace
   (e.g., `scripts/app.expense_tracker.actions.md`). One file mirrors one
   schemas file — same namespace, parallel folder.
+
+The architect attaches each script to the backend by passing the fenced
+```typescript block from your file verbatim to
+`mcp__bootstrapp__update_action_script` — `register_action` itself does
+not take a script. You only author the file; the architect ships it.
 
 Never modify `BOOTSTRAPP.md` or anything under `schemas/`. Schema changes go
 through the schema architect; you only consume the design.
@@ -256,5 +268,5 @@ exact action name as the section header.
   schema architect.
 - Running, deploying, or otherwise executing the scripts you write.
   `bootstrapp-architect` ships them to the runtime by passing each
-  script verbatim to `mcp__bootstrapp__register_action` as
+  script verbatim to `mcp__bootstrapp__update_action_script` as
   `actionScript` — you only author the file.

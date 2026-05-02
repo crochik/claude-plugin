@@ -149,9 +149,10 @@ Hand back to the **`bootstrapp-architect`**. It will:
   it, and an action does not need to wait for its target/input/output
   classes.
 - Verify with `mcp__bootstrapp__get_object_classes` (and
-  `mcp__bootstrapp__get_class_schema` /
-  `mcp__bootstrapp__get_namespaces` when finer-grained checks help)
-  only after the parallel batch finishes.
+  `mcp__bootstrapp__get_namespaces` when you need to confirm
+  which namespaces exist) only after the parallel batch finishes.
+  `get_object_classes` returns the full schema of every class in
+  the namespace, so it doubles as a single-class inspector.
 
 ## Phase 6 — Generate the OpenAPI spec
 

@@ -1,7 +1,7 @@
 ---
 name: bootstrapp-architect
 description: Use PROACTIVELY for any end-to-end work on an app whose backend is bootstrapp.cloud — interviewing the user about scope, handing off to the schema architect, creating classes on the backend via the `bootstrapp` MCP server, generating the typed API client, scaffolding the client (web/Flutter/CLI/desktop/mobile), wiring auth, and iterating on the running UI. Drives the `bootstrapp` MCP server to inspect and modify the backend before touching client code.
-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_class_schema, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__tool_search
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__tool_search
 mcpServers:
   - bootstrapp
 ---
@@ -87,9 +87,10 @@ small, working slice and then iterating with the user.
    - `baseObjectType` — only when the class extends another (single
      inheritance with a discriminator).
 
-   Verify with `mcp__bootstrapp__get_object_classes` (and
-   `mcp__bootstrapp__get_class_schema` / `mcp__bootstrapp__get_namespaces`
-   when you need to inspect what's already on the backend). Register
+   Verify with `mcp__bootstrapp__get_object_classes` (passing the
+   namespace to see the full schema of every class in it) and
+   `mcp__bootstrapp__get_namespaces` when you need to inspect
+   what's already on the backend. Register
    each custom action with `mcp__bootstrapp__register_action`,
    passing:
    - `fullObjectType` — the action's target class (a top-level
@@ -272,9 +273,10 @@ small, working slice and then iterating with the user.
    their target/input/output classes. Verify with
    `mcp__bootstrapp__get_object_classes` against each namespace
    only after the batch returns (use `mcp__bootstrapp__get_namespaces`
-   first if you need to see which namespaces already exist, and
-   `mcp__bootstrapp__get_class_schema` to inspect a single class's
-   schema). For actions, call `mcp__bootstrapp__register_action`
+   first if you need to see which namespaces already exist;
+   `get_object_classes` returns the full schema of every class
+   under the namespace, so use it to inspect individual classes
+   too). For actions, call `mcp__bootstrapp__register_action`
    once per row in the action registry with `fullObjectType`,
    `actionName`, `actionSummary`, `actionDescription`,
    `actionInputObjectType`, `actionOutputObjectType`, and `scope`

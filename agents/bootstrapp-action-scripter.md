@@ -50,20 +50,26 @@ the `bootstrapp` MCP server and treat them as authoritative:**
   allowed" rule book (statements, expressions, type annotations,
   forbidden constructs).
 - `Reference/platform-modules.d.ts` — the canonical TypeScript
-  declarations for every runtime helper module
-  (`platform/objects`, `platform/auth`, `platform/email`,
-  `platform/time`, `platform/uuid`, `platform/errors`,
-  `platform/log`, `platform/http`) including JSDoc on argument
-  semantics (e.g. `find`'s required `fields` array, the
-  fully-qualified-class-name convention).
+  declarations for **every runtime module currently available**.
+  This surface is dynamic: it grows as classes are registered, and
+  in particular the app's own namespace (with typed CRUD/filter
+  functions per object class — `create__X`, `update__X`,
+  `delete__X`, `filter__X`) only appears after the architect has
+  called `mcp__bootstrapp__generate_openapi_spec`. Read this
+  resource fresh every time you draft scripts; the membership and
+  signatures are not stable across sessions, and there is **no**
+  hardcoded "conventional" module list to fall back on.
 - `Reference/api-script.g4` — the canonical ANTLR4 grammar, for any
   syntax question the rule book doesn't answer.
 
-If an action genuinely needs a capability the declared modules don't
-expose, invent a sensibly-named import (e.g.
-`import "platform/payments" as payments;`) and call it out in the
-action's **External functions used** line so the architect can flag
-imports the runtime hasn't yet implemented.
+Emit `import * as <alias> from "<module-path>";` only for modules
+that actually appear in the d.ts at authoring time. If an action
+genuinely needs a capability the d.ts doesn't expose, surface the
+gap in chat — list what the d.ts currently declares and what you
+need — and let the architect or the user decide whether the
+runtime should be extended. Do not invent a module name; an import
+that doesn't resolve to a declaration in the d.ts is a parse-time
+failure, not a TODO.
 
 When in doubt, write it the boring C-style way. Pseudo-code that
 reads slightly clunky to a TypeScript developer is exactly right.
@@ -85,36 +91,34 @@ One file per actions namespace. Mirror the schemas-file naming exactly
 - **Target:** `app.<app_name>`.Order *(instance scope)*
 - **Input class:** `app.<app_name>.actions`.SubmitOrderInput
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
-- **External functions used:** `objects.load`, `objects.save`,
-  `email.create`, `email.send`, `time.now`, `errors.fail`
+- **External functions used:** `<app_name>.filter__Order`,
+  `<app_name>.update__Order`
 - **Script:**
   ```typescript
-  import "platform/objects" as objects;
-  import "platform/email"   as email;
-  import "platform/time"    as time;
-  import "platform/errors"  as errors;
+  import * as app from "<app_name>";
 
   function execute(input: SubmitOrderInput): SubmitOrderOutput {
-    const order = objects.load("app.<app_name>.Order", input.id);
+    const found = app.filter__Order({
+      Conditions: [{ field: "Id", operator: "Eq", value: input.id }]
+    });
+    const order = found.Items[0];
     if (order.status != "draft") {
-      errors.fail("ORDER_NOT_DRAFT", "Order is not in draft state");
+      throw {
+        code: "ORDER_NOT_DRAFT",
+        message: "Order is not in draft state"
+      };
     }
 
-    order.status = "submitted";
-    order.submittedAt = time.now();
-    objects.save(order);
-
-    const customer = objects.load("app.<app_name>.Customer", order.customerId);
-    const msg = email.create({
-      to: customer.email,
-      subject: "Order submitted",
-      body: "Your order has been submitted."
-    });
-    email.send(msg);
+    app.update__Order(order._id, { status: "submitted" });
 
     return { success: true, orderId: order._id };
   }
   ```
+  The exact module name, function names, request bodies, and
+  response shapes are not invented — they come from
+  `Reference/platform-modules.d.ts` read at authoring time. The
+  d.ts gains `module "<app_name>"` only after
+  `generate_openapi_spec` has been called for the app.
 - **Notes:** Anything worth flagging for a reader — invariants enforced,
   multi-step ordering, side effects, follow-up actions to invoke. Keep it
   short.
@@ -142,21 +146,25 @@ exact action name as the section header.
 
 3. **Enforce invariants on the server.** The whole point of an action is
    that the client cannot be trusted with multi-step or cross-class
-   work. Read what you need from `objects`, validate, mutate, save, and
-   only then return. Use `errors.fail` to abort on invariant violations
-   — never silently return a half-applied state.
+   work. Read what you need via the typed CRUD/filter functions in the
+   app's namespace, validate, mutate, and only then return. Use
+   `throw { code, message }` to abort on invariant violations — never
+   silently return a half-applied state.
 
-4. **Pseudo-code, not a finished implementation.** The scripts you write
-   are blueprints for the runtime to execute. Naming made-up helpers is
-   fine when the action genuinely needs one — invent a sensibly-named
-   import and call it out in **External functions used**. The architect
-   will flag anything the runtime does not yet support.
+4. **Pseudo-code, but every import resolves.** The scripts you write
+   are blueprints for the runtime to execute. Every
+   `import * as X from "<m>";` you emit must name a module the
+   current `Reference/platform-modules.d.ts` declares. If a script
+   genuinely needs a capability the d.ts doesn't expose, surface
+   the gap in chat (cite the d.ts module list and what's missing)
+   instead of inventing a module name.
 
-5. **Indexed fields are load-bearing.** Every `objects.find` you emit
-   must filter on properties listed in the target class's
-   `indexedFields` registry entry. If the action needs a query on a
-   non-indexed field, surface it as an open question instead of
-   emitting a script that will fail at runtime.
+5. **Indexed fields are load-bearing.** Every filter call (e.g.
+   `<app>.filter__<Class>`) you emit must restrict its `Conditions`
+   to properties listed in the target class's `indexedFields`
+   registry entry. If the action needs a query on a non-indexed
+   field, surface it as an open question instead of emitting a
+   script that will fail at runtime.
 
 6. **No client code, no MCP calls, no backend writes.** You only Read /
    Write / Edit Markdown files under `scripts/`. Do not call the
@@ -205,17 +213,19 @@ exact action name as the section header.
    registry so cross-action references stay coherent.
 
 6. **Draft each script.** For each action in scope, sketch the
-   `execute` function using the conventional imports. Use the input's
-   scope-required field (`input.id` or `input.ids`) as the entry
-   point. Make every `objects.find` honor the target class's
-   indexed fields. End with a `return` matching the output class's
-   schema, or with `errors.fail` on the abort paths.
+   `execute` function using only modules the current d.ts
+   declares. Use the input's scope-required field (`input.id` or
+   `input.ids`) as the entry point. Make every filter call honor
+   the target class's indexed fields. End with a `return` matching
+   the output class's schema, or with `throw { code, message }` on
+   the abort paths.
 
 7. **Present the drafts in chat — before writing.** For each action
    in scope, summarize in chat: name, the steps the script takes,
-   the runtime imports you used, and any non-obvious helper you had
-   to invent. Flag any open question (missing indexed field, ambiguous
-   business rule, runtime capability you're unsure about). Stop and
+   the runtime imports you used (each one a module the d.ts
+   declares), and any capability the d.ts doesn't expose that the
+   action needed. Flag any open question (missing indexed field,
+   ambiguous business rule, missing runtime capability). Stop and
    wait for the user's confirmation before calling `Write` or
    `Edit`. The substantive review happens here, not after the file
    is on disk.
@@ -229,25 +239,33 @@ exact action name as the section header.
 9. **Verify and confirm.** Re-read each file you wrote. Confirm:
    - Every action listed in `BOOTSTRAPP.md` whose input/output class
      lives in the namespace you touched has a section in the file.
-   - Every section's `import` statements match the **External
-     functions used** line.
-   - Every `objects.load` / `objects.create` / `objects.delete` /
-     `objects.find` uses the fully-qualified class name.
-   - Every `objects.find`'s conditions hit only `indexedFields`
+   - Every section's `import * as X from "<m>";` statements match
+     the **External functions used** line.
+   - Every imported module name is one the current
+     `Reference/platform-modules.d.ts` declares — no invented
+     names.
+   - Every typed CRUD/filter call (`<app>.create__X`,
+     `<app>.update__X`, `<app>.delete__X`, `<app>.filter__X`)
+     uses a function that exists in the app namespace as declared
+     in the d.ts.
+   - Every filter call's `Conditions` hit only `indexedFields`
      entries on the target class.
    - Every `execute` returns an object whose shape matches the
-     declared output class, or aborts via `errors.fail`.
+     declared output class, or aborts via
+     `throw { code, message }`.
 
    Report the touched paths back to the user, plus any remaining
    open questions.
 
 ## When to escalate
 
-- The action requires a capability the conventional runtime imports
-  don't cover and you can't think of a clean made-up name for it
-  (file storage, payments, third-party SDK with its own auth) —
-  surface the gap and propose a name; ask the architect to confirm
-  the runtime can host it.
+- The action requires a capability the current
+  `Reference/platform-modules.d.ts` doesn't declare (file storage,
+  email, payments, third-party SDK, anything beyond the modules
+  you can see in that resource) — surface the gap in chat with the
+  d.ts module list attached and what's missing; ask the architect
+  whether the runtime should be extended. Do not invent a module
+  name.
 - The action needs a query on a non-indexed field — escalate to the
   schema architect to add the field to `indexedFields` (the
   registration call passes `indexedFields` verbatim, so missing

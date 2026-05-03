@@ -65,14 +65,19 @@ The three agents are intentionally separate and should stay that way:
   actions-namespace schemas files, then writes one
   `scripts/<ActionsNamespace>.md` per actions namespace with an ApiScript
   pseudo-implementation of each action. ApiScript is a simplified TypeScript
-  dialect (grammar at [ApiScript.g4](./ApiScript.g4)) that the
-  bootstrapp.cloud runtime executes server-side. The agent uses a small
-  set of conventional runtime imports (`platform/objects`,
-  `platform/email`, `platform/auth`, `platform/time`, `platform/errors`,
-  `platform/log`, `platform/http`, `platform/uuid`) and may invent
-  additional ones when an action genuinely needs them — flagging the new
-  helpers in the script's **External functions used** line. Never touches
-  the MCP server, the schemas files, or client code.
+  dialect — the canonical grammar is served by the `bootstrapp` MCP
+  server at `bootstrapp://reference/api-script.g4`, with a curated rule
+  book at `bootstrapp://reference/api-script.md`. The set of runtime
+  modules a script may import is **dynamic and discovery-driven**:
+  whatever `bootstrapp://reference/platform-modules.d.ts` declares at
+  authoring time is what exists. The app's own namespace (typed
+  CRUD/filter functions per object class) appears there only after
+  `mcp__bootstrapp__generate_openapi_spec` is called. The agent reads
+  the d.ts on each run, emits `import * as <alias> from "<m>";` only for
+  modules the d.ts declares, surfaces unmet capabilities as questions
+  rather than inventing module names, and uses
+  `throw { code, message }` for invariant violations. Never touches the
+  MCP server, the schemas files, or client code.
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
   discovery, implementation, and iteration. Runs the upfront discovery
   exchange (clarifying scope, offering feedback), hands off to the schema

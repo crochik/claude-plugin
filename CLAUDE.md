@@ -63,8 +63,10 @@ The three agents are intentionally separate and should stay that way:
 - **[bootstrapp-action-scripter](./agents/bootstrapp-action-scripter.md)** —
   design-only, action-implementation layer. Reads `BOOTSTRAPP.md` and the
   actions-namespace schemas files, then writes one
-  `scripts/<ActionsNamespace>.md` per actions namespace with an ApiScript
-  pseudo-implementation of each action. ApiScript is a simplified TypeScript
+  `scripts/<actionName>.ts` per action (containing only the ApiScript
+  body — no Markdown) plus a thin `scripts/<ActionsNamespace>.md` index
+  per actions namespace that links to those `.ts` files without
+  embedding the bodies. ApiScript is a simplified TypeScript
   dialect — the canonical grammar is served by the `bootstrapp` MCP
   server at `bootstrapp://reference/api-script.g4`, with a curated rule
   book at `bootstrapp://reference/api-script.md`. The set of runtime
@@ -123,19 +125,22 @@ extending:
   registry tables for classes, actions, embeddings, references, relations
   — no JSON Schemas), one `schemas/<Namespace>.md` file per namespace
   holds the full class definitions (the actions namespace file also holds
-  the full action definitions), and one `scripts/<ActionsNamespace>.md`
-  per actions namespace holds the ApiScript pseudo-implementation of
-  each action. The schema architect writes the index and schemas files;
-  the action scripter writes the script files; the implementation
-  architect and any other reader load the index first, then only the
-  schemas/scripts files relevant to the change. Invariant: every class
-  and action appears in exactly one schemas file *and* exactly one row
-  of the matching registry — never one without the other. Every action
-  also appears in exactly one script file (in the namespace matching
-  its input/output classes). When a user's project already has a
-  `BOOTSTRAPP.md`, the index plus schemas/scripts files are the source
-  of truth — read them before proposing changes, and never rename the
-  app silently.
+  the full action definitions), one `scripts/<actionName>.ts` per
+  action holds the ApiScript pseudo-implementation, and one
+  `scripts/<ActionsNamespace>.md` per actions namespace is a thin
+  index that links to those `.ts` files (it does **not** embed the
+  bodies). The schema architect writes the index and schemas files;
+  the action scripter writes both the per-action `.ts` files and the
+  per-namespace `.md` indexes; the implementation architect and any
+  other reader load the index first, then only the schemas/scripts
+  files relevant to the change. Invariant: every class and action
+  appears in exactly one schemas file *and* exactly one row of the
+  matching registry — never one without the other. Every action also
+  appears in exactly one `scripts/<actionName>.ts` file *and* exactly
+  one section of the matching `scripts/<ActionsNamespace>.md` index.
+  When a user's project already has a `BOOTSTRAPP.md`, the index plus
+  schemas/scripts files are the source of truth — read them before
+  proposing changes, and never rename the app silently.
 - **One working vertical slice.** Auth + one real read + one real write beats
   elaborate stubs.
 - **Secrets hygiene.** `.env.example` is committed; `.env` is gitignored.

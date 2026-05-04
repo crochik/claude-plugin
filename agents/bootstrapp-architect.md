@@ -141,17 +141,18 @@ small, working slice and then iterating with the user.
    the app name in `BOOTSTRAPP.md`) since the latest action/class
    change, so the MCP server's `Reference/platform-modules.d.ts`
    resource is refreshed with the typed runtime helpers for the
-   app's classes. The scripter loads that resource and writes
-   `scripts/<ActionsNamespace>.md` against it. Once the scripts
-   exist on disk, attach each one with
+   app's classes. The scripter loads that resource and writes one
+   `scripts/<actionName>.ts` per action, plus a thin
+   `scripts/<ActionsNamespace>.md` index per namespace. Once the
+   scripts exist on disk, attach each one with
    `mcp__bootstrapp__update_action_script` — passing
    `fullObjectType` (the action's target class), `actionName`, and
-   `actionScript` (the fenced ```typescript block from the action's
-   section in `scripts/<ActionsNamespace>.md`, passed verbatim).
-   **Fire every `update_action_script` call in parallel.** Until a
-   script is attached, the action endpoint exists but executing it
-   is a no-op — the user must see scripts attached before
-   invoking any action.
+   `actionScript` (the **full contents of `scripts/<actionName>.ts`,
+   read verbatim** — no fence stripping, no transformation; the file
+   already holds only the ApiScript body). **Fire every
+   `update_action_script` call in parallel.** Until a script is
+   attached, the action endpoint exists but executing it is a no-op
+   — the user must see scripts attached before invoking any action.
 
    Beyond that, scripts are independent of everything else. The
    OpenAPI spec, the typed client, and the UI scaffold all describe
@@ -311,24 +312,27 @@ small, working slice and then iterating with the user.
    files, the just-refreshed `Reference/platform-modules.d.ts`, and
    any domain schemas the actions touch; draft an ApiScript
    implementation for every action in scope; present the drafts in
-   chat for confirmation; and write `scripts/<ActionsNamespace>.md`
-   — one file per actions namespace, parallel to the schemas
-   folder. Do not draft the scripts yourself.
+   chat for confirmation; and write one
+   `scripts/<actionName>.ts` per action plus a thin
+   `scripts/<ActionsNamespace>.md` index per namespace. Do not
+   draft the scripts yourself.
 
 9. **Attach action scripts to the backend.** Walk the action
    registry and call `mcp__bootstrapp__update_action_script` once
    per action — passing `fullObjectType` (the target class),
-   `actionName`, and `actionScript` (the fenced ```typescript
-   block from the action's section in
-   `scripts/<ActionsNamespace>.md`, passed verbatim — the
-   `import` statements and the `execute` function). **Fire every
-   `update_action_script` call in parallel.** Until a script is
-   attached, the corresponding action endpoint exists but
-   executes as a no-op, so this step must complete before the
-   user invokes any action; it does not block client generation
-   or UI scaffolding. If a `scripts/*.md` file is missing or has
-   no matching section for an action, stop and re-invoke
-   `bootstrapp-action-scripter` before retrying.
+   `actionName`, and `actionScript` (the **full contents of
+   `scripts/<actionName>.ts`, read verbatim**: the file already
+   holds only the ApiScript body — its `import` statements plus
+   the `execute` function — with no Markdown fences to strip).
+   **Fire every `update_action_script` call in parallel.** Until a
+   script is attached, the corresponding action endpoint exists but
+   executes as a no-op, so this step must complete before the user
+   invokes any action; it does not block client generation or UI
+   scaffolding. If a `scripts/<actionName>.ts` file is missing for
+   an action in the registry — or if the matching
+   `scripts/<ActionsNamespace>.md` index is missing or out of sync
+   — stop and re-invoke `bootstrapp-action-scripter` before
+   retrying.
 
    Steps 7 (client gen), 8 (scripter), and 9 (attach scripts) are
    independent of each other — the only ordering constraints are

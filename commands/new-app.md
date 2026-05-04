@@ -189,11 +189,14 @@ subagent. It reads `BOOTSTRAPP.md`, every
 `Reference/platform-modules.d.ts`, and any domain schemas the
 actions touch. It drafts an ApiScript pseudo-implementation for
 each action in the registry, presents the drafts in chat for
-confirmation, and writes `scripts/<ActionsNamespace>.md` — one
-file per actions namespace, parallel to `schemas/`. These scripts
-are **server-side action bodies** that Phase 9 ships to the
-backend via `mcp__bootstrapp__update_action_script`. The scripter
-does not call any MCP tool that mutates the backend.
+confirmation, and writes one `scripts/<actionName>.ts` per action
+(holding only the ApiScript body — no Markdown) plus a thin
+`scripts/<ActionsNamespace>.md` index per actions namespace
+(parallel to `schemas/`) that links to each action's `.ts` file
+without embedding the body. These `.ts` files are the
+**server-side action bodies** that Phase 9 ships to the backend
+via `mcp__bootstrapp__update_action_script`. The scripter does not
+call any MCP tool that mutates the backend.
 
 Phases 7 (client generation), 8 (scripter), and 9 (attach scripts)
 are independent of each other — nothing in client generation or UI
@@ -209,16 +212,18 @@ shown is the canonical readable default.
 The `bootstrapp-architect` walks the action registry and calls
 `mcp__bootstrapp__update_action_script` once per action — passing
 `fullObjectType` (the action's target class), `actionName`, and
-`actionScript` (the fenced ```typescript block from the action's
-section in `scripts/<ActionsNamespace>.md`, passed verbatim — the
-`import` statements and the `execute` function). **Fire every
-`update_action_script` call in parallel** — they are independent
-of each other. Until a script is attached, the action endpoint
-exists in the OpenAPI spec but executing it is a no-op; this
-phase must therefore complete before the user invokes any action.
-If a `scripts/*.md` file is missing or has no matching section
-for an action, stop and re-invoke `bootstrapp-action-scripter`
-before retrying.
+`actionScript` (the **full contents of `scripts/<actionName>.ts`,
+read verbatim**: the file already holds only the ApiScript body —
+its `import` statements plus the `execute` function — with no
+Markdown fences to strip). **Fire every `update_action_script`
+call in parallel** — they are independent of each other. Until a
+script is attached, the action endpoint exists in the OpenAPI spec
+but executing it is a no-op; this phase must therefore complete
+before the user invokes any action. If a
+`scripts/<actionName>.ts` file is missing for an action in the
+registry — or if the matching `scripts/<ActionsNamespace>.md`
+index is missing or out of sync — stop and re-invoke
+`bootstrapp-action-scripter` before retrying.
 
 ## Phase 10 — Scaffold the UI app
 

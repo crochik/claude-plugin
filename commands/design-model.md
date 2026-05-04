@@ -69,15 +69,18 @@ document.
   API client) or to defer until later.
 - If the change touched the action registry (added, renamed, removed,
   or reshaped any action), the architect must also refresh the
-  matching `scripts/<ActionsNamespace>.md` file(s) and attach the
-  updated scripts via `mcp__bootstrapp__update_action_script`. The
-  ordering matters because the **`bootstrapp-action-scripter`**
-  subagent drafts against `Reference/platform-modules.d.ts` from the
-  MCP server, and that resource is only refreshed when the architect
-  calls `mcp__bootstrapp__generate_openapi_spec` — so the canonical
-  flow is: architect registers the class/action changes → architect
+  matching `scripts/<actionName>.ts` file(s) (and the namespace
+  `scripts/<ActionsNamespace>.md` index that links to them) and
+  attach the updated scripts via
+  `mcp__bootstrapp__update_action_script`. The ordering matters
+  because the **`bootstrapp-action-scripter`** subagent drafts
+  against `Reference/platform-modules.d.ts` from the MCP server, and
+  that resource is only refreshed when the architect calls
+  `mcp__bootstrapp__generate_openapi_spec` — so the canonical flow
+  is: architect registers the class/action changes → architect
   calls `generate_openapi_spec` → invoke the scripter to rewrite the
-  affected scripts → architect calls `update_action_script` for each
-  updated action. The scripter itself is design-only and never
-  touches the backend, but it should run after the spec regen, not
-  before.
+  affected `scripts/<actionName>.ts` files (and refresh the
+  matching index) → architect reads each updated `.ts` file and
+  calls `update_action_script` with its contents passed verbatim.
+  The scripter itself is design-only and never touches the backend,
+  but it should run after the spec regen, not before.

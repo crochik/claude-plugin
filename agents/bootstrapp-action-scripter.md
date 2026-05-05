@@ -109,7 +109,7 @@ function execute(input: SubmitOrderInput): SubmitOrderOutput {
   const found = app.filter__Order({
     Conditions: [{ field: "Id", operator: "Eq", value: input.id }]
   });
-  const order = found.Items[0];
+  const order: Order = found.Items[0];
   if (order.status != "draft") {
     throw {
       code: "ORDER_NOT_DRAFT",
@@ -211,10 +211,23 @@ filename, so the link is always `./<actionName>.ts`.
    MCP server. Do not run dev servers. Do not edit anything under
    `schemas/` or `BOOTSTRAPP.md`.
 
-7. **Pass type annotations through.** Use the unqualified class name as
-   the parameter type (`SubmitOrderInput`, not the full path). The
+7. **Use type annotations to make scripts readable.** ApiScript
+   accepts (optional) annotations on `let` and `const`
+   declarations, function parameters, and function return types.
+   Always annotate the `execute` parameter and return type
+   (`function execute(input: SubmitOrderInput): SubmitOrderOutput`)
+   — they document the action's contract for the human reviewer.
+   For local `let` / `const`, annotate when the type isn't obvious
+   from the right-hand side (`const order: Order = found.Items[0];`,
+   `let totals: Record<string, number> = {};`); skip the annotation
+   when the RHS makes it self-evident (a literal, a typed CRUD
+   call). Allowed forms are `number`, `string`, `boolean`, `any`,
+   `T[]`, `Record<string, T>`, and `IDENTIFIER`. Use the
+   unqualified class name as the type — `SubmitOrderInput`, not
+   `app.expense_tracker.actions.SubmitOrderInput` — because the
    runtime infers the namespace from the action's registered
-   input/output types; the annotation is for human readers.
+   input/output classes. Generics other than `Record<string, T>`
+   are not supported.
 
 8. **Ask questions in plain text.** `AskUserQuestion` is not available
    inside subagents. List options inline ("approve script as drafted, or

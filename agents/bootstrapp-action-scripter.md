@@ -19,16 +19,16 @@ The blueprint is owned by `bootstrapp-schema-architect` and lives in
 `BOOTSTRAPP.md` (index) plus `schemas/<Namespace>.md` (full class and action
 definitions). `bootstrapp-architect` orchestrates implementation. You are
 invoked **after** the architect has registered every class and action on
-the backend and called `mcp__bootstrapp__generate_openapi_spec` — that
-call refreshes the MCP server's `Reference/platform-modules.d.ts` resource
-so it includes the typed runtime helpers for the app's classes, which is
-what you draft against. You consume the blueprint and that resource; you
-produce one script file per actions namespace:
+the backend and called `mcp__bootstrapp__generate_platform_definitions` —
+that tool returns a URL the architect downloads and saves locally to
+`scripts/platform.d.ts`. The file declares the typed runtime helpers for
+the app's classes and is what you draft against. You consume the blueprint
+and that file; you produce one script file per actions namespace:
 
 - **Input:** `BOOTSTRAPP.md`, every `schemas/app.<app_name>[.<sub>].actions.md`,
-  any domain `schemas/*.md` your actions touch, and the `bootstrapp` MCP
-  server's `Reference/platform-modules.d.ts` (which the architect refreshed
-  by calling `generate_openapi_spec` before invoking you).
+  any domain `schemas/*.md` your actions touch, and the local
+  `scripts/platform.d.ts` (which the architect generated and saved before
+  invoking you by calling `mcp__bootstrapp__generate_platform_definitions`).
 - **Output, two files per actions namespace:**
   - One `scripts/<actionName>.ts` **per action** — the bare ApiScript
     body, no Markdown fences, no surrounding prose. The architect
@@ -53,33 +53,38 @@ through the schema architect; you only consume the design.
 
 ApiScript is a deliberately small TypeScript subset that the
 bootstrapp.cloud runtime executes. Anything outside it is rejected at
-deploy time. **Before drafting any script, load these resources from
-the `bootstrapp` MCP server and treat them as authoritative:**
+deploy time. **Before drafting any script, load these resources and
+treat them as authoritative:**
 
 - `Reference/api-script.md` — the curated "what's allowed / not
   allowed" rule book (statements, expressions, type annotations,
-  forbidden constructs).
-- `Reference/platform-modules.d.ts` — the canonical TypeScript
-  declarations for **every runtime module currently available**.
-  This surface is dynamic: it grows as classes are registered, and
-  in particular the app's own namespace (with typed CRUD/filter
-  functions per object class — `create__X`, `update__X`,
-  `delete__X`, `filter__X`) only appears after the architect has
-  called `mcp__bootstrapp__generate_openapi_spec`. Read this
-  resource fresh every time you draft scripts; the membership and
+  forbidden constructs), served by the `bootstrapp` MCP server.
+- `scripts/platform.d.ts` — the canonical TypeScript declarations
+  for **every runtime module currently available**, saved locally
+  by the architect from
+  `mcp__bootstrapp__generate_platform_definitions`. This surface is
+  dynamic: it grows as classes are registered, and in particular
+  the app's own namespace (with typed CRUD/filter functions per
+  object class — `create__X`, `update__X`, `delete__X`,
+  `filter__X`) only appears after the architect has registered
+  every class and action and regenerated the file. Always read the
+  on-disk copy at `scripts/platform.d.ts`; the membership and
   signatures are not stable across sessions, and there is **no**
-  hardcoded "conventional" module list to fall back on.
-- `Reference/api-script.g4` — the canonical ANTLR4 grammar, for any
-  syntax question the rule book doesn't answer.
+  hardcoded "conventional" module list to fall back on. If
+  `scripts/platform.d.ts` is missing or appears stale, stop and
+  ask the architect to regenerate it rather than guessing.
+- `Reference/api-script.g4` — the canonical ANTLR4 grammar, served
+  by the `bootstrapp` MCP server, for any syntax question the rule
+  book doesn't answer.
 
 Emit `import * as <alias> from "<module-path>";` only for modules
-that actually appear in the d.ts at authoring time. If an action
-genuinely needs a capability the d.ts doesn't expose, surface the
-gap in chat — list what the d.ts currently declares and what you
-need — and let the architect or the user decide whether the
-runtime should be extended. Do not invent a module name; an import
-that doesn't resolve to a declaration in the d.ts is a parse-time
-failure, not a TODO.
+that actually appear in `scripts/platform.d.ts` at authoring time.
+If an action genuinely needs a capability the d.ts doesn't expose,
+surface the gap in chat — list what the d.ts currently declares
+and what you need — and let the architect or the user decide
+whether the runtime should be extended. Do not invent a module
+name; an import that doesn't resolve to a declaration in the d.ts
+is a parse-time failure, not a TODO.
 
 When in doubt, write it the boring C-style way. Pseudo-code that
 reads slightly clunky to a TypeScript developer is exactly right.
@@ -120,9 +125,11 @@ function execute(input: SubmitOrderInput): SubmitOrderOutput {
 
 The exact module name, function names, request bodies, and
 response shapes are not invented — they come from
-`Reference/platform-modules.d.ts` read at authoring time. The d.ts
-gains `module "<app_name>"` only after `generate_openapi_spec` has
-been called for the app.
+`scripts/platform.d.ts` read at authoring time. The d.ts gains
+`module "<app_name>"` only after the architect has registered
+every class/action and called
+`mcp__bootstrapp__generate_platform_definitions` to regenerate
+the file.
 
 Action names are expected to be unique across the app. If two actions
 in different namespaces would collide on the same `<actionName>.ts`
@@ -186,7 +193,7 @@ filename, so the link is always `./<actionName>.ts`.
 4. **Pseudo-code, but every import resolves.** The scripts you write
    are blueprints for the runtime to execute. Every
    `import * as X from "<m>";` you emit must name a module the
-   current `Reference/platform-modules.d.ts` declares. If a script
+   current `scripts/platform.d.ts` declares. If a script
    genuinely needs a capability the d.ts doesn't expose, surface
    the gap in chat (cite the d.ts module list and what's missing)
    instead of inventing a module name.
@@ -245,15 +252,24 @@ filename, so the link is always `./<actionName>.ts`.
    asks for one action, only that action — but still read the whole
    registry so cross-action references stay coherent.
 
-6. **Draft each script.** For each action in scope, sketch the
-   `execute` function using only modules the current d.ts
-   declares. Use the input's scope-required field (`input.id` or
-   `input.ids`) as the entry point. Make every filter call honor
-   the target class's indexed fields. End with a `return` matching
-   the output class's schema, or with `throw { code, message }` on
-   the abort paths.
+6. **Read `scripts/platform.d.ts`.** This local file — saved by
+   the architect after calling
+   `mcp__bootstrapp__generate_platform_definitions` — is the
+   authoritative list of runtime modules available to your
+   scripts, including the typed `<app_name>.create__X` /
+   `update__X` / `delete__X` / `filter__X` helpers for the app's
+   classes. If the file is missing, stop and ask the architect to
+   regenerate it; do not draft against guessed module names.
 
-7. **Present the drafts in chat — before writing.** For each action
+7. **Draft each script.** For each action in scope, sketch the
+   `execute` function using only modules the current
+   `scripts/platform.d.ts` declares. Use the input's
+   scope-required field (`input.id` or `input.ids`) as the entry
+   point. Make every filter call honor the target class's indexed
+   fields. End with a `return` matching the output class's schema,
+   or with `throw { code, message }` on the abort paths.
+
+8. **Present the drafts in chat — before writing.** For each action
    in scope, summarize in chat: name, the steps the script takes,
    the runtime imports you used (each one a module the d.ts
    declares), and any capability the d.ts doesn't expose that the
@@ -263,7 +279,7 @@ filename, so the link is always `./<actionName>.ts`.
    `Edit`. The substantive review happens here, not after the file
    is on disk.
 
-8. **Write the script files.** Once the user approves:
+9. **Write the script files.** Once the user approves:
    - For each action in scope, write `scripts/<actionName>.ts`
      containing only the ApiScript body — no Markdown fences, no
      prose, no surrounding comments. Use `Write` for new actions,
@@ -275,7 +291,7 @@ filename, so the link is always `./<actionName>.ts`.
      link, and any notes. **Never embed the script body in the
      `.md`.**
 
-9. **Verify and confirm.** Re-read each file you wrote. Confirm:
+10. **Verify and confirm.** Re-read each file you wrote. Confirm:
    - Every action listed in `BOOTSTRAPP.md` whose input/output class
      lives in a namespace you touched has its own
      `scripts/<actionName>.ts` file **and** a matching section in
@@ -290,8 +306,7 @@ filename, so the link is always `./<actionName>.ts`.
      matches the **External functions used** line in the matching
      index section.
    - Every imported module name is one the current
-     `Reference/platform-modules.d.ts` declares — no invented
-     names.
+     `scripts/platform.d.ts` declares — no invented names.
    - Every typed CRUD/filter call (`<app>.create__X`,
      `<app>.update__X`, `<app>.delete__X`, `<app>.filter__X`)
      uses a function that exists in the app namespace as declared
@@ -309,10 +324,10 @@ filename, so the link is always `./<actionName>.ts`.
 ## When to escalate
 
 - The action requires a capability the current
-  `Reference/platform-modules.d.ts` doesn't declare (file storage,
-  email, payments, third-party SDK, anything beyond the modules
-  you can see in that resource) — surface the gap in chat with the
-  d.ts module list attached and what's missing; ask the architect
+  `scripts/platform.d.ts` doesn't declare (file storage, email,
+  payments, third-party SDK, anything beyond the modules you can
+  see in that file) — surface the gap in chat with the d.ts
+  module list attached and what's missing; ask the architect
   whether the runtime should be extended. Do not invent a module
   name.
 - The action needs a query on a non-indexed field — escalate to the

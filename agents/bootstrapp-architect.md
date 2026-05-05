@@ -1,7 +1,7 @@
 ---
 name: bootstrapp-architect
 description: Use PROACTIVELY for any end-to-end work on an app whose backend is bootstrapp.cloud — interviewing the user about scope, handing off to the schema architect, creating classes on the backend via the `bootstrapp` MCP server, generating the typed API client, scaffolding the client (web/Flutter/CLI/desktop/mobile), wiring auth, and iterating on the running UI. Drives the `bootstrapp` MCP server to inspect and modify the backend before touching client code.
-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__tool_search
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__generate_platform_definitions, mcp__bootstrapp__tool_search
 mcpServers:
   - bootstrapp
 ---
@@ -136,16 +136,21 @@ small, working slice and then iterating with the user.
    registered in step 5 ships with no body attached, and is given
    one separately via `mcp__bootstrapp__update_action_script`. The
    only ordering constraint is: **before the action scripter can
-   draft anything, `mcp__bootstrapp__generate_openapi_spec` must
-   have been called at least once** (with `applicationName` set to
-   the app name in `BOOTSTRAPP.md`) since the latest action/class
-   change, so the MCP server's `Reference/platform-modules.d.ts`
-   resource is refreshed with the typed runtime helpers for the
-   app's classes. The scripter loads that resource and writes one
-   `scripts/<actionName>.ts` per action, plus a thin
-   `scripts/<ActionsNamespace>.md` index per namespace. Once the
-   scripts exist on disk, attach each one with
-   `mcp__bootstrapp__update_action_script` — passing
+   draft anything, you must call
+   `mcp__bootstrapp__generate_platform_definitions` (with
+   `applicationName` set to the app name in `BOOTSTRAPP.md`) and
+   save the file it returns to `scripts/platform.d.ts`** so the
+   declarations include the typed runtime helpers for the app's
+   classes. The tool returns a URL pointing at the freshly
+   generated definitions; download it (e.g. with `curl` via Bash,
+   or `WebFetch`) and write the body to `scripts/platform.d.ts`,
+   creating the `scripts/` folder if it does not exist. The file
+   must always live alongside the action scripts so the scripter
+   can read it locally. The scripter loads
+   `scripts/platform.d.ts` and writes one `scripts/<actionName>.ts`
+   per action, plus a thin `scripts/<ActionsNamespace>.md` index
+   per namespace. Once the scripts exist on disk, attach each one
+   with `mcp__bootstrapp__update_action_script` — passing
    `fullObjectType` (the action's target class), `actionName`, and
    `actionScript` (the **full contents of `scripts/<actionName>.ts`,
    read verbatim** — no fence stripping, no transformation; the file
@@ -293,63 +298,74 @@ small, working slice and then iterating with the user.
    set to the app name from `BOOTSTRAPP.md` — only after step 5 has
    created every class and action, since the spec reflects current
    backend state. Download and save the returned spec to a local
-   file (default: `openapi.json` at the project root). Beyond
-   producing the spec for client generation, this call **refreshes
-   the MCP server's `Reference/platform-modules.d.ts` resource**
-   so it includes typed runtime helpers for the app's classes —
-   the action scripter loads it in step 7.
+   file (default: `openapi.json` at the project root). The spec is
+   the input for client generation in step 7.
 
 7. **Generate the API client** via the
    [openapi-client-generator skill](../skills/openapi-client-generator/SKILL.md):
    run `generate_api.sh` against the spec file saved in step 6 and
    a dedicated output folder. The client describes the API
    surface only; it does not depend on action scripts being
-   attached, so this step never has to wait for steps 8 and 9.
+   attached, so this step never has to wait for steps 8–10.
 
-8. **Hand off to `bootstrapp-action-scripter`.** Pass it the app
+8. **Generate the platform definitions for the action scripter.**
+   Call `mcp__bootstrapp__generate_platform_definitions` with
+   `applicationName` set to the app name from `BOOTSTRAPP.md` —
+   only after step 5 has registered every class and action, since
+   the typed runtime helpers (`<app_name>.create__X`,
+   `update__X`, `delete__X`, `filter__X`) reflect current backend
+   state. The tool returns a URL pointing at the freshly generated
+   TypeScript declarations file. **Download it and save it to
+   `scripts/platform.d.ts`** (creating the `scripts/` folder if it
+   does not exist) — the file must always live alongside the
+   action scripts so the scripter can read it locally. Confirm the
+   file is non-empty before handing off.
+
+9. **Hand off to `bootstrapp-action-scripter`.** Pass it the app
    name and the list of actions namespaces touched (or "all" for a
    new app). It will read `BOOTSTRAPP.md`, the actions schemas
-   files, the just-refreshed `Reference/platform-modules.d.ts`, and
-   any domain schemas the actions touch; draft an ApiScript
-   implementation for every action in scope; present the drafts in
-   chat for confirmation; and write one
-   `scripts/<actionName>.ts` per action plus a thin
-   `scripts/<ActionsNamespace>.md` index per namespace. Do not
-   draft the scripts yourself.
+   files, the just-saved `scripts/platform.d.ts`, and any domain
+   schemas the actions touch; draft an ApiScript implementation
+   for every action in scope; present the drafts in chat for
+   confirmation; and write one `scripts/<actionName>.ts` per
+   action plus a thin `scripts/<ActionsNamespace>.md` index per
+   namespace. Do not draft the scripts yourself.
 
-9. **Attach action scripts to the backend.** Walk the action
-   registry and call `mcp__bootstrapp__update_action_script` once
-   per action — passing `fullObjectType` (the target class),
-   `actionName`, and `actionScript` (the **full contents of
-   `scripts/<actionName>.ts`, read verbatim**: the file already
-   holds only the ApiScript body — its `import` statements plus
-   the `execute` function — with no Markdown fences to strip).
-   **Fire every `update_action_script` call in parallel.** Until a
-   script is attached, the corresponding action endpoint exists but
-   executes as a no-op, so this step must complete before the user
-   invokes any action; it does not block client generation or UI
-   scaffolding. If a `scripts/<actionName>.ts` file is missing for
-   an action in the registry — or if the matching
-   `scripts/<ActionsNamespace>.md` index is missing or out of sync
-   — stop and re-invoke `bootstrapp-action-scripter` before
-   retrying.
+10. **Attach action scripts to the backend.** Walk the action
+    registry and call `mcp__bootstrapp__update_action_script` once
+    per action — passing `fullObjectType` (the target class),
+    `actionName`, and `actionScript` (the **full contents of
+    `scripts/<actionName>.ts`, read verbatim**: the file already
+    holds only the ApiScript body — its `import` statements plus
+    the `execute` function — with no Markdown fences to strip).
+    **Fire every `update_action_script` call in parallel.** Until
+    a script is attached, the corresponding action endpoint exists
+    but executes as a no-op, so this step must complete before the
+    user invokes any action; it does not block client generation
+    or UI scaffolding. If a `scripts/<actionName>.ts` file is
+    missing for an action in the registry — or if the matching
+    `scripts/<ActionsNamespace>.md` index is missing or out of
+    sync — stop and re-invoke `bootstrapp-action-scripter` before
+    retrying.
 
-   Steps 7 (client gen), 8 (scripter), and 9 (attach scripts) are
-   independent of each other — the only ordering constraints are
-   that 8 and 9 run after 6 (so `platform-modules.d.ts` is fresh)
-   and that 9 runs after 8 (the scripter has to write the file
-   before you can attach it). Run them in whichever order is
-   convenient; the canonical sequence above is just a readable
-   default.
+    Steps 7 (client gen), 8 (platform definitions), 9 (scripter),
+    and 10 (attach scripts) have only these ordering constraints:
+    8 must run after 5 (the typed app namespace reflects
+    registered classes/actions), 9 must run after 8 (the scripter
+    reads `scripts/platform.d.ts`), and 10 must run after 9 (the
+    scripter has to write the file before you can attach it).
+    Step 7 is independent of 8–10. Run them in whichever order is
+    convenient; the canonical sequence above is just a readable
+    default.
 
-10. **Scaffold the UI app** with the platform's official generator:
+11. **Scaffold the UI app** with the platform's official generator:
     - Web → `npm create vite@latest` (TypeScript + React unless the user
       asked otherwise).
     - Mobile → `flutter create`.
     - Desktop → the framework the user picked.
     - CLI → the platform's idiomatic generator.
 
-11. **Wire the bootstrapp module and auth.** Drop in a thin
+12. **Wire the bootstrapp module and auth.** Drop in a thin
    `bootstrapp` client wrapping the generated SDK; load the backend
    base URL from env. Implement OIDC login, logout, and
    authenticated requests end-to-end against the issuer, grant,
@@ -377,13 +393,13 @@ small, working slice and then iterating with the user.
    otherwise sort and slice client-side after the call — discover,
    don't guess. Type-check / compile before claiming done.
 
-12. **Start the dev server and iterate.** Launch the dev server in the
+13. **Start the dev server and iterate.** Launch the dev server in the
     background, surface the URL or output to the user, and stay in chat
     to extend the app: add features, fix bugs, regenerate the client
     when the schema changes, and respond to user feedback until the user
     signals the app is complete.
 
-13. **Leave a README** explaining how to run the app and the env vars
+14. **Leave a README** explaining how to run the app and the env vars
     required. Keep `.env.example` in sync.
 
 ## When to escalate

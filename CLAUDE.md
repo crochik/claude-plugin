@@ -71,15 +71,19 @@ The three agents are intentionally separate and should stay that way:
   server at `bootstrapp://reference/api-script.g4`, with a curated rule
   book at `bootstrapp://reference/api-script.md`. The set of runtime
   modules a script may import is **dynamic and discovery-driven**:
-  whatever `bootstrapp://reference/platform-modules.d.ts` declares at
-  authoring time is what exists. The app's own namespace (typed
-  CRUD/filter functions per object class) appears there only after
-  `mcp__bootstrapp__generate_openapi_spec` is called. The agent reads
-  the d.ts on each run, emits `import * as <alias> from "<m>";` only for
-  modules the d.ts declares, surfaces unmet capabilities as questions
-  rather than inventing module names, and uses
-  `throw { code, message }` for invariant violations. Never touches the
-  MCP server, the schemas files, or client code.
+  whatever the platform definitions file declares at authoring time
+  is what exists. That file is produced on demand by the architect
+  calling `mcp__bootstrapp__generate_platform_definitions` (which
+  returns a URL); the architect downloads it and saves it next to
+  the action scripts as `scripts/platform.d.ts` so the scripter can
+  read it locally. The app's own namespace (typed CRUD/filter
+  functions per object class) appears there only after the classes
+  and actions have been registered on the backend. The agent reads
+  `scripts/platform.d.ts` on each run, emits `import * as <alias>
+  from "<m>";` only for modules the d.ts declares, surfaces unmet
+  capabilities as questions rather than inventing module names, and
+  uses `throw { code, message }` for invariant violations. Never
+  touches the MCP server, the schemas files, or client code.
 - **[bootstrapp-architect](./agents/bootstrapp-architect.md)** —
   discovery, implementation, and iteration. Runs the upfront discovery
   exchange (clarifying scope, offering feedback), hands off to the schema

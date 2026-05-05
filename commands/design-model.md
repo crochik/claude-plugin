@@ -74,13 +74,21 @@ document.
   attach the updated scripts via
   `mcp__bootstrapp__update_action_script`. The ordering matters
   because the **`bootstrapp-action-scripter`** subagent drafts
-  against `Reference/platform-modules.d.ts` from the MCP server, and
-  that resource is only refreshed when the architect calls
-  `mcp__bootstrapp__generate_openapi_spec` — so the canonical flow
-  is: architect registers the class/action changes → architect
-  calls `generate_openapi_spec` → invoke the scripter to rewrite the
-  affected `scripts/<actionName>.ts` files (and refresh the
-  matching index) → architect reads each updated `.ts` file and
-  calls `update_action_script` with its contents passed verbatim.
-  The scripter itself is design-only and never touches the backend,
-  but it should run after the spec regen, not before.
+  against `scripts/platform.d.ts` — a local file the architect
+  generates by calling
+  `mcp__bootstrapp__generate_platform_definitions` and downloading
+  the URL it returns. So the canonical flow is: architect
+  registers the class/action changes → architect calls
+  `mcp__bootstrapp__generate_platform_definitions` and saves the
+  file to `scripts/platform.d.ts` (always alongside the action
+  scripts) → invoke the scripter to rewrite the affected
+  `scripts/<actionName>.ts` files (and refresh the matching
+  index) → architect reads each updated `.ts` file and calls
+  `update_action_script` with its contents passed verbatim. The
+  scripter itself is design-only and never touches the backend,
+  but it should run after the platform-definitions regen, not
+  before. The architect still calls
+  `mcp__bootstrapp__generate_openapi_spec` and regenerates the
+  typed API client whenever the class or action surface changes,
+  but that step is independent of the platform-definitions
+  refresh.

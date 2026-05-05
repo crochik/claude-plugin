@@ -137,9 +137,10 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `actionOutputObjectType`, and `scope` (capitalized to match the
   tool's enum: `Instance` / `Bulk` / `Class`). **`register_action`
   no longer takes `actionScript`** — the body is attached
-  separately in Phase 9 via `mcp__bootstrapp__update_action_script`,
-  after the OpenAPI spec has been refreshed so the scripter can
-  draft against an up-to-date `Reference/platform-modules.d.ts`.
+  separately in Phase 10 via `mcp__bootstrapp__update_action_script`,
+  after the architect has generated and saved the platform
+  definitions file (Phase 8) so the scripter can draft against
+  an up-to-date `scripts/platform.d.ts`.
   **All `add_object_class` and `register_action` calls in this
   phase are independent of each other and of class-to-class
   dependencies — fire them in parallel.** The backend resolves
@@ -160,12 +161,10 @@ Once Phase 5 has registered every class and action, the architect
 calls `mcp__bootstrapp__generate_openapi_spec` with
 `applicationName` set to the app name in `BOOTSTRAPP.md`. This
 call returns a URL pointing at the freshly regenerated spec for
-the app, **and** as a side effect refreshes the
-`Reference/platform-modules.d.ts` MCP resource so it includes the
-typed runtime helpers for the app's classes — the action scripter
-will read it in Phase 8. The architect downloads the spec to a
-local file (default: `openapi.json` at the project root) and
-confirms the file is non-empty and well-formed.
+the app. The architect downloads the spec to a local file
+(default: `openapi.json` at the project root) and confirms the
+file is non-empty and well-formed. The spec is the input for
+client generation in Phase 7.
 
 ## Phase 7 — Generate the typed API client
 
@@ -179,35 +178,51 @@ appear in the API surface, so client generation does not depend
 on them and a second `generate_openapi_spec` call is never
 needed.
 
-## Phase 8 — Action scripts via `bootstrapp-action-scripter`
+## Phase 8 — Generate the platform definitions
 
-With the spec generated in Phase 6 (and therefore
-`Reference/platform-modules.d.ts` refreshed), the
+The architect calls
+`mcp__bootstrapp__generate_platform_definitions` with
+`applicationName` set to the app name in `BOOTSTRAPP.md`. The
+tool returns a URL pointing at a freshly generated TypeScript
+declarations file for every runtime module currently available —
+including the typed `<app_name>.create__X` / `update__X` /
+`delete__X` / `filter__X` helpers for the app's classes (which
+exist because Phase 5 registered them). **The architect downloads
+the file and saves it to `scripts/platform.d.ts`**, creating the
+`scripts/` folder if it does not exist. The platform definitions
+file must always live alongside the action scripts so the
+scripter can read it locally. Confirm the file is non-empty
+before handing off to Phase 9.
+
+## Phase 9 — Action scripts via `bootstrapp-action-scripter`
+
+With `scripts/platform.d.ts` saved by Phase 8, the
 `bootstrapp-architect` invokes the **`bootstrapp-action-scripter`**
 subagent. It reads `BOOTSTRAPP.md`, every
 `schemas/app.<app_name>[.<sub>].actions.md`,
-`Reference/platform-modules.d.ts`, and any domain schemas the
-actions touch. It drafts an ApiScript pseudo-implementation for
-each action in the registry, presents the drafts in chat for
+`scripts/platform.d.ts`, and any domain schemas the actions
+touch. It drafts an ApiScript pseudo-implementation for each
+action in the registry, presents the drafts in chat for
 confirmation, and writes one `scripts/<actionName>.ts` per action
 (holding only the ApiScript body — no Markdown) plus a thin
 `scripts/<ActionsNamespace>.md` index per actions namespace
 (parallel to `schemas/`) that links to each action's `.ts` file
 without embedding the body. These `.ts` files are the
-**server-side action bodies** that Phase 9 ships to the backend
-via `mcp__bootstrapp__update_action_script`. The scripter does not
-call any MCP tool that mutates the backend.
+**server-side action bodies** that Phase 10 ships to the backend
+via `mcp__bootstrapp__update_action_script`. The scripter does
+not call any MCP tool that mutates the backend.
 
-Phases 7 (client generation), 8 (scripter), and 9 (attach scripts)
-are independent of each other — nothing in client generation or UI
-scaffolding depends on action scripts being on disk or attached,
-and the scripter only needs `Reference/platform-modules.d.ts` to
-have been refreshed in Phase 6. The architect can run Phases 7–9
-in any order (or in parallel) as long as Phase 9 follows Phase 8
-and all three precede the user invoking any action. The order
-shown is the canonical readable default.
+Phases 7 (client generation), 8 (platform definitions),
+9 (scripter), and 10 (attach scripts) have only these ordering
+constraints: Phase 8 follows Phase 5 (the typed app namespace
+needs registered classes/actions), Phase 9 follows Phase 8 (the
+scripter reads `scripts/platform.d.ts`), and Phase 10 follows
+Phase 9 (the scripter must write the `.ts` file before the
+architect can attach it). Phase 7 is independent of Phases 8–10.
+The architect can run them in any convenient order; the
+canonical sequence shown is just a readable default.
 
-## Phase 9 — Attach action scripts to the backend
+## Phase 10 — Attach action scripts to the backend
 
 The `bootstrapp-architect` walks the action registry and calls
 `mcp__bootstrapp__update_action_script` once per action — passing
@@ -225,7 +240,7 @@ registry — or if the matching `scripts/<ActionsNamespace>.md`
 index is missing or out of sync — stop and re-invoke
 `bootstrapp-action-scripter` before retrying.
 
-## Phase 10 — Scaffold the UI app
+## Phase 11 — Scaffold the UI app
 
 The architect runs the platform's official scaffolder in the project
 folder:
@@ -243,7 +258,7 @@ per redirect URL the client will use (the dev server URL plus
 OIDC callback path, and any production origin the user names) so
 the OIDC issuer accepts login redirects.
 
-## Phase 11 — Start the UI and iterate
+## Phase 12 — Start the UI and iterate
 
 The architect starts the dev server in the background, surfaces the URL
 or output, and **stays in chat** to add features, fix issues, and respond

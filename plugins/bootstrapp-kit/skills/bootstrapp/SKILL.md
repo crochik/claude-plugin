@@ -18,8 +18,9 @@ kit has one skill for each:
 Moving an existing app onto BootstrApp has its own skill:
 `bootstrapp-migration`.
 
-There is **no required order** beyond real dependencies (a class must exist
-before an action targets it; scripts are written against definitions that
+There is **no required order** beyond real dependencies (the app must be
+initialized with `init_app` before any other tool that takes an app name;
+a class must exist before an action targets it; scripts are written against definitions that
 include the classes they touch; the client reflects whatever is registered
 when the spec is generated). Work on whatever the user asks for, from
 whatever state the project is in.
@@ -89,7 +90,7 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 
 | Tool | Use |
 |---|---|
-| `init_app` | Create the app (once). Provisions the OIDC client named after the app. |
+| `init_app` | Create the app (once), before any other call for it. Provisions the OIDC client named after the app. If `applied.json` has no `app` entry, call it (with `app.json`'s name, title, description) and record it before the first other backend call. |
 | `add_object_class` | Register one class. Fails if it already exists. |
 | `register_action` | Register one action. **Not idempotent: calling twice creates a duplicate.** |
 | `update_action_script` | Attach or replace an action's script. Safe to repeat. |

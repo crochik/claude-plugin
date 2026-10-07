@@ -18,6 +18,12 @@ It bundles:
 - **Agent** `bootstrapp-schema-architect` — design-only subagent for
   classes, actions, and named views.
 
+> A second, more flexible plugin lives in
+> [plugins/bootstrapp-kit](./plugins/bootstrapp-kit/): no fixed flow, works on
+> existing codebases being migrated to BootstrApp, and its skills are usable
+> from other agent harnesses. Install it with
+> `/plugin install bootstrapp-kit@bootstrapp`.
+
 ## Install
 
 From any Claude Code session:

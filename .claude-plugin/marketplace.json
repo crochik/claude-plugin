@@ -12,6 +12,11 @@
       "name": "bootstrapp",
       "source": "./",
       "description": "Use bootstrapp.cloud as a backend for apps you build with Claude Code. Wires up the bootstrapp.cloud MCP server plus scaffolding commands, usage skills, design and implementation agents, and helpers for named views and on-demand filter calls."
+    },
+    {
+      "name": "bootstrapp-kit",
+      "source": "./plugins/bootstrapp-kit",
+      "description": "Flexible BootstrApp toolkit: skills, commands and agents to model ObjectTypes, define actions, write ApiScripts and generate typed clients, for new apps and for existing apps moving their backend to BootstrApp."
     }
   ]
 }

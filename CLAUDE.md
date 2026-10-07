@@ -166,6 +166,28 @@ extending:
   directory without `BOOTSTRAPP.md`. Preserve this split when editing
   commands or agents.
 
+## Second plugin: `plugins/bootstrapp-kit`
+
+The marketplace also lists [plugins/bootstrapp-kit](./plugins/bootstrapp-kit/),
+a flow-free successor experiment that also targets existing apps being
+migrated to BootstrApp. It is self-contained (own `plugin.json`, `.mcp.json`,
+skills, agents, commands) and shares nothing with the root plugin at runtime.
+Its conventions differ on purpose and live in its own files:
+
+- Knowledge lives in **skills** (Agent Skills format, usable by other
+  harnesses); agents and commands are thin and optional.
+- The app record is `bootstrapp/` in the user's repo: JSON manifests that are
+  the exact MCP tool arguments (`classes/`, `actions/`), `scripts/*.ts`,
+  `generated/`, and an `applied.json` ledger.
+- Helper scripts are dependency-free Node 18+ (`bootstrapp-state.mjs`,
+  `check-apiscript.mjs`). Test them against a scratch `bootstrapp/` folder
+  after changing them.
+- Platform facts it relies on (tool behavior, script runtime, known gaps) are
+  in `skills/bootstrapp/references/platform-notes.md`; update that file when
+  the platform changes.
+
+Changes to one plugin don't need mirroring in the other.
+
 ## Outstanding item
 
 [README.md:72](./README.md#L72) flags a TODO to confirm the canonical

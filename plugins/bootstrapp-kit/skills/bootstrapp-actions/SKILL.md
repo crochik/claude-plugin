@@ -1,0 +1,75 @@
+---
+name: bootstrapp-actions
+description: Decide whether a BootstrApp operation needs a server-side action, and define it - target class, scope (Instance/Bulk/Class), typed input and output classes, and registration. Use when the user needs an API operation beyond the auto-generated CRUD and filter endpoints, or when mapping an existing app's custom endpoints onto BootstrApp.
+---
+
+# Defining actions
+
+Every top-level class already has create, update, delete and filter
+endpoints. An **action** is an extra, named operation registered on a class,
+with its own input class and output class, whose body is an ApiScript that
+runs on the server.
+
+## Is it an action?
+
+Default to the client chaining CRUD and filter calls, even across classes.
+Make it an action only when the client genuinely can't do it that way:
+
+- **Atomic multi-write**: several documents must change together or not at
+  all (approve an expense and bump the monthly total).
+- **Server-side effects**: work that must not run in the client, such as
+  enforcing an invariant against data the caller can't see, or using a
+  server-only capability. Scripts can only call what `platform.d.ts` declares,
+  so check it exposes the capability (email, HTTP, files) before promising it.
+- **Computation over data the client shouldn't fetch**: totals over many
+  rows, checks against other users' data.
+
+Authorization is **not** a reason: the platform enforces group-based access
+on every CRUD, filter, and action call. If one of the generated endpoints
+already does the job, drop the action.
+
+When migrating, each custom endpoint of the old backend gets this test. Plain
+reads and writes map to the generated endpoints; the rest become actions.
+
+## Anatomy
+
+| Part | Rule |
+|---|---|
+| `actionName` | camelCase verb phrase for the business event: `approveExpense`, `importCustomersCsv`. Not `updateStatus`. Unique in the app. |
+| `fullObjectType` | The top-level class the action is about (the target). |
+| `scope` | `Instance` (one row: input has a required `id` uuid), `Bulk` (several rows: required `ids` uuid array, `minItems: 1`, `uniqueItems: true`), `Class` (no row: neither field). Pick the smallest that fits. Acting on "rows matching a filter" is still Bulk; the caller resolves the ids. |
+| Input class | Embedded class in `app.<app>.actions`, named `<ActionName>Input`. Only what the event needs. |
+| Output class | Embedded class in `app.<app>.actions`, named `<ActionName>Output`. Always a dedicated class, even for one value. |
+| `actionSummary` | 5–10 words; the action's label in API docs. |
+| `actionDescription` | 1–3 sentences: what it does, side effects, invariants it enforces, errors it throws. |
+
+Never reuse a domain class as an input or output. Payload classes describe a
+request/response, not a stored document.
+
+## Workflow
+
+1. Read `bootstrapp/app.json`, the target class manifest, and any classes the
+   action reads or writes.
+2. Draft the input and output classes as manifests in
+   `bootstrapp/classes/app.<app>.actions.<Name>Input.json` /
+   `...Output.json` (`type: "Embedded"`, `indexedFields: []`, full
+   `title`/`description`/`examples`).
+3. Write `bootstrapp/actions/<actionName>.json` (format in the `bootstrapp`
+   skill's `references/manifests.md`).
+4. Write the script with the `bootstrapp-apiscript` skill. You can write it
+   before the action is registered; you can only *check it against the real
+   function surface* once the classes it touches are registered and
+   `generated/platform.d.ts` has been regenerated.
+5. Run `bootstrapp-state.mjs check`; fix errors.
+6. Apply when asked: input/output classes and the target via
+   `add_object_class`, then `register_action` **once** (it is not
+   idempotent), then `update_action_script`, recording each success.
+
+## After registering
+
+- Registered actions appear in the OpenAPI spec (regenerate the client) and as
+  callable functions in other scripts (regenerate `platform.d.ts`).
+- Invoke the action once through the generated client to confirm the script
+  runs (see the platform notes in the `bootstrapp` skill about script wiring).
+- Changing an action's name, scope, or payload classes after registering is
+  not possible through MCP: add a new action instead, and tell the user.

@@ -18,14 +18,18 @@ what you are relying on from this page.
   but `add_object_class` stores only the root class. `$ref` properties are
   dropped (the single-schema parse has no components to resolve them). How a
   property should point at a separately registered embedded class is not
-  settled in the code; after registering a class with nested objects, check
-  the generated spec or `.d.ts` shows the nested shape before building on it,
-  and flag it to the user if it does not.
+  supported yet; the platform owner expects to change `add_object_class` for
+  it. Until then, write nested objects inline, check the generated spec or
+  `.d.ts` shows the nested shape before building on it, and flag it to the
+  user if it does not.
+- **Inheritance is `baseObjectType`.** A class extends another through the
+  `baseObjectType` argument of `add_object_class` (the manifest's
+  `baseObjectType`), not through `allOf` in the schema. Embedding is a
+  different relationship and is not expressed by `baseObjectType`.
 - **Supported property shapes.** `string` (formats `date`, `date-time`,
   `email`, `uri`, `password`, `uuid`; `enum` becomes a select), `integer`,
   `number`, `boolean`, arrays of strings/numbers/objects, string arrays with
-  `enum` (multi-select), objects. `allOf` with exactly one `$ref` means
-  inheritance; `anyOf`/`oneOf` with more than one branch is rejected. Formats
+  `enum` (multi-select), objects. `anyOf`/`oneOf` with more than one branch is rejected. Formats
   `byte`/`binary` are not supported.
 - **Top-level classes belong directly in `app.<app_name>`.** Generating the
   spec creates the default flow only for top-level classes whose namespace is
@@ -47,7 +51,8 @@ what you are relying on from this page.
 - The request body is available as a global variable named `input`. The
   action's result is the value of a top-level `return`, or else the value of
   the last statement. A declared `function execute(...)` is **not** called
-  automatically, so scripts end with `return execute(input);`.
+  automatically, so scripts end with `return execute(input);` (confirmed by
+  the platform owner).
 - Functions per top-level class (module = the class's namespace):
   `filter<Class>(conditions, fields, orderBy?, reverseOrder?, top?, skip?)`
   → array, `create<Class>(fields)` → new id, `update<Class>ById(id, fields)`

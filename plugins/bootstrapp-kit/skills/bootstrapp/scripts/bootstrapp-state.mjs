@@ -132,6 +132,18 @@ function check(state) {
     if (schema.type !== "object" && !schema.allOf) error(where, 'schema.type must be "object"');
     checkSchemaNode(schema, "schema", where, error, warn, true);
 
+    for (const { path, ref } of schemaRefs(schema)) {
+      if (!ref.startsWith(REF_PREFIX)) { error(where, `${path}: $ref must be ${REF_PREFIX}<full class name>`); continue; }
+      const target = ref.slice(REF_PREFIX.length);
+      const embedded = byName.get(target);
+      if (target === name) error(where, `${path}: a class cannot embed itself`);
+      else if (!embedded) warn(where, `${path}: embedded class ${target} has no local manifest; it must already exist on the server`);
+      else if (embedded.type !== "Embedded") error(where, `${path}: ${target} is top-level and cannot be embedded; store its _id in a <name>Id field with a foreign key`);
+    }
+    for (const nested of inlineClassNames(schema, name)) {
+      if (byName.has(nested)) error(where, `inline object creates embedded class ${nested}, which clashes with an existing manifest; use a $ref instead`);
+    }
+
     const props = propsOf(cls);
     if (cls.type === "TopLevel") {
       if (root && ns !== root) warn(where, `top-level class outside ${root}; actions on it may not run (see platform notes)`);
@@ -202,9 +214,45 @@ function check(state) {
   return problems;
 }
 
+const REF_PREFIX = "#/components/schemas/";
+
+// Every $ref in a schema, with the path it was found at.
+function schemaRefs(node, path = "schema", out = []) {
+  if (!node || typeof node !== "object") return out;
+  if (typeof node.$ref === "string") { out.push({ path, ref: node.$ref }); return out; }
+  for (const [key, child] of Object.entries(node.properties ?? {})) schemaRefs(child, `${path}.properties.${key}`, out);
+  if (node.items && typeof node.items === "object") schemaRefs(node.items, `${path}.items`, out);
+  if (node.additionalProperties && typeof node.additionalProperties === "object") schemaRefs(node.additionalProperties, `${path}.additionalProperties`, out);
+  return out;
+}
+
+// add_object_class stores each inline object property as an embedded class named <parent>.<property>.
+function inlineClassNames(node, parent, out = []) {
+  for (const [key, child] of Object.entries(node?.properties ?? {})) {
+    const shape = child?.type === "array" ? child.items
+      : child?.type === "object" && !child.properties && typeof child.additionalProperties === "object" ? child.additionalProperties
+      : child;
+    if (shape?.type === "object" && shape.properties && !shape.$ref) {
+      out.push(`${parent}.${key}`);
+      inlineClassNames(shape, `${parent}.${key}`, out);
+    }
+  }
+  return out;
+}
+
+// Classes a class needs registered before it: its base class and the classes it embeds by $ref.
+function classDependencies(cls) {
+  const deps = schemaRefs(cls.schema)
+    .filter(({ ref }) => ref.startsWith(REF_PREFIX))
+    .map(({ ref }) => ref.slice(REF_PREFIX.length));
+  if (cls.baseObjectType) deps.push(cls.baseObjectType);
+  return deps;
+}
+
 function checkSchemaNode(node, path, where, error, warn, isRoot = false) {
   if (!node || typeof node !== "object") return;
-  if (node.$ref) error(where, `${path}: $ref is not resolved by add_object_class; inline the shape`);
+  // A $ref points at another manifest; its docs and shape are checked there. title/description next to it label the field.
+  if (node.$ref) return;
   if ((node.anyOf?.length ?? 0) > 1 || (node.oneOf?.length ?? 0) > 1) error(where, `${path}: anyOf/oneOf with several branches is not supported`);
   if (["byte", "binary"].includes(node.format)) error(where, `${path}: format ${node.format} is not supported`);
   // Root and properties feed the OpenAPI surface directly, so missing docs there are errors.
@@ -217,6 +265,9 @@ function checkSchemaNode(node, path, where, error, warn, isRoot = false) {
   }
   if (node.items && typeof node.items === "object" && node.items.type === "object") {
     checkSchemaNode(node.items, `${path}.items`, where, error, warn);
+  }
+  if (node.additionalProperties && typeof node.additionalProperties === "object" && node.additionalProperties.type === "object") {
+    checkSchemaNode(node.additionalProperties, `${path}.additionalProperties`, where, error, warn);
   }
 }
 
@@ -254,7 +305,7 @@ function plan(state) {
   if (app?.state === "new") {
     calls.push({ tool: "init_app", record: ["app", appName], args: { appName, appTitle: state.app.title, appDescription: state.app.description } });
   }
-  for (const item of items.filter((i) => i.kind === "class")) {
+  for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
     if (item.state === "new") {
       const { fullObjectType, type, baseObjectType, indexedFields, foreignKeys, schema } = strip(data);
@@ -282,6 +333,25 @@ function plan(state) {
     calls.push({ tool: "update_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>` } });
   }
   return { calls, blocked };
+}
+
+// Base classes and $ref'd embedded classes go before the classes that use them.
+function dependencyOrder(classItems, state) {
+  const byName = new Map(classItems.map((i) => [i.name, i]));
+  const ordered = [];
+  const visiting = new Set();
+  const done = new Set();
+  const visit = (item) => {
+    if (done.has(item.name) || visiting.has(item.name)) return;
+    visiting.add(item.name);
+    const data = state.classes.find((c) => c.data.fullObjectType === item.name)?.data;
+    for (const dep of data ? classDependencies(data) : []) if (byName.has(dep)) visit(byName.get(dep));
+    visiting.delete(item.name);
+    done.add(item.name);
+    ordered.push(item);
+  };
+  classItems.forEach(visit);
+  return ordered;
 }
 
 function record(state, kind, names) {

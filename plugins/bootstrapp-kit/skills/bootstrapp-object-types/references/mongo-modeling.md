@@ -18,7 +18,8 @@ Ask, for each candidate class:
 | Relational shape | Document shape |
 |---|---|
 | 1:1 owned (user ↔ profile settings) | embed in the owner |
-| 1:few owned (order ↔ lines, ≤ ~100) | array of embedded objects |
+| 1:few owned (order ↔ lines, ≤ ~100) | array of embedded objects (`items: {"$ref": ...}`) |
+| keyed set owned (settings per locale) | dictionary of embedded objects (`additionalProperties: {"$ref": ...}`) |
 | 1:many (project ↔ tasks) | top-level child with `projectId` (indexed, foreign key) |
 | many:many without data (posts ↔ tags) | array of ids or strings on the side read most |
 | many:many with data (students ↔ courses with grade) | top-level link class (`Enrollment` with `studentId`, `courseId`, `grade`) |

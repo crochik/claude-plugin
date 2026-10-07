@@ -13,15 +13,23 @@ what you are relying on from this page.
   manifests as the record.
 - **`get_object_classes` returns names only.** The OpenAPI spec is the only
   MCP route to see full backend shapes.
-- **Nested objects inside one schema.** The schema parser turns an inline
-  object property into an embedded type named `<ParentFullName>.<property>`,
-  but `add_object_class` stores only the root class. `$ref` properties are
-  dropped (the single-schema parse has no components to resolve them). How a
-  property should point at a separately registered embedded class is not
-  supported yet; the platform owner expects to change `add_object_class` for
-  it. Until then, write nested objects inline, check the generated spec or
-  `.d.ts` shows the nested shape before building on it, and flag it to the
-  user if it does not.
+- **Embedding a registered class.** A property points at an embedded class
+  that was already added with `{"$ref": "#/components/schemas/<full class
+  name>"}`: directly (one object), as array `items` (a list), or as
+  `additionalProperties` of an object (a dictionary keyed by string). The
+  referenced class must exist, be `Embedded`, and live under `app.<app_name>`;
+  `add_object_class` rejects anything else with a message saying which.
+  Register embedded classes before the classes that use them (`plan` orders
+  them).
+- **Inline nested objects** become embedded classes named
+  `<ParentFullName>.<property>` and are stored together with the parent, so
+  they cannot be reused and their names clash if a manifest uses the same
+  one. Prefer a `$ref` to a named embedded class for anything reused or worth
+  naming in the client.
+- These two behaviors come from crochik/BootstrApp PR #20. A server without
+  it silently drops `$ref` properties and inline nested classes. After
+  registering a class that embeds, check the generated spec or `.d.ts` shows
+  the nested shape; if it does not, the server is older, so tell the user.
 - **Inheritance is `baseObjectType`.** A class extends another through the
   `baseObjectType` argument of `add_object_class` (the manifest's
   `baseObjectType`), not through `allOf` in the schema. Embedding is a

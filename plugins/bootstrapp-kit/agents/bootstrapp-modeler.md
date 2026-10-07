@@ -30,8 +30,9 @@ action instead and say why.
    format, with `title`, `description` and `examples` everywhere. Put the
    reasoning for non-obvious choices in a `$notes` key.
 3. Re-read every file you wrote and check it against the schema rules in
-   the object-types skill (ids, indexed fields, references, naming, no
-   `$ref`, embedded classes with `indexedFields: []`, action scope fields).
+   the object-types skill (ids, indexed fields, references, naming, `$ref`
+   only to embedded classes, embedded classes with `indexedFields: []`,
+   action scope fields).
 
 ## What to return
 

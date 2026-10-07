@@ -93,9 +93,15 @@ The full checklist with examples is in
 - Domain classes go directly in `app.<app_name>`. Use sub-namespaces only for
   action payloads (`app.<app_name>.actions`) unless you have confirmed
   top-level classes elsewhere behave (see the platform notes).
-- No `$ref` and no multi-branch `anyOf`/`oneOf` inside a class schema.
-  Nested objects are written inline; check the platform notes about how
-  nested objects register before relying on deep nesting.
+- Embed a named class with `{"$ref": "#/components/schemas/<full class
+  name>"}` on a property, on array `items` (list) or on
+  `additionalProperties` (string-keyed dictionary). The target must be an
+  `Embedded` class with its own manifest, registered first. `title` and
+  `description` may sit next to the `$ref` to label the field. Never `$ref`
+  a top-level class; use a `<name>Id` reference instead.
+- Inline nested objects also work and become embedded classes named
+  `<Parent>.<property>`; use them for one-off shapes only.
+- No multi-branch `anyOf`/`oneOf` inside a class schema.
 - `default` on scalar properties becomes the field default.
 
 ## Changing a class that is already applied

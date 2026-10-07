@@ -96,6 +96,27 @@ File name is the full class name, e.g.
 }
 ```
 
+An embedded class used by others is its own manifest
+(`classes/app.expense_tracker.Receipt.json`, `"type": "Embedded"`,
+`"indexedFields": []`, no `_id`). A class embeds it by `$ref`:
+
+```json
+"receipts": {
+  "type": "array",
+  "title": "Receipts",
+  "description": "Scanned receipts attached to this expense.",
+  "items": { "$ref": "#/components/schemas/app.expense_tracker.Receipt" }
+},
+"mainReceipt": {
+  "$ref": "#/components/schemas/app.expense_tracker.Receipt",
+  "title": "Main receipt",
+  "description": "The receipt shown in lists."
+}
+```
+
+A string-keyed dictionary uses `"type": "object", "additionalProperties":
+{ "$ref": ... }`. `plan` registers referenced classes first.
+
 Maps to `add_object_class` as: `appName` (from `app.json`),
 `fullObjectType`, `type` (`TopLevel` | `Embedded`), `baseObjectType`
 (optional), `indexedFields` (required; `[]` for embedded), `foreignKeys`

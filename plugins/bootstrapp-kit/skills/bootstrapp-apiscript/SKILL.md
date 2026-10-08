@@ -89,9 +89,11 @@ Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`.
    in `platform.d.ts`, and a missing `return execute(input);`. It is a lint,
    not the real type checker; fix what it reports, then reason through the
    rest.
-5. Push with `update_action_script` (safe to repeat) and record it with
-   `bootstrapp-state.mjs record script <actionName>`. Then call the action
-   once through the client, or ask the user to, to see it run.
+5. Push with `replace_action_script` (safe to repeat). The server type-checks
+   the script against the real classes and modules and returns errors with
+   line and column instead of saving a broken script; fix and push again.
+   Record it with `bootstrapp-state.mjs record script <actionName>`, then call
+   the action once through the client, or ask the user to, to see it run.
 
 ## Porting existing server code
 

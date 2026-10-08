@@ -62,8 +62,8 @@ request/response, not a stored document.
    `generated/platform.d.ts` has been regenerated.
 5. Run `bootstrapp-state.mjs check`; fix errors.
 6. Apply when asked: input/output classes and the target via
-   `add_object_class`, then `register_action` **once** (it is not
-   idempotent), then `update_action_script`, recording each success.
+   `add_object_class`, then `register_action`, then `replace_action_script`,
+   recording each success.
 
 ## After registering
 
@@ -71,5 +71,6 @@ request/response, not a stored document.
   callable functions in other scripts (regenerate `platform.d.ts`).
 - Invoke the action once through the generated client to confirm the script
   runs (see the platform notes in the `bootstrapp` skill about script wiring).
-- Changing an action's name, scope, or payload classes after registering is
-  not possible through MCP: add a new action instead, and tell the user.
+- Scope, payload classes, summary and description can change later with
+  `replace_action`. The name can't: a renamed action is a new action, and the
+  old one stays.

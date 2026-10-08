@@ -45,10 +45,28 @@ create. Scalar `default` values are kept as field defaults.
 | `actionInputObjectType` | Full name of the input class. |
 | `actionOutputObjectType` | Full name of the output class. |
 
-**Not idempotent.** Every call inserts a new action record, so never call it
-twice for the same action. It does not take a script.
+Refuses an action name the class already has (older servers inserted a
+duplicate instead). It does not take a script.
 
-## `update_action_script`
+## `replace_object_class`
+
+Same arguments as `add_object_class`. Fails if the class doesn't exist or if
+`type` differs from the stored class. Replaces properties, indexes, foreign
+keys, base class, title and description; keeps the class id, collection and
+flow. Inline nested classes are replaced or added. Stored records are not
+migrated.
+
+## `replace_action`
+
+Same arguments as `register_action`, for an action that exists. Keeps the
+action id and its script.
+
+## `get_actions`
+
+`get_actions(fullObjectType)` → `{ objectClass, actions: [{ name, summary,
+description, inputObjectType, outputObjectType, scope, hasScript }] }`.
+
+## `replace_action_script` (and `update_action_script`)
 
 | Arg | Notes |
 |---|---|
@@ -56,7 +74,18 @@ twice for the same action. It does not take a script.
 | `actionName` | As registered. |
 | `actionScript` | The full ApiScript source. |
 
-Replaces the stored script. Safe to repeat.
+Validates the script against the app's classes and the system modules
+(`input` is a global), and rejects it with `Syntax`/`Type`/`Reference` errors
+and line/column when invalid, leaving the stored script unchanged.
+Otherwise stores it and adds or updates the step that runs it when the action
+is invoked (top-level classes in `app.<app_name>` only). Safe to repeat.
+`update_action_script` is the older name; on servers before PR #28 it only
+stores the script.
+
+## `get_action_script`
+
+`get_action_script(fullObjectType, actionName)` → the stored script text.
+Use it to pull scripts written elsewhere into `scripts/<actionName>.ts`.
 
 ## `get_namespaces` / `get_object_classes`
 

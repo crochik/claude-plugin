@@ -49,9 +49,11 @@ The JSON manifests are **exactly the MCP tool arguments**, so applying them is
 mechanical and reviewing them is a normal code review. Formats are in
 [references/manifests.md](references/manifests.md).
 
-Why local files at all: the backend has no "read class schema" or "update
-class" tool. `get_object_classes` returns names and descriptions only, so the
-manifests (plus the ledger) are the only full record of what was defined.
+Why local files at all: the backend has no "read class schema" tool.
+`get_object_classes` returns names and descriptions only, so the manifests
+(plus the ledger) are the only full record of what was defined. Actions and
+scripts can be read back (`get_actions`, `get_action_script`), which helps
+when adopting an app that was built without this folder.
 
 ## Find the current state before acting
 
@@ -92,8 +94,12 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 |---|---|
 | `init_app` | Create the app (once), before any other call for it. Provisions the OIDC client named after the app. If `applied.json` has no `app` entry, call it (with `app.json`'s name, title, description) and record it before the first other backend call. |
 | `add_object_class` | Register one class. Fails if it already exists. |
-| `register_action` | Register one action. **Not idempotent: calling twice creates a duplicate.** |
-| `update_action_script` | Attach or replace an action's script. Safe to repeat. |
+| `replace_object_class` | Replace an existing class's definition (same arguments as `add_object_class`). Stored records are not migrated. |
+| `register_action` | Register one action. Refuses a name the class already has. |
+| `replace_action` | Change a registered action's input/output classes, scope, summary, description. |
+| `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
+| `replace_action_script` | Validate a script on the server, then store it and wire it to run. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
+| `get_action_script` | Read the script stored on an action. |
 | `get_namespaces`, `get_object_classes` | Read what exists (names only). |
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
 | `generate_openapi_spec` | URL of the OpenAPI spec for client generation. |
@@ -133,15 +139,27 @@ and you can grep them when needed.
 
 ## Changing things already applied
 
-The server has no update or delete tools for classes or actions yet. When the
-state helper reports a changed class or action:
+When the state helper reports something changed after it was applied, `plan`
+lists the replace call for it:
 
-- **Script changed** → just call `update_action_script` again.
-- **Class or action changed** → it cannot be patched through MCP. Tell the
-  user plainly, and offer: (a) add a new class/action under a new name and
-  migrate to it, (b) have the change made in the BootstrApp admin, or (c)
-  keep the old definition and revert the local file. Never call
-  `register_action` again for the same name.
+- **Script changed** → `replace_action_script` again.
+- **Action changed** → `replace_action`. It keeps the action's id and script.
+- **Class changed** → `replace_object_class`. Records already stored are not
+  migrated: a removed property stays in old documents, and a new required
+  property is missing from them until they are updated. Tell the user what
+  changes for existing data before replacing a class that already has
+  records, and never switch a class between `TopLevel` and `Embedded` (the
+  server refuses; add a new class instead).
+
+There are no delete tools. Renaming a class or action means adding the new
+one and leaving the old one in place.
+
+Older servers (before crochik/BootstrApp PR #28) have no replace tools,
+`get_action_script` or `get_actions`, and `register_action` silently creates
+duplicates there. If the tool list lacks `replace_object_class`, a changed
+class or action can't be applied through MCP: tell the user and offer a new
+name, a change in the BootstrApp admin, or reverting the local file. Scripts
+then go through `update_action_script` with the same arguments.
 
 Known platform gaps and behaviors worth knowing before you rely on something:
 [references/platform-notes.md](references/platform-notes.md).
@@ -156,12 +174,13 @@ When the user wants local definitions pushed:
    already asked you to apply.
 3. If the app is not initialized, call `init_app` with `app.json`'s name,
    title, and description.
-4. Call `add_object_class` for every new class and `register_action` for
-   every new action. They are independent: issue them in parallel.
+4. Make the class calls in the order `plan` lists them (base and embedded
+   classes come first), then the action calls; actions don't depend on each
+   other and can go in parallel.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `class`, `action`, `script`). Record only what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
-   surface, then push changed scripts with `update_action_script` and record
+   surface, then push changed scripts with `replace_action_script` and record
    them.
 7. Regenerate the OpenAPI spec and client if the API surface changed.

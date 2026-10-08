@@ -13,8 +13,15 @@ what you are relying on from this page.
   type) without migrating stored records. Nothing deletes a class or action.
   These need a server with crochik/BootstrApp PR #28; older ones cannot
   change a class at all.
-- **`get_object_classes` returns names only.** The OpenAPI spec is the only
-  MCP route to see full backend shapes.
+- **`get_object_classes` returns names only.** `get_object_class` returns one
+  class in full (PR #28 servers); on older servers the OpenAPI spec is the
+  only MCP route to see backend shapes.
+- **`get_object_class` returns the API form**, not the stored manifest. The
+  read schema adds a `{field}|Name` string for every reference field and the
+  fields of related classes; those are generated, so drop them before using
+  the schema as `add_object_class`/`replace_object_class` input. Field
+  formats and descriptions come back as the platform stores them, which may
+  differ in wording from what was sent.
 - **Embedding a registered class.** A property points at an embedded class
   that was already added with `{"$ref": "#/components/schemas/<full class
   name>"}`: directly (one object), as array `items` (a list), or as

@@ -49,11 +49,12 @@ The JSON manifests are **exactly the MCP tool arguments**, so applying them is
 mechanical and reviewing them is a normal code review. Formats are in
 [references/manifests.md](references/manifests.md).
 
-Why local files at all: the backend has no "read class schema" tool.
-`get_object_classes` returns names and descriptions only, so the manifests
-(plus the ledger) are the only full record of what was defined. Actions and
-scripts can be read back (`get_actions`, `get_action_script`), which helps
-when adopting an app that was built without this folder.
+Why local files at all: the backend only gives back the API form of a class
+(`get_object_class`), with generated fields mixed in and no record of what was
+applied when, so the manifests (plus the ledger) are the record of intent.
+Classes, actions and scripts can all be read back (`get_object_class`,
+`get_actions`, `get_action_script`), which helps when adopting an app that was
+built without this folder.
 
 ## Find the current state before acting
 
@@ -100,7 +101,8 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 | `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
 | `replace_action_script` | Validate a script on the server, then store it and wire it to run. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
 | `get_action_script` | Read the script stored on an action. |
-| `get_namespaces`, `get_object_classes` | Read what exists (names only). |
+| `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
+| `get_namespaces`, `get_object_classes` | List what exists (names only). |
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
 | `generate_openapi_spec` | URL of the OpenAPI spec for client generation. |
 | `add_oidc_client_redirect` | Allow a login redirect URL. |
@@ -155,7 +157,7 @@ There are no delete tools. Renaming a class or action means adding the new
 one and leaving the old one in place.
 
 Older servers (before crochik/BootstrApp PR #28) have no replace tools,
-`get_action_script` or `get_actions`, and `register_action` silently creates
+`get_object_class`, `get_action_script` or `get_actions`, and `register_action` silently creates
 duplicates there. If the tool list lacks `replace_object_class`, a changed
 class or action can't be applied through MCP: tell the user and offer a new
 name, a change in the BootstrApp admin, or reverting the local file. Scripts

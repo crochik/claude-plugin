@@ -87,13 +87,29 @@ stores the script.
 `get_action_script(fullObjectType, actionName)` → the stored script text.
 Use it to pull scripts written elsewhere into `scripts/<actionName>.ts`.
 
+## `get_object_class`
+
+`get_object_class(fullObjectType)` → `{ fullObjectType, type, baseObjectType,
+label, description, indexedFields, foreignKeys: [{ localFieldName,
+referenceObjectType, referenceFieldName }], schemas }`.
+
+`schemas` is the OpenAPI 3.1 `components.schemas` the app's API exposes for
+the class, keyed by full class name: `<fullObjectType>` (read model),
+`create--<fullObjectType>--request`, `update--<fullObjectType>--request`, and
+every embedded or base class it depends on. `$ref`s use
+`#/components/schemas/<full class name>`, the same form `add_object_class`
+takes. The read model also carries generated fields (`{field}|Name` per
+reference field, relation fields); leave them out when turning it into a
+manifest. Use it to adopt a class built elsewhere, or to compare the backend
+with `classes/<Class>.json`.
+
 ## `get_namespaces` / `get_object_classes`
 
 `get_namespaces()` lists namespaces visible to the account.
 `get_object_classes(namespace?)` lists classes under a namespace prefix
 (must start with `app.`): name, namespace, description, base class. **It does
-not return schemas, indexed fields, or actions.** To see full shapes on the
-backend, generate the OpenAPI spec.
+not return schemas, indexed fields, or actions.** Use `get_object_class` for
+one class in full.
 
 ## `generate_platform_definitions`
 

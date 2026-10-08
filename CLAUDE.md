@@ -182,6 +182,10 @@ Its conventions differ on purpose and live in its own files:
 - Helper scripts are dependency-free Node 18+ (`bootstrapp-state.mjs`,
   `check-apiscript.mjs`). Test them against a scratch `bootstrapp/` folder
   after changing them.
+- Access control (profiles, class/field access, constraints, action access,
+  sign-in) is manifests too: `profiles/`, `access/<Profile>/`,
+  `access/actions/`, `auth.json`, taught by the `bootstrapp-access` skill.
+  Users and organizations are data and have no manifests.
 - Platform facts it relies on (tool behavior, script runtime, known gaps) are
   in `skills/bootstrapp/references/platform-notes.md`; update that file when
   the platform changes.

@@ -78,8 +78,12 @@ The full checklist with examples is in
   `format: date` or `date-time`. Enums as `enum` on a string. No
   `byte`/`binary`; store files elsewhere and keep a URL.
 - **Users** are platform objects. Store `ownerId`, `assigneeId`, … as uuid
-  strings. Never define `User` or `Group`. Authorization is group-based and
-  enforced by the platform; don't add ACL fields.
+  strings. Never define `User` or `Group`. Access is set per profile and
+  enforced by the platform (`bootstrapp-access` skill); don't add ACL fields.
+  When some profile should see only its own records, or its organization's,
+  the class needs the field the constraint filters on: an `ownerId` (or
+  `submittedById`, …) uuid for "their own", an `organizationId` uuid for
+  "their organization's". Index it.
 
 ## Schema rules (the server rejects or degrades otherwise)
 

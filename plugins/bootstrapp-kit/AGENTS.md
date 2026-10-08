@@ -23,7 +23,7 @@ where you placed this folder).
 
 ## Minimal setup for another agent
 
-1. Make the six skill folders available to the agent.
+1. Make the seven skill folders available to the agent.
 2. Add the `bootstrapp` MCP server.
 3. Add to the project instructions:
 

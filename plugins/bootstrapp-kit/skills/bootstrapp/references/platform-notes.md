@@ -101,6 +101,28 @@ what you are relying on from this page.
   TypeScript web apps; other platforms load it from env. Read the server's
   auth config resource for the issuer and current rules.
 - Every redirect URL must be allowed with `add_oidc_client_redirect`.
+- `init_app` sets sign-up open to everyone, into the full-access `Admin`
+  profile. Before real users arrive, add a restricted profile and point
+  sign-up at it (or make it invite only) with `replace_app_auth`.
+
+## Access control
+
+These need crochik/BootstrApp PRs #30–#33. On an older server the tools are
+missing; access can then only be set in the BootstrApp admin.
+
+- Permissions resolve **first match** over the user's profile and then its
+  `inheritsFrom` list, in order; entries are not merged. A field or class
+  with no entry anywhere means no access. Constraints of all those profiles
+  are combined with AND.
+- A field added by `replace_object_class` has no entry for existing profiles,
+  so it is hidden from them until their access is applied again.
+- Users and organizations are account-wide: every app the developer has in
+  the account shares them. A user's access to one app is their profile for
+  it.
+- A user's profile and organization are in their token, so changing them
+  reaches the user at their next sign in.
+- Only the app owner can call the access, sign-in and user tools, and the
+  class, action, script and generate tools for an app.
 
 ## Ideas the platform could add (from the original plugin's notes)
 

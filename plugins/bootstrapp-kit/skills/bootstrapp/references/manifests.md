@@ -144,16 +144,91 @@ The script is `scripts/<actionName>.ts` by convention; no field needed.
 The ApiScript body sent verbatim as `replace_action_script.actionScript`. See
 the `bootstrapp-apiscript` skill.
 
+## `profiles/<Profile>.json`
+
+```json
+{
+  "profileName": "Manager",
+  "description": "Approves expenses for their team and sees everyone's.",
+  "inheritsFrom": ["Member"]
+}
+```
+
+Maps to `add_profile` (first time) and `replace_profile` (after a change):
+`appName`, `profileName`, `description`, `inheritsFrom` (optional, profiles
+listed first are applied first). Never declare `Admin`, the default profile
+`init_app` created. `copyAccessFrom` is not used: write the access files.
+
+## `access/<Profile>/<fullObjectType>.json`
+
+```json
+{
+  "profileName": "Member",
+  "fullObjectType": "app.expense_tracker.Expense",
+  "permissions": ["Read", "Create", "Update"],
+  "fieldPermissions": {
+    "status": ["Read"],
+    "approverNotes": []
+  },
+  "constraints": [
+    { "fieldName": "submittedById", "operator": "Eq", "value": "{{context \"UserId\"}}" }
+  ],
+  "$notes": "Members see and edit only their own expenses; managers set status."
+}
+```
+
+Maps 1:1 to `replace_class_access` (no `appName`; the class names the app).
+Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
+`relationPermissions`, `constraints`. `permissions: []` removes the
+profile's access. The folder name must equal `profileName`.
+
+## `access/actions/<actionName>.json`
+
+```json
+{
+  "fullObjectType": "app.expense_tracker.Expense",
+  "actionName": "approveExpense",
+  "profiles": ["Manager"]
+}
+```
+
+Maps 1:1 to `replace_action_access`. `Admin` always runs every action;
+`profiles: []` leaves only `Admin`. Without this file a registered action's
+profile list is whatever the server has (see `get_actions`).
+
+## `auth.json`
+
+```json
+{
+  "providers": ["Microsoft", "Google"],
+  "signup": "invite_only",
+  "signupProfile": "Member",
+  "providerTenants": { "Microsoft": ["8f0c…-tenant-id"] },
+  "calculatedClaims": { "department": "{{Objects.User.department}}" }
+}
+```
+
+Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
+`invite_only`; `providerTenants` and `calculatedClaims` are optional
+(`calculatedClaims` omitted keeps the current ones, `{}` removes them).
+
 ## `applied.json` (written by the state helper)
 
 ```json
 {
   "app": { "name": "expense_tracker", "appliedAt": "2026-10-07T14:00:00Z" },
+  "profiles": { "Member": { "hash": "…", "appliedAt": "…" } },
   "classes": { "app.expense_tracker.Expense": { "hash": "…", "appliedAt": "…" } },
+  "access": { "Member/app.expense_tracker.Expense": { "hash": "…", "classHash": "…", "appliedAt": "…" } },
   "actions": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
-  "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } }
+  "actionAccess": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
+  "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
+  "auth": { "hash": "…", "appliedAt": "…" }
 }
 ```
+
+`classHash` is the class version the access was applied against; when the
+class changes, the access shows as `recheck` and is applied again.
 
 Commit it with the rest of the folder: it is how the next session (or a
 teammate) knows what the backend already has.

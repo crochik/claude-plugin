@@ -16,6 +16,9 @@ Use the `bootstrapp` skill.
    `/bootstrapp-kit:migrate`.
 3. If the MCP server is reachable and the user wants a backend comparison,
    call `get_object_classes` for `app.<name>` and report classes that exist
-   on only one side.
+   on only one side; `get_object_class` to compare a class with its
+   manifest (ignoring generated `{field}|Name` and relation fields); for
+   actions, `get_actions` per class (and `get_action_script` to compare a
+   script with the local file).
 4. Reply with the state in a few lines and up to three suggested next steps.
    Don't start any of them unless the user asked.

@@ -106,9 +106,10 @@ The full checklist with examples is in
 
 ## Changing a class that is already applied
 
-There is no update tool. If the state helper says a class changed after it
-was applied, follow "Changing things already applied" in the `bootstrapp`
-skill. Adding a brand-new class is always fine.
+`replace_object_class` applies a changed manifest, but stored records are not
+migrated. Prefer additive changes (new optional properties); for a removed
+or newly required property, say what happens to existing records first.
+Details in "Changing things already applied" in the `bootstrapp` skill.
 
 ## Hand-off
 

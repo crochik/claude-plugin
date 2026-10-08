@@ -18,13 +18,16 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
 3. With `--dry-run`, show the plan and stop. Otherwise, unless the user
    already said to apply, show the list of registrations (they can't be
    undone through MCP) and continue when they confirm.
-4. Execute: `init_app` if planned; then all `add_object_class` and
-   `register_action` calls in parallel; record each success immediately with
+4. Execute: `init_app` if planned; then the class calls (`add_object_class`
+   / `replace_object_class`) in plan order, then the action calls
+   (`register_action` / `replace_action`); record each success immediately with
    `bootstrapp-state.mjs record <kind> <name>`. On a failure, report it and
    keep going with independent items.
 5. If classes or actions were added, regenerate
    `bootstrapp/generated/platform.d.ts`, re-run the script check, then attach
-   new or changed scripts with `update_action_script` (reading each file
-   verbatim) and record them.
-6. Report blocked items (changed after applying) with the options from the
-   skill. Offer to regenerate the client if the API surface changed.
+   new or changed scripts with `replace_action_script` (reading each file
+   verbatim) and record them. If the server rejects a script, show its
+   errors, fix the script, and push again.
+6. Before replacing a class, say what changes for records already stored
+   (see "Changing things already applied" in the skill). Report blocked items.
+   Offer to regenerate the client if the API surface changed.

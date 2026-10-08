@@ -141,7 +141,7 @@ The script is `scripts/<actionName>.ts` by convention; no field needed.
 
 ## `scripts/<actionName>.ts`
 
-The ApiScript body sent verbatim as `update_action_script.actionScript`. See
+The ApiScript body sent verbatim as `replace_action_script.actionScript`. See
 the `bootstrapp-apiscript` skill.
 
 ## `applied.json` (written by the state helper)

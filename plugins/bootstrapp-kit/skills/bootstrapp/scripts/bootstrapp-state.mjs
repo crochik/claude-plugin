@@ -307,20 +307,17 @@ function plan(state) {
   }
   for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
-    if (item.state === "new") {
+    if (item.state === "new" || item.state === "changed") {
       const { fullObjectType, type, baseObjectType, indexedFields, foreignKeys, schema } = strip(data);
-      calls.push({ tool: "add_object_class", record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema } });
-    } else if (item.state === "changed") {
-      blocked.push({ kind: "class", name: item.name, reason: "already registered; MCP cannot update classes" });
+      const tool = item.state === "new" ? "add_object_class" : "replace_object_class";
+      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema } });
     }
   }
   const registered = new Set();
   for (const item of items.filter((i) => i.kind === "action")) {
     const { data } = state.actions.find((a) => a.data.actionName === item.name);
-    if (item.state === "new") {
-      calls.push({ tool: "register_action", record: ["action", item.name], args: strip(data) });
-    } else if (item.state === "changed") {
-      blocked.push({ kind: "action", name: item.name, reason: "already registered; registering again creates a duplicate" });
+    if (item.state === "new" || item.state === "changed") {
+      calls.push({ tool: item.state === "new" ? "register_action" : "replace_action", record: ["action", item.name], args: strip(data) });
     }
     registered.add(item.name);
   }
@@ -330,7 +327,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "update_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>` } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>` } });
   }
   return { calls, blocked };
 }

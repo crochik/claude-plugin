@@ -8,11 +8,20 @@ what you are relying on from this page.
 
 ## Classes
 
-- **No update or delete.** `add_object_class` refuses an existing name; there
-  is no tool to change or remove a class. Plan names carefully and keep the
-  manifests as the record.
-- **`get_object_classes` returns names only.** The OpenAPI spec is the only
-  MCP route to see full backend shapes.
+- **Replace, but no delete.** `add_object_class` refuses an existing name;
+  `replace_object_class` changes an existing class (not its TopLevel/Embedded
+  type) without migrating stored records. Nothing deletes a class or action.
+  These need a server with crochik/BootstrApp PR #28; older ones cannot
+  change a class at all.
+- **`get_object_classes` returns names only.** `get_object_class` returns one
+  class in full (PR #28 servers); on older servers the OpenAPI spec is the
+  only MCP route to see backend shapes.
+- **`get_object_class` returns the API form**, not the stored manifest. The
+  read schema adds a `{field}|Name` string for every reference field and the
+  fields of related classes; those are generated, so drop them before using
+  the schema as `add_object_class`/`replace_object_class` input. Field
+  formats and descriptions come back as the platform stores them, which may
+  differ in wording from what was sent.
 - **Embedding a registered class.** A property points at an embedded class
   that was already added with `{"$ref": "#/components/schemas/<full class
   name>"}`: directly (one object), as array `items` (a list), or as
@@ -46,13 +55,13 @@ what you are relying on from this page.
 
 ## Actions
 
-- **`register_action` is not idempotent**: a second call creates a duplicate.
-- Scripts are stored on the action by `update_action_script`. At the time of
-  writing, wiring a stored script into the class flow (so invoking the action
-  runs it) happens in a server validation step that no MCP tool calls. After
-  attaching scripts, invoke one action through the generated client to
-  confirm it runs; if it returns nothing or does not execute, tell the user
-  the platform has not wired it yet.
+- `register_action` refuses a name the class already has; `replace_action`
+  changes one. Before PR #28 a second `register_action` created a duplicate.
+- `replace_action_script` validates on the server before storing and wires
+  the script into the class flow, so invoking the action runs it.
+  `generate_openapi_spec` also wires any stored scripts. On servers before
+  PR #28, storing a script did not wire it: invoke one action through the
+  generated client to confirm it runs, and tell the user if it doesn't.
 
 ## Script runtime
 

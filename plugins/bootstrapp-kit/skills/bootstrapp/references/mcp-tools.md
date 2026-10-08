@@ -12,9 +12,9 @@ from this page, the live schema wins.
 | `appTitle` | Human-readable. |
 | `appDescription` | Paragraph. |
 
-Creates the app, a default user profile, and an OIDC client (authorization
+Creates the app, its `Admin` profile (full access, can't be restricted), and an OIDC client (authorization
 code + PKCE; Microsoft, Google, Salesforce, GitHub sign-in with user
-auto-provisioning). Calling it again for an app you already own returns the
+auto-provisioning into `Admin`; change that with `replace_app_auth`). Calling it again for an app you already own returns the
 existing app; a name owned by someone else returns an error. Grants the
 calling user a profile on the app so they can log in.
 
@@ -141,3 +141,51 @@ default flow for each top-level class and the forms for actions.
 | `redirectUrl` | Absolute URL the identity provider redirects back to after login. |
 
 Idempotent. Needed for every dev and deployed origin before login works there.
+
+## Access, sign-in and users
+
+Owner only: anyone but the app's owner gets an error. All take names, never
+ids. The `access-control.md` server resource explains the model; the
+`bootstrapp-access` skill explains how to use it.
+
+### Profiles
+
+| Tool | Args | Notes |
+|---|---|---|
+| `get_profiles` | `appName` | Each profile with description, `inheritsFrom`, user count, `isDefault` (`Admin`), `isSignupProfile`. |
+| `add_profile` | `appName`, `profileName`, `description`, `inheritsFrom?`, `copyAccessFrom?` | New profiles have no access. `copyAccessFrom` copies class, field, relation, constraint and action access from another profile. |
+| `replace_profile` | `appName`, `profileName`, `description`, `inheritsFrom?` | Omitting `inheritsFrom` removes it. |
+| `remove_profile` | `appName`, `profileName`, `reassignUsersTo?` | Deletes the profile and all its access, and drops it from other profiles' `inheritsFrom`. Refuses `Admin`, and refuses a profile with users unless `reassignUsersTo` is given. |
+
+### Class and action access
+
+| Tool | Args | Notes |
+|---|---|---|
+| `get_class_access` | `fullObjectType`, `profileName?` | Per profile: class permissions, field and relation permissions, constraints. |
+| `replace_class_access` | `fullObjectType`, `profileName`, `permissions`, `fieldPermissions?`, `defaultFieldPermissions?`, `relationPermissions?`, `constraints?` | Replaces everything the profile has on the class. Validates fields (own fields only; base-class fields go on the base class), relations, operators and context keys before writing. `permissions: []` removes access. Refuses `Admin`. Returns the hidden fields, the constraint, and the fields an `Eq` constraint stamps on create. |
+| `remove_class_access` | `fullObjectType`, `profileName` | Same as `permissions: []`. |
+| `replace_action_access` | `fullObjectType`, `actionName`, `profiles` | Profiles that can see and run the action besides `Admin`. |
+
+`get_actions` lists each action's `profiles`. `replace_object_class` reports
+fields it added that other profiles can't see yet and constraints its change
+broke; apply the class's access files again after it.
+
+### Sign-in
+
+| Tool | Args | Notes |
+|---|---|---|
+| `get_app_auth` | `appName` | Providers, sign-up mode, signup profile, tenants, claims, origins and redirects. |
+| `replace_app_auth` | `appName`, `providers`, `signup` (`open` \| `invite_only`), `signupProfile`, `providerTenants?`, `calculatedClaims?` | Rewrites providers and their tenants. Keeps redirect URIs, secrets and token settings. Warns when open sign-up uses `Admin`. |
+| `add_oidc_client_origin` | `appName`, `origin` | Allows a browser origin (CORS) for the client. Idempotent. |
+
+### Users and organizations
+
+| Tool | Args | Notes |
+|---|---|---|
+| `get_users` | `appName`, `profileName?`, `search?` | Users holding a profile of the app: name, email, profile, organization, `active` / `invited` / `inactive`. |
+| `invite_user` | `appName`, `email`, `profileName`, `name?`, `organizationName?` | Creates an invitation (an inactive user with no sign-ins) that becomes the user on their first sign in with a provider that verifies the email; if the account already has that email, sets their profile instead. Sends nothing. |
+| `assign_user_profile` | `appName`, `email`, `profileName` | Applies from the next sign in. |
+| `remove_user_access` | `appName`, `email` | Removes the app from the user; the user stays in the account. Refuses the caller. |
+| `set_user_organization` | `appName`, `email`, `organizationName` | |
+| `get_organizations` | `appName`, `search?` | Every organization in the account, with how many of the app's users are in each. |
+| `add_organization` | `appName`, `name`, `email?`, `phone?` | Names are unique in the account. |

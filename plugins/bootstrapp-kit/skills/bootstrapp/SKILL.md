@@ -5,7 +5,7 @@ description: Core guide for any work on an app whose backend is (or is moving to
 
 # Working with BootstrApp
 
-BootstrApp is a backend PaaS. An app on it is defined by four things, and this
+BootstrApp is a backend PaaS. An app on it is defined by five things, and this
 kit has one skill for each:
 
 | Concern | What it is | Skill |
@@ -13,6 +13,7 @@ kit has one skill for each:
 | Data + API model | **ObjectTypes** (classes): JSON Schemas stored as MongoDB collections. The same schema is the API model: the platform generates CRUD + filter endpoints from it. | `bootstrapp-object-types` |
 | Operations | **Actions**: named server operations on a class, each with a typed input class and output class. | `bootstrapp-actions` |
 | Logic | **ApiScripts**: the body of an action, in a small TypeScript dialect, calling only the functions the platform exposes for the app's classes. | `bootstrapp-apiscript` |
+| Access | **Profiles** (roles), what each may do on every class, field, relation and action, which records it sees (constraints), and how users sign in. | `bootstrapp-access` |
 | Client | A strongly typed client generated from the OpenAPI spec the MCP server produces. | `bootstrapp-client` |
 
 Moving an existing app onto BootstrApp has its own skill:
@@ -39,6 +40,10 @@ bootstrapp/
   classes/<fullObjectType>.json one file per ObjectType = the add_object_class payload
   actions/<actionName>.json     one file per action = the register_action payload
   scripts/<actionName>.ts       one ApiScript per action
+  profiles/<Profile>.json       one file per profile = the add_profile payload
+  access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
+  access/actions/<actionName>.json         profiles that run an action = replace_action_access
+  auth.json                     sign-in providers and sign-up = replace_app_auth
   generated/platform.d.ts       script function surface (downloaded, never edited)
   generated/openapi.yaml        API spec (downloaded, never edited)
   applied.json                  ledger of what has been pushed to the backend
@@ -106,6 +111,13 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
 | `generate_openapi_spec` | URL of the OpenAPI spec for client generation. |
 | `add_oidc_client_redirect` | Allow a login redirect URL. |
+| `get_profiles`, `add_profile`, `replace_profile`, `remove_profile` | Profiles (roles). |
+| `get_class_access`, `replace_class_access`, `remove_class_access`, `replace_action_access` | What a profile may do and see. |
+| `get_app_auth`, `replace_app_auth`, `add_oidc_client_origin` | Sign-in providers, sign-up, browser origins. |
+| `get_users`, `invite_user`, `assign_user_profile`, `remove_user_access`, `get_organizations`, `add_organization`, `set_user_organization` | People. They change real access: confirm each call. |
+
+Only the app's owner can call the tools that take an app (or a class or
+action of it); see the `bootstrapp-access` skill for the access tools.
 
 The server also publishes reference resources (schema conventions, filter
 operators, action scopes, the ApiScript grammar and rule book, auth config).
@@ -176,11 +188,15 @@ When the user wants local definitions pushed:
    already asked you to apply.
 3. If the app is not initialized, call `init_app` with `app.json`'s name,
    title, and description.
-4. Make the class calls in the order `plan` lists them (base and embedded
-   classes come first), then the action calls; actions don't depend on each
-   other and can go in parallel.
+4. Make the calls in the order `plan` lists them: profiles, classes (base
+   and embedded classes first), class access, actions, action access,
+   scripts, `auth.json`. Actions don't depend on each other and can go in
+   parallel; so can access calls. Access shown as `recheck` is applied again
+   because its class changed.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
-   (kinds: `app`, `class`, `action`, `script`). Record only what succeeded.
+   (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
+   `script`, `auth`; an access item's name is `<Profile>/<fullObjectType>`).
+   Record only what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
    surface, then push changed scripts with `replace_action_script` and record

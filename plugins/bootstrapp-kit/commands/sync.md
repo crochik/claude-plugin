@@ -1,5 +1,5 @@
 ---
-description: Push local BootstrApp manifests and scripts to the backend (init app, add classes, register actions, attach scripts) and refresh generated files.
+description: Push local BootstrApp manifests and scripts to the backend (init app, profiles, classes, access, actions, scripts, sign-in) and refresh generated files.
 argument-hint: "[--dry-run]"
 ---
 
@@ -18,9 +18,9 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
 3. With `--dry-run`, show the plan and stop. Otherwise, unless the user
    already said to apply, show the list of registrations (they can't be
    undone through MCP) and continue when they confirm.
-4. Execute: `init_app` if planned; then the class calls (`add_object_class`
-   / `replace_object_class`) in plan order, then the action calls
-   (`register_action` / `replace_action`); record each success immediately with
+4. Execute: `init_app` if planned; then the calls in plan order (profiles,
+   classes, class access, actions, action access, and `replace_app_auth`
+   after the scripts in step 5); record each success immediately with
    `bootstrapp-state.mjs record <kind> <name>`. On a failure, report it and
    keep going with independent items.
 5. If classes or actions were added, regenerate

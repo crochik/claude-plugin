@@ -7,7 +7,7 @@
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
 //   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp]
-//        kind: app | class | action | script
+//        kind: app | profile | class | access | action | action-access | script | auth
 //
 // No dependencies; Node 18+.
 
@@ -27,6 +27,18 @@ const SNAKE = /^[a-z][a-z0-9_]*$/;
 const PASCAL = /^[A-Z][A-Za-z0-9]*$/;
 const CAMEL = /^[a-z][A-Za-z0-9]*$/;
 const SCOPES = ["Instance", "Bulk", "Class"];
+
+// Access control (see the bootstrapp-access skill). Names as the MCP tools take them.
+const DEFAULT_PROFILE = "Admin"; // created by init_app, always full access, can't be restricted
+const CLASS_PERMISSIONS = ["Read", "Create", "Update", "Delete", "Import", "Export", "BulkDelete", "BulkTag", "Customize", "DeepClone", "ReadOnly", "ReadWrite", "Full"];
+const FIELD_PERMISSIONS = ["Read", "Update", "SetOnCreate", "Reset", "CreateOnDemand"];
+const RELATION_PERMISSIONS = ["Read"];
+const OPERATORS = ["Eq", "Ne", "Gt", "Gte", "Lt", "Lte", "In", "Nin"];
+const CONTEXT_KEYS = ["AccountId", "OrganizationId", "UserId", "EntityId", "ProfileId", "ClientId", "AllProfileIds", "AllUserIds", "AllOrganizationIds", "AllEntityIds"];
+const CONTEXT_VALUE = /^\{\{\s*context\s+"(?<key>[^"]+)"\s*\}\}$/;
+const PROVIDERS = ["Microsoft", "Google", "Salesforce", "GitHub"];
+const SIGNUP = ["open", "invite_only"];
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", script: "scripts", auth: null };
 
 function fail(message) {
   console.error(`bootstrapp-state: ${message}`);
@@ -74,11 +86,22 @@ function load() {
   const classes = listFiles("classes", ".json").map((file) => ({ file, data: readJson(file) }));
   const actions = listFiles("actions", ".json").map((file) => ({ file, data: readJson(file) }));
   const scripts = listFiles("scripts", ".ts").map((file) => ({ file, name: basename(file, ".ts"), text: readFileSync(file, "utf8") }));
+  const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
+  // access/<profileName>/<fullObjectType>.json, and access/actions/<actionName>.json
+  const accessDir = join(dir, "access");
+  const profileDirs = existsSync(accessDir)
+    ? readdirSync(accessDir, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "actions").map((d) => d.name).sort()
+    : [];
+  const access = profileDirs.flatMap((folder) => listFiles(join("access", folder), ".json").map((file) => ({ file, folder, data: readJson(file) })));
+  const actionAccess = listFiles(join("access", "actions"), ".json").map((file) => ({ file, data: readJson(file) }));
+  const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["classes", "actions", "scripts"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "scripts"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, profiles, access, actionAccess, auth, ledger, ledgerPath };
 }
+
+const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
 
 // ---------------------------------------------------------------- checks
 
@@ -215,7 +238,135 @@ function check(state) {
     if (!actionNames.has(script.name)) warn(`scripts/${script.name}.ts`, "no matching action manifest");
   }
 
+  checkAccess(state, byName, propsOf, error, warn);
+
   return problems;
+}
+
+function checkAccess(state, byName, propsOf, error, warn) {
+  const profileNames = new Set();
+  const profiles = new Map();
+  for (const { file, data } of state.profiles) {
+    const where = `profiles/${basename(file)}`;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!data.profileName) { error(where, "profileName is required"); continue; }
+    if (basename(file) !== `${data.profileName}.json`) warn(where, `file name should be ${data.profileName}.json`);
+    if (data.profileName.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) error(where, `${DEFAULT_PROFILE} is the app's default profile (created by init_app, always full access); don't declare it`);
+    if (data.profileName === "actions") error(where, '"actions" is reserved (access/actions/ holds action access)');
+    if (!data.description) error(where, "description is required (what users with this profile do)");
+    if (data.copyAccessFrom) error(where, "copyAccessFrom isn't used in manifests: write the access/ files for this profile instead");
+    profileNames.add(data.profileName);
+    profiles.set(data.profileName, data);
+  }
+  const knownProfile = (name) => profileNames.has(name) || name?.toLowerCase() === DEFAULT_PROFILE.toLowerCase();
+
+  for (const [name, data] of profiles) {
+    const where = `profiles/${name}.json`;
+    if (data.inheritsFrom !== undefined && !Array.isArray(data.inheritsFrom)) { error(where, "inheritsFrom must be a list of profile names"); continue; }
+    for (const parent of data.inheritsFrom ?? []) {
+      if (parent === name) error(where, "a profile can't inherit from itself");
+      else if (!knownProfile(parent)) warn(where, `inherits from ${parent}, which has no local manifest; it must already exist on the server`);
+    }
+  }
+
+  const badValues = (values, allowed) => (Array.isArray(values) ? values.filter((v) => !allowed.includes(v)) : null);
+
+  for (const { file, folder, data } of state.access) {
+    const where = `access/${folder}/${basename(file)}`;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!data.fullObjectType || !data.profileName) { error(where, "fullObjectType and profileName are required"); continue; }
+    if (data.profileName !== folder) error(where, `profileName "${data.profileName}" doesn't match its folder ${folder}`);
+    if (basename(file) !== `${data.fullObjectType}.json`) warn(where, `file name should be ${data.fullObjectType}.json`);
+    if (data.profileName.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) { error(where, `${DEFAULT_PROFILE} always has full access and can't be restricted`); continue; }
+    if (!knownProfile(data.profileName)) warn(where, `profile ${data.profileName} has no local manifest; it must already exist on the server`);
+
+    const bad = badValues(data.permissions, CLASS_PERMISSIONS);
+    if (!bad) error(where, "permissions is required (a list; [] removes the profile's access)");
+    else if (bad.length) error(where, `unknown permissions ${bad.join(", ")}. Valid: ${CLASS_PERMISSIONS.join(", ")}`);
+    const removing = Array.isArray(data.permissions) && data.permissions.length === 0;
+    if (removing && (Object.keys(data.fieldPermissions ?? {}).length || Object.keys(data.relationPermissions ?? {}).length || data.constraints?.length)) {
+      error(where, "permissions [] removes access; don't combine it with field, relation or constraint settings");
+    }
+
+    const cls = byName.get(data.fullObjectType);
+    if (!cls) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
+    const own = cls?.schema?.properties ?? {};
+    const all = cls ? propsOf(cls) : {};
+
+    for (const [field, values] of Object.entries(data.fieldPermissions ?? {})) {
+      if (cls && !own[field]) error(where, all[field] ? `field ${field} is inherited from ${cls.baseObjectType}: set its access there` : `${data.fullObjectType} has no field ${field}`);
+      const badField = badValues(values, FIELD_PERMISSIONS);
+      if (!badField) error(where, `fieldPermissions.${field} must be a list ([] hides the field)`);
+      else if (badField.length) error(where, `fieldPermissions.${field}: unknown ${badField.join(", ")}. Valid: ${FIELD_PERMISSIONS.join(", ")}`);
+    }
+    if (data.defaultFieldPermissions !== undefined) {
+      const badDefault = badValues(data.defaultFieldPermissions, FIELD_PERMISSIONS);
+      if (!badDefault) error(where, "defaultFieldPermissions must be a list");
+      else if (badDefault.length) error(where, `defaultFieldPermissions: unknown ${badDefault.join(", ")}. Valid: ${FIELD_PERMISSIONS.join(", ")}`);
+    }
+    for (const [relation, values] of Object.entries(data.relationPermissions ?? {})) {
+      const badRelation = badValues(values, RELATION_PERMISSIONS);
+      if (!badRelation) error(where, `relationPermissions.${relation} must be a list`);
+      else if (badRelation.length) error(where, `relationPermissions.${relation}: only Read, or [] to hide it`);
+    }
+
+    if (data.constraints !== undefined && !Array.isArray(data.constraints)) { error(where, "constraints must be a list"); continue; }
+    if (data.constraints?.length && cls?.type === "Embedded") error(where, "constraints only apply to top-level classes");
+    for (const [i, c] of (data.constraints ?? []).entries()) {
+      const at = `constraints[${i}]`;
+      if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
+      if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
+      if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
+      const values = Array.isArray(c.value) ? c.value : [c.value];
+      const isList = Array.isArray(c.value) || (typeof c.value === "string" && /"All\w+Ids"/.test(c.value));
+      if (["In", "Nin"].includes(c.operator) && !isList) error(where, `${at}: ${c.operator} takes a list (or an All*Ids context value)`);
+      if (OPERATORS.includes(c.operator) && !["In", "Nin"].includes(c.operator) && isList) error(where, `${at}: ${c.operator} takes a single value; use In or Nin with a list`);
+      for (const v of values) {
+        if (typeof v !== "string" || !v.includes("{{")) continue;
+        const key = CONTEXT_VALUE.exec(v)?.groups?.key;
+        if (!key) error(where, `${at}: "${v}" must be exactly {{context "Key"}}`);
+        else if (!CONTEXT_KEYS.includes(key) && !key.startsWith("Claims.")) error(where, `${at}: unknown context key ${key}. Valid: ${CONTEXT_KEYS.join(", ")}, Claims.<name>`);
+        else if (key.startsWith("Claims.") && !(key.slice(7) in (state.auth?.data?.calculatedClaims ?? {}))) warn(where, `${at}: claim ${key.slice(7)} isn't in auth.json calculatedClaims; it must be a claim the token already has`);
+      }
+    }
+  }
+
+  const actionsByName = new Map(state.actions.filter((a) => !a.data.$error).map((a) => [a.data.actionName, a.data]));
+  for (const { file, data } of state.actionAccess) {
+    const where = `access/actions/${basename(file)}`;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!data.fullObjectType || !data.actionName) { error(where, "fullObjectType and actionName are required"); continue; }
+    if (basename(file) !== `${data.actionName}.json`) warn(where, `file name should be ${data.actionName}.json`);
+    const action = actionsByName.get(data.actionName);
+    if (!action) warn(where, `action ${data.actionName} has no local manifest; it must already be registered`);
+    else if (action.fullObjectType !== data.fullObjectType) error(where, `${data.actionName} is registered on ${action.fullObjectType}, not ${data.fullObjectType}`);
+    if (!Array.isArray(data.profiles)) { error(where, "profiles is required (a list; [] leaves only the default profile)"); continue; }
+    for (const p of data.profiles) {
+      if (p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} always runs every action; no need to list it`);
+      else if (!knownProfile(p)) warn(where, `profile ${p} has no local manifest; it must already exist on the server`);
+    }
+  }
+
+  if (state.auth) {
+    const where = "auth.json";
+    const data = state.auth.data;
+    if (data.$error) { error(where, data.$error); return; }
+    const badProviders = badValues(data.providers, PROVIDERS);
+    if (!badProviders || !data.providers.length) error(where, `providers is required: one or more of ${PROVIDERS.join(", ")}`);
+    else if (badProviders.length) error(where, `unknown providers ${badProviders.join(", ")}. Valid: ${PROVIDERS.join(", ")}`);
+    if (!SIGNUP.includes(data.signup)) error(where, `signup must be ${SIGNUP.join(" or ")}`);
+    if (!data.signupProfile) error(where, "signupProfile is required");
+    else if (!knownProfile(data.signupProfile)) warn(where, `signupProfile ${data.signupProfile} has no local manifest; it must already exist on the server`);
+    else if (data.signup === "open" && data.signupProfile.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) {
+      warn(where, `open sign-up with ${DEFAULT_PROFILE} gives anyone who signs in full access; use a restricted profile`);
+    }
+    for (const provider of Object.keys(data.providerTenants ?? {})) {
+      if (!(data.providers ?? []).includes(provider)) error(where, `providerTenants.${provider}: ${provider} isn't in providers`);
+    }
+    for (const [claim, expression] of Object.entries(data.calculatedClaims ?? {})) {
+      if (typeof expression !== "string" || !expression.includes("{{")) error(where, `calculatedClaims.${claim} must be a {{...}} expression`);
+    }
+  }
 }
 
 const REF_PREFIX = "#/components/schemas/";
@@ -297,6 +448,27 @@ function diff(state) {
     const prev = ledger.scripts[script.name];
     items.push({ kind: "script", name: script.name, hash: hash(script.text), state: !prev ? "new" : prev.hash === hash(script.text) ? "applied" : "changed" });
   }
+  const manifestItem = (kind, name, data, prev) => ({ kind, name, hash: hashJson(data), state: !prev ? "new" : prev.hash === hashJson(data) ? "applied" : "changed" });
+  for (const { data } of state.profiles) {
+    if (data.$error || !data.profileName) continue;
+    items.push(manifestItem("profile", data.profileName, data, ledger.profiles[data.profileName]));
+  }
+  // Replacing a class can add fields the profile has no entry for (hidden), so access is applied again
+  // whenever its class changed since the access was applied (the ledger keeps the class hash it was applied against).
+  const changedClasses = new Set(items.filter((i) => i.kind === "class" && i.state === "changed").map((i) => i.name));
+  for (const { data } of state.access) {
+    if (data.$error || !data.profileName || !data.fullObjectType) continue;
+    const prev = ledger.access[accessName(data)];
+    const item = manifestItem("access", accessName(data), data, prev);
+    const classMoved = changedClasses.has(data.fullObjectType) || prev?.classHash !== ledger.classes[data.fullObjectType]?.hash;
+    if (item.state === "applied" && classMoved) item.state = "recheck";
+    items.push(item);
+  }
+  for (const { data } of state.actionAccess) {
+    if (data.$error || !data.actionName) continue;
+    items.push(manifestItem("action-access", data.actionName, data, ledger.actionAccess[data.actionName]));
+  }
+  if (state.auth && !state.auth.data.$error) items.push(manifestItem("auth", "auth", state.auth.data, ledger.auth));
   return items;
 }
 
@@ -309,6 +481,11 @@ function plan(state) {
   if (app?.state === "new") {
     calls.push({ tool: "init_app", record: ["app", appName], args: { appName, appTitle: state.app.title, appDescription: state.app.description } });
   }
+  const pending = (kind) => items.filter((i) => i.kind === kind && i.state !== "applied");
+  for (const item of profileOrder(pending("profile"), state)) {
+    const { profileName, description, inheritsFrom } = strip(state.profiles.find((p) => p.data.profileName === item.name).data);
+    calls.push({ tool: item.state === "new" ? "add_profile" : "replace_profile", record: ["profile", item.name], args: { appName, profileName, description, ...(inheritsFrom?.length ? { inheritsFrom } : {}) } });
+  }
   for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
     if (item.state === "new" || item.state === "changed") {
@@ -316,6 +493,10 @@ function plan(state) {
       const tool = item.state === "new" ? "add_object_class" : "replace_object_class";
       calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema } });
     }
+  }
+  for (const item of pending("access")) {
+    const { data } = state.access.find((a) => accessName(a.data) === item.name);
+    calls.push({ tool: "replace_class_access", record: ["access", item.name], args: strip(data) });
   }
   const registered = new Set();
   for (const item of items.filter((i) => i.kind === "action")) {
@@ -325,6 +506,10 @@ function plan(state) {
     }
     registered.add(item.name);
   }
+  for (const item of pending("action-access")) {
+    const { data } = state.actionAccess.find((a) => a.data.actionName === item.name);
+    calls.push({ tool: "replace_action_access", record: ["action-access", item.name], args: strip(data) });
+  }
   for (const item of items.filter((i) => i.kind === "script" && i.state !== "applied")) {
     const action = state.actions.find((a) => a.data.actionName === item.name)?.data;
     if (!action || !registered.has(item.name)) {
@@ -333,7 +518,26 @@ function plan(state) {
     }
     calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>` } });
   }
+  for (const item of pending("auth")) {
+    calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });
+  }
   return { calls, blocked };
+}
+
+// Profiles a profile inherits from go first.
+function profileOrder(profileItems, state) {
+  const byName = new Map(profileItems.map((i) => [i.name, i]));
+  const ordered = [];
+  const seen = new Set();
+  const visit = (item) => {
+    if (seen.has(item.name)) return;
+    seen.add(item.name);
+    const data = state.profiles.find((p) => p.data.profileName === item.name)?.data;
+    for (const parent of data?.inheritsFrom ?? []) if (byName.has(parent)) visit(byName.get(parent));
+    ordered.push(item);
+  };
+  profileItems.forEach(visit);
+  return ordered;
 }
 
 // Base classes and $ref'd embedded classes go before the classes that use them.
@@ -366,10 +570,14 @@ function record(state, kind, names) {
     }
     const item = items.find((i) => i.kind === kind && i.name === name);
     if (!item) fail(`no local ${kind} named ${name}`);
-    const key = { class: "classes", action: "actions", script: "scripts" }[kind];
-    ledger[key][name] = { hash: item.hash, appliedAt: now };
+    if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
+    else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
+    else ledger[KINDS[kind]][name] = { hash: item.hash, appliedAt: now };
   }
-  const ordered = { app: ledger.app, classes: ledger.classes, actions: ledger.actions, scripts: ledger.scripts };
+  const ordered = {
+    app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
+    actions: ledger.actions, actionAccess: ledger.actionAccess, scripts: ledger.scripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
+  };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
 }
@@ -400,10 +608,11 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    for (const kind of ["app", "class", "action", "script"]) {
-      const group = items.filter((i) => i.kind === kind && kind !== "app");
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", script: "Scripts", auth: "Sign-in (auth.json)" };
+    for (const kind of Object.keys(titles)) {
+      const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;
-      console.log(`\n${kind === "class" ? "Classes" : `${kind[0].toUpperCase()}${kind.slice(1)}s`}:`);
+      console.log(`\n${titles[kind]}:`);
       for (const i of group) console.log(`  ${i.state.padEnd(8)} ${i.name}`);
     }
     const app = items.find((i) => i.kind === "app");
@@ -428,7 +637,7 @@ switch (command) {
   }
   case "record": {
     const [kind, ...names] = positional;
-    if (!["app", "class", "action", "script"].includes(kind) || !names.length) fail("usage: record <app|class|action|script> <name...>");
+    if (!(kind in KINDS) || !names.length) fail(`usage: record <${Object.keys(KINDS).join("|")}> <name...>`);
     record(state, kind, names);
     break;
   }

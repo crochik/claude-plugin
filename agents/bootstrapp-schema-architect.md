@@ -647,6 +647,29 @@ conditions themselves.
 |---|---|---|---|---|
 | order-customer | `app.<app_name>`.Order | customerId | `app.<app_name>`.Customer | _id |
 
+## Access
+
+Profiles (roles) and what each may do. `Admin` is created with the app,
+always has full access, and is not listed. Leave the section out only
+when the app has no users besides its developer.
+
+| Profile | Description | Inherits from |
+|---|---|---|
+| Member  | Submits and tracks their own orders. | — |
+| Manager | Fulfils every order.                 | — |
+
+| Profile | Class | Permissions | Fields | Constraint |
+|---|---|---|---|---|
+| Member  | `app.<app_name>`.Order    | Read, Create, Update | status: Read | customerId Eq {{context "UserId"}} |
+| Manager | `app.<app_name>`.Order    | Read, Update         | —            | — |
+| Manager | `app.<app_name>`.Customer | Read                 | —            | — |
+
+| Action | Profiles (besides Admin) |
+|---|---|
+| submitOrder | Member |
+
+Sign-in: Google, Microsoft; invite only; new users get Member.
+
 ## Design decisions
 
 1. **Decision title** — rationale and trade-offs.
@@ -674,12 +697,35 @@ Record the link in the **References** registry as pointing to
 `User._id`; you do not need a row in the **Classes** registry for
 User itself.
 
-Authorization is **group-based** and enforced by the backend on every
-object, action, and view. You do not design ACL fields, role
-hierarchies, or per-user permission flags into the schema — those
-concerns live with the platform, not with the app's data model. If a
-business rule depends on the caller's group membership, encode that
-rule inside the action that needs it; do not surface it as schema.
+Authorization is enforced by the backend on every object, action, and
+view, per **profile** (role). You do not design ACL fields, role
+hierarchies, or per-user permission flags into the schema. Instead,
+fill the **Access** section of `BOOTSTRAPP.md`:
+
+- One row per profile, named in PascalCase. `Admin` exists already,
+  has full access and is not listed.
+- One row per profile × top-level class it may use. Permissions are
+  `Read`, `Create`, `Update`, `Delete` (also `Import`, `Export`,
+  `BulkDelete`, ...). A profile with no row for a class has no access
+  to it. List only the fields that differ from the class permissions
+  (`salary: hidden`, `status: Read`).
+- A **constraint** limits the records a profile sees, e.g.
+  `ownerId Eq {{context "UserId"}}` (own records) or
+  `organizationId Eq {{context "OrganizationId"}}` (their
+  organization's). An `Eq` constraint also fills the field when that
+  profile creates a record. The field must exist on the class, so add
+  it (and index it) when you design the class.
+- Inheritance between profiles is first match per class and field, and
+  constraints of all inherited profiles apply together; prefer explicit
+  rows over inheritance.
+- The action table lists which profiles run each action (`Admin`
+  always can). The sign-in line names the providers (Microsoft, Google,
+  Salesforce, GitHub), open sign-up or invite only, and the profile new
+  users get, never `Admin` when sign-up is open.
+
+Ask the user who uses the app and what each kind of user may see and
+change before filling it. The server's `access-control.md` resource
+(`bootstrapp://reference/access-control.md`) is the reference.
 
 ### `schemas/<Namespace>.md` (per-namespace definitions)
 

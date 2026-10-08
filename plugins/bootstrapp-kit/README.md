@@ -23,6 +23,7 @@ skills/
   bootstrapp/                core guide: folder layout, MCP tools, state, sync, platform notes
   bootstrapp-object-types/   ObjectType design for MongoDB (data model = API model)
   bootstrapp-actions/        when an action is needed; scope, input/output classes
+  bootstrapp-access/         profiles, permissions, row constraints, sign-in, users
   bootstrapp-apiscript/      writing and checking ApiScripts against platform.d.ts
   bootstrapp-client/         OpenAPI spec → typed client → wrapper → auth
   bootstrapp-migration/      inventory, mapping and slice plan for existing apps
@@ -33,7 +34,7 @@ agents/
 commands/
   /bootstrapp-kit:status   /bootstrapp-kit:init     /bootstrapp-kit:model
   /bootstrapp-kit:action   /bootstrapp-kit:sync     /bootstrapp-kit:client
-  /bootstrapp-kit:migrate
+  /bootstrapp-kit:migrate  /bootstrapp-kit:access
 ```
 
 The commands are shortcuts. Asking in plain words ("add an approval action
@@ -59,6 +60,7 @@ in to BootstrApp.
 
 Everything lands in `bootstrapp/` at the root of the user's repository:
 `app.json`, `classes/*.json`, `actions/*.json`, `scripts/*.ts`,
+`profiles/*.json`, `access/`, `auth.json`,
 `generated/` (platform.d.ts, openapi.yaml), `applied.json`, and for
 migrations `MIGRATION.md`. Commit it; it is the record of what the backend
 has, since the MCP server cannot return full class definitions.

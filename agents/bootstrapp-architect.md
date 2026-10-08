@@ -1,7 +1,7 @@
 ---
 name: bootstrapp-architect
 description: Use PROACTIVELY for any end-to-end work on an app whose backend is bootstrapp.cloud — interviewing the user about scope, handing off to the schema architect, creating classes on the backend via the `bootstrapp` MCP server, generating the typed API client, scaffolding the client (web/Flutter/CLI/desktop/mobile), wiring auth, and iterating on the running UI. Drives the `bootstrapp` MCP server to inspect and modify the backend before touching client code.
-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__generate_platform_definitions, mcp__bootstrapp__tool_search
+tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, TodoWrite, mcp__bootstrapp__init_app, mcp__bootstrapp__add_object_class, mcp__bootstrapp__get_object_classes, mcp__bootstrapp__get_namespaces, mcp__bootstrapp__register_action, mcp__bootstrapp__update_action_script, mcp__bootstrapp__add_oidc_client_redirect, mcp__bootstrapp__get_profiles, mcp__bootstrapp__add_profile, mcp__bootstrapp__replace_profile, mcp__bootstrapp__get_class_access, mcp__bootstrapp__replace_class_access, mcp__bootstrapp__replace_action_access, mcp__bootstrapp__get_app_auth, mcp__bootstrapp__replace_app_auth, mcp__bootstrapp__add_oidc_client_origin, mcp__bootstrapp__invite_user, mcp__bootstrapp__get_users, mcp__bootstrapp__generate_openapi_spec, mcp__bootstrapp__generate_platform_definitions, mcp__bootstrapp__tool_search
 mcpServers:
   - bootstrapp
 ---
@@ -292,6 +292,24 @@ small, working slice and then iterating with the user.
    `mcp__bootstrapp__update_action_script` once the spec has been
    regenerated and the action scripter has produced the script
    files.
+
+   **Then apply the Access section of `BOOTSTRAPP.md`**, after the
+   batch above returns (access needs the classes and actions to
+   exist). Create each profile with `mcp__bootstrapp__add_profile`
+   (`appName`, `profileName`, `description`, `inheritsFrom`; inherited
+   profiles first, and `replace_profile` for one that exists). Then
+   one `mcp__bootstrapp__replace_class_access` per profile × class row
+   (`fullObjectType`, `profileName`, `permissions`, `fieldPermissions`
+   such as `{"salary": [], "status": ["Read"]}`, and `constraints` as
+   `[{"fieldName", "operator", "value"}]`), one
+   `mcp__bootstrapp__replace_action_access` per action row
+   (`profiles`), and `mcp__bootstrapp__replace_app_auth` for the
+   sign-in line (`providers`, `signup` `open` or `invite_only`,
+   `signupProfile`). These calls replace what was there, so re-running
+   them is safe; re-run a class's access rows after changing the class,
+   since new fields are hidden from existing profiles until then. When
+   the app is invite only, offer to `mcp__bootstrapp__invite_user` the
+   user's test accounts, and confirm each invitation with the user.
 
 6. **Generate the OpenAPI spec.** Call
    `mcp__bootstrapp__generate_openapi_spec` with `applicationName`

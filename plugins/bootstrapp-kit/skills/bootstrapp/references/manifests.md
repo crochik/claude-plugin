@@ -2,7 +2,8 @@
 
 Every manifest is plain JSON whose fields are the arguments of one MCP tool
 call. Extra keys starting with `$` (for example `$notes`) are for humans and
-are stripped before a call.
+are stripped before a call. JSON Schema keywords (`$ref`, `$defs`, `$id`,
+`$schema`, `$anchor`) are kept, so don't use those names for notes.
 
 ## `app.json`
 

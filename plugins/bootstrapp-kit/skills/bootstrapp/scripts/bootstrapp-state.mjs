@@ -47,14 +47,18 @@ function listFiles(sub, ext) {
   return readdirSync(path).filter((f) => f.endsWith(ext)).sort().map((f) => join(path, f));
 }
 
-// Drop human-only "$" keys, then serialize with sorted keys so formatting
-// changes don't count as changes.
+// JSON Schema keywords that start with "$" and must reach the server
+// ("$ref" is how a property embeds a registered class).
+const SCHEMA_KEYWORDS = new Set(["$ref", "$defs", "$id", "$schema", "$anchor", "$dynamicRef", "$dynamicAnchor"]);
+
+// Drop human-only "$" keys (like "$notes"), keep JSON Schema keywords, then
+// serialize with sorted keys so formatting changes don't count as changes.
 function strip(value) {
   if (Array.isArray(value)) return value.map(strip);
   if (value && typeof value === "object") {
     const out = {};
     for (const key of Object.keys(value).sort()) {
-      if (!key.startsWith("$")) out[key] = strip(value[key]);
+      if (!key.startsWith("$") || SCHEMA_KEYWORDS.has(key)) out[key] = strip(value[key]);
     }
     return out;
   }

@@ -146,7 +146,11 @@ own:
    app's classes, actions, endpoints, and schemas. Never guess API
    shapes.
 3. **Sync the backend with `BOOTSTRAPP.md`.** When the blueprint changes,
-   re-run class creation via `mcp__bootstrapp__add_object_class` and
+   add new classes and actions (`mcp__bootstrapp__add_object_class`,
+   `mcp__bootstrapp__register_action`), replace changed ones
+   (`mcp__bootstrapp__replace_object_class`,
+   `mcp__bootstrapp__replace_action`), attach scripts with
+   `mcp__bootstrapp__replace_action_script`, and
    regenerate the API client via the
    [openapi-client-generator skill](../openapi-client-generator/SKILL.md)
    before touching client code that depends on the new shape.
@@ -166,6 +170,37 @@ own:
    chat to extend the app.
 7. **Document.** Update the README with how to run the app and the env
    vars required.
+
+## MCP tools at a glance
+
+Tool names follow `get_` (read), `add_` (create; refuses an existing
+name), `replace_` (overwrite an existing one), `remove_` (delete).
+Only the app's owner can call the per-app tools; anyone else gets an
+error.
+
+- **Read the backend:** `get_namespaces`, `get_object_classes` (class
+  names in a namespace, no schemas), `get_object_class` (one class in
+  full: type, base, indexed fields, foreign keys, OpenAPI schemas),
+  `get_actions` (a class's actions, whether each has a script, and who
+  can run it), `get_action_script`.
+- **Change the model:** `init_app` (once per app), `add_object_class` /
+  `replace_object_class` (no record migration; can't change
+  TopLevel/Embedded), `register_action` / `replace_action`,
+  `replace_action_script` (type-checks the script and wires it so the
+  action runs it; rejects invalid scripts with line/column errors).
+  Nothing deletes a class or action.
+- **Access and sign-in:** `get_profiles`, `add_profile`,
+  `replace_profile`, `remove_profile`, `get_class_access`,
+  `replace_class_access`, `remove_class_access`,
+  `replace_action_access`, `get_app_auth`, `replace_app_auth`,
+  `add_oidc_client_redirect`, `add_oidc_client_origin`.
+- **Users and organizations** (account-wide, shared by the
+  developer's apps): `get_users`, `invite_user`,
+  `assign_user_profile`, `remove_user_access`,
+  `set_user_organization`, `get_organizations`, `add_organization`.
+- **Generate:** `generate_openapi_spec` (client), and
+  `generate_platform_definitions` (`scripts/platform.d.ts` for the
+  action scripter).
 
 ## Client patterns by platform
 

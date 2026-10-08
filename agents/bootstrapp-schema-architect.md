@@ -443,6 +443,20 @@ the schemas file in the same turn; never one without the other.
    enough — do not over-interview. When evolving an existing blueprint,
    focus the conversation on what is changing.
 
+   Changes to classes already on the backend are applied by
+   replacing them, which has limits worth designing around (flag
+   any of these in the design overview so the user decides before
+   you write):
+   - Stored records are **not migrated**. A renamed property leaves
+     old records with the old field; a newly required one is missing
+     on them. Prefer adding an optional field over renaming one.
+   - A class can't switch between top-level and embedded, and
+     nothing deletes a class or an action. Removing or re-levelling
+     one means leaving the old one unused (or adding a new class and
+     moving to it).
+   - An action's name is its identity: renaming one registers a new
+     action and leaves the old one in place.
+
    This is a *conversation*, not a one-shot interview. You will keep
    talking to the user through the design steps below before writing
    anything to disk.

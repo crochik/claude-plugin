@@ -64,15 +64,22 @@ document.
 - Once the subagent returns the updated blueprint, present the touched
   paths, the app name, and a short summary of what changed. Then ask
   whether the user wants the `bootstrapp-architect` to apply the
-  schema changes to the backend (registering the new/changed classes
-  and actions, regenerating the OpenAPI spec, and regenerating the
-  API client) or to defer until later.
+  schema changes to the backend or to defer until later. Applying
+  means: `add_object_class` / `register_action` for new classes and
+  actions, `replace_object_class` / `replace_action` for changed ones
+  (after telling the user what changes for records already stored,
+  since replacing a class does not migrate them), re-applying the
+  Access rows of every replaced class, regenerating the OpenAPI spec,
+  and regenerating the API client. The architect does **not** call
+  `init_app` here. Nothing deletes a class or action through MCP, and
+  a class can't switch between top-level and embedded; if the change
+  removes or re-levels one, say so in the summary.
 - If the change touched the action registry (added, renamed, removed,
   or reshaped any action), the architect must also refresh the
   matching `scripts/<actionName>.ts` file(s) (and the namespace
   `scripts/<ActionsNamespace>.md` index that links to them) and
   attach the updated scripts via
-  `mcp__bootstrapp__update_action_script`. The ordering matters
+  `mcp__bootstrapp__replace_action_script`. The ordering matters
   because the **`bootstrapp-action-scripter`** subagent drafts
   against `scripts/platform.d.ts` — a local file the architect
   generates by calling
@@ -84,7 +91,9 @@ document.
   scripts) → invoke the scripter to rewrite the affected
   `scripts/<actionName>.ts` files (and refresh the matching
   index) → architect reads each updated `.ts` file and calls
-  `update_action_script` with its contents passed verbatim. The
+  `replace_action_script` with its contents passed verbatim (the
+  server type-checks it; on rejection the scripter fixes the
+  reported lines and the architect retries). The
   scripter itself is design-only and never touches the backend,
   but it should run after the platform-definitions regen, not
   before. The architect still calls

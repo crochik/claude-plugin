@@ -118,7 +118,10 @@ Hand back to the **`bootstrapp-architect`**. It will:
   app record and its OIDC client. `init_app` is a one-time
   creation step; only `/bootstrapp:new-app` calls it.
   `/bootstrapp:design-model` and incremental architect runs on an
-  existing app must skip it.
+  existing app skip it. If the name is already taken by another
+  account, `init_app` returns an error: go back to Phase 1 for a
+  different name. Only the app's owner can call the per-app tools
+  that follow.
 - Read `BOOTSTRAPP.md` and every `schemas/*.md` it references, then
   call `mcp__bootstrapp__add_object_class` once per row of the class
   registry — passing `appName` (from `BOOTSTRAPP.md`),
@@ -137,23 +140,26 @@ Hand back to the **`bootstrapp-architect`**. It will:
   `actionOutputObjectType`, and `scope` (capitalized to match the
   tool's enum: `Instance` / `Bulk` / `Class`). **`register_action`
   no longer takes `actionScript`** — the body is attached
-  separately in Phase 10 via `mcp__bootstrapp__update_action_script`,
+  separately in Phase 10 via `mcp__bootstrapp__replace_action_script`,
   after the architect has generated and saved the platform
   definitions file (Phase 8) so the scripter can draft against
   an up-to-date `scripts/platform.d.ts`.
-  **All `add_object_class` and `register_action` calls in this
-  phase are independent of each other and of class-to-class
-  dependencies — fire them in parallel.** The backend resolves
-  inheritance, embeddings, references, and action
-  input/output/target links after the fact, so order does not
-  matter; a class does not need to exist before another references
-  it, and an action does not need to wait for its target/input/output
-  classes.
-- Verify with `mcp__bootstrapp__get_object_classes` (and
-  `mcp__bootstrapp__get_namespaces` when you need to confirm
-  which namespaces exist) only after the parallel batch finishes.
-  `get_object_classes` returns the full schema of every class in
-  the namespace, so it doubles as a single-class inspector.
+  **Register in dependency waves, each wave in parallel.** An
+  embedded class used by `$ref` and a base class named in
+  `baseObjectType` must exist before the classes that use them
+  (the server checks the embedded target); the rest can go in
+  parallel. Register the actions in
+  one parallel batch once every class is in. `add_object_class`
+  refuses a class that already exists and `register_action` an
+  action name the class already has; if a retry hits that, switch
+  to `replace_object_class` / `replace_action` for that row.
+- Verify with `mcp__bootstrapp__get_object_class` (one class in
+  full) and `mcp__bootstrapp__get_actions` (the actions on a
+  target class) after the batches finish.
+  `mcp__bootstrapp__get_object_classes` lists only the class names
+  in a namespace.
+- Apply the Access section of `BOOTSTRAPP.md` (profiles, class and
+  action access, sign-in) as the architect's workflow describes.
 
 ## Phase 6 — Generate the OpenAPI spec
 
@@ -185,9 +191,9 @@ The architect calls
 `applicationName` set to the app name in `BOOTSTRAPP.md`. The
 tool returns a URL pointing at a freshly generated TypeScript
 declarations file for every runtime module currently available —
-including the typed `<app_name>.create__X` / `update__X` /
-`delete__X` / `filter__X` helpers for the app's classes (which
-exist because Phase 5 registered them). **The architect downloads
+including the typed `filter<Class>` / `create<Class>` /
+`update<Class>ById` functions for the app's top-level classes
+(which exist because Phase 5 registered them). **The architect downloads
 the file and saves it to `scripts/platform.d.ts`**, creating the
 `scripts/` folder if it does not exist. The platform definitions
 file must always live alongside the action scripts so the
@@ -209,8 +215,8 @@ confirmation, and writes one `scripts/<actionName>.ts` per action
 (parallel to `schemas/`) that links to each action's `.ts` file
 without embedding the body. These `.ts` files are the
 **server-side action bodies** that Phase 10 ships to the backend
-via `mcp__bootstrapp__update_action_script`. The scripter does
-not call any MCP tool that mutates the backend.
+via `mcp__bootstrapp__replace_action_script`. The scripter does
+not call the MCP server at all.
 
 Phases 7 (client generation), 8 (platform definitions),
 9 (scripter), and 10 (attach scripts) have only these ordering
@@ -225,16 +231,20 @@ canonical sequence shown is just a readable default.
 ## Phase 10 — Attach action scripts to the backend
 
 The `bootstrapp-architect` walks the action registry and calls
-`mcp__bootstrapp__update_action_script` once per action — passing
+`mcp__bootstrapp__replace_action_script` once per action — passing
 `fullObjectType` (the action's target class), `actionName`, and
 `actionScript` (the **full contents of `scripts/<actionName>.ts`,
 read verbatim**: the file already holds only the ApiScript body —
-its `import` statements plus the `execute` function — with no
-Markdown fences to strip). **Fire every `update_action_script`
-call in parallel** — they are independent of each other. Until a
-script is attached, the action endpoint exists in the OpenAPI spec
-but executing it is a no-op; this phase must therefore complete
-before the user invokes any action. If a
+its `import` statements, the `execute` function, and
+`return execute(input);` — with no Markdown fences to strip).
+**Fire every `replace_action_script` call in parallel** — they are
+independent of each other. The server type-checks each script and
+wires it so invoking the action runs it. A rejected script comes
+back with `Syntax`/`Type`/`Reference` errors and line/column and
+is not stored: show the errors, have `bootstrapp-action-scripter`
+fix the file, and attach it again. Until a script is accepted, the
+action endpoint exists in the OpenAPI spec but does nothing; this
+phase must therefore complete before the user invokes any action. If a
 `scripts/<actionName>.ts` file is missing for an action in the
 registry — or if the matching `scripts/<ActionsNamespace>.md`
 index is missing or out of sync — stop and re-invoke

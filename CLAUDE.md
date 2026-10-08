@@ -88,7 +88,8 @@ The three agents are intentionally separate and should stay that way:
   discovery, implementation, and iteration. Runs the upfront discovery
   exchange (clarifying scope, offering feedback), hands off to the schema
   architect, then to the action scripter, then drives the `bootstrapp`
-  MCP server to create classes from `BOOTSTRAPP.md` and register actions,
+  MCP server to add or replace classes and actions from `BOOTSTRAPP.md`
+  (and attach scripts, which the server type-checks), applies the Access section,
   invokes the [openapi-client-generator skill](./skills/openapi-client-generator/SKILL.md)
   to emit the typed client, scaffolds the UI app, wires auth, then starts
   the dev server and stays in chat to iterate with the user. Driven

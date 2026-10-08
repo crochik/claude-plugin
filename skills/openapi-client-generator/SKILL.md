@@ -24,8 +24,10 @@ only appear in the spec for classes and actions that have already been
 registered on bootstrapp.cloud. Before step 1:
 
 - Every class in `BOOTSTRAPP.md`'s class registry must have been
-  created via `mcp__bootstrapp__add_object_class` (verify with
-  `mcp__bootstrapp__get_object_classes`).
+  created via `mcp__bootstrapp__add_object_class` (or updated via
+  `mcp__bootstrapp__replace_object_class`; verify with
+  `mcp__bootstrapp__get_object_classes` for names and
+  `mcp__bootstrapp__get_object_class` for a class's shape).
 - Every action in the action registry must have been registered.
 
 If you skip this and call `mcp__bootstrapp__generate_openapi_spec`

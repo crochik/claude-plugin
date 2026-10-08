@@ -42,9 +42,14 @@ and that file; you produce one script file per actions namespace:
 
 The architect attaches each script to the backend by reading
 `scripts/<actionName>.ts` and passing its full contents verbatim to
-`mcp__bootstrapp__update_action_script` — `register_action` itself
+`mcp__bootstrapp__replace_action_script` — `register_action` itself
 does not take a script. You only author the files; the architect
-ships them.
+ships them. The server type-checks every script against the app's
+classes and the runtime modules before storing it, and rejects an
+invalid one with `Syntax`, `Type`, or `Reference` errors and a
+line/column. When that happens the architect hands the errors back
+to you: fix the named lines in the `.ts` file and return it — the
+stored script is unchanged until a valid version is accepted.
 
 Never modify `BOOTSTRAPP.md` or anything under `schemas/`. Schema changes go
 through the schema architect; you only consume the design.
@@ -65,8 +70,8 @@ treat them as authoritative:**
   `mcp__bootstrapp__generate_platform_definitions`. This surface is
   dynamic: it grows as classes are registered, and in particular
   the app's own namespace (with typed CRUD/filter functions per
-  object class — `create__X`, `update__X`, `delete__X`,
-  `filter__X`) only appears after the architect has registered
+  top-level class — such as `filter<Class>`, `create<Class>`,
+  `update<Class>ById`) only appears after the architect has registered
   every class and action and regenerated the file. Always read the
   on-disk copy at `scripts/platform.d.ts`; the membership and
   signatures are not stable across sessions, and there is **no**
@@ -99,17 +104,22 @@ A flat file in the `scripts/` folder named after the action, holding
 the ApiScript body **and nothing else** — no Markdown fences, no
 leading or trailing prose, no comments around the imports. The
 architect reads the file verbatim and passes its full contents to
-`mcp__bootstrapp__update_action_script`, so anything that isn't valid
-ApiScript breaks the deploy.
+`mcp__bootstrapp__replace_action_script`, and the server rejects
+anything that isn't valid ApiScript.
 
 ```typescript
-import * as app from "<app_name>";
+import * as app from "app.<app_name>";
+import * as actions from "app.<app_name>.actions";
 
 function execute(input: SubmitOrderInput): SubmitOrderOutput {
-  const found = app.filter__Order({
-    Conditions: [{ field: "Id", operator: "Eq", value: input.id }]
-  });
-  const order: Order = found.Items[0];
+  const found = app.filterOrder(
+    [{ field: "_id", operator: "Eq", value: input.id }],
+    ["_id", "status"]
+  );
+  if (found.length == 0) {
+    throw { code: "NOT_FOUND", message: "Order not found" };
+  }
+  const order: Order = found[0];
   if (order.status != "draft") {
     throw {
       code: "ORDER_NOT_DRAFT",
@@ -117,16 +127,26 @@ function execute(input: SubmitOrderInput): SubmitOrderOutput {
     };
   }
 
-  app.update__Order(order._id, { status: "submitted" });
+  app.updateOrderById(order._id, { status: "submitted" });
 
   return { success: true, orderId: order._id };
 }
+
+return execute(input);
 ```
 
-The exact module name, function names, request bodies, and
+The request body is the global `input`, and the action's result is
+the value of the script's top-level `return`. A declared
+`function execute(...)` is **not** called on its own, so every
+script ends with `return execute(input);`.
+
+The exact module names, function names, arguments, and
 response shapes are not invented — they come from
-`scripts/platform.d.ts` read at authoring time. The d.ts gains
-`module "<app_name>"` only after the architect has registered
+`scripts/platform.d.ts` read at authoring time (the example above
+uses the names the platform generates today: module = the class's
+namespace, `filter<Class>(conditions, fields, ...)` returning an
+array, `create<Class>`, `update<Class>ById`). The d.ts gains
+the app's own modules only after the architect has registered
 every class/action and called
 `mcp__bootstrapp__generate_platform_definitions` to regenerate
 the file.
@@ -155,8 +175,8 @@ embed the script body here.**
 - **Target:** `app.<app_name>`.Order *(instance scope)*
 - **Input class:** `app.<app_name>.actions`.SubmitOrderInput
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
-- **External functions used:** `<app_name>.filter__Order`,
-  `<app_name>.update__Order`
+- **External functions used:** `app.<app_name>.filterOrder`,
+  `app.<app_name>.updateOrderById`
 - **Script:** [submitOrder.ts](./submitOrder.ts)
 - **Notes:** Anything worth flagging for a reader — invariants
   enforced, multi-step ordering, side effects, follow-up actions to
@@ -199,7 +219,7 @@ filename, so the link is always `./<actionName>.ts`.
    instead of inventing a module name.
 
 5. **Indexed fields are load-bearing.** Every filter call (e.g.
-   `<app>.filter__<Class>`) you emit must restrict its `Conditions`
+   `app.filter<Class>`) you emit must restrict its conditions
    to properties listed in the target class's `indexedFields`
    registry entry. If the action needs a query on a non-indexed
    field, surface it as an open question instead of emitting a
@@ -224,9 +244,13 @@ filename, so the link is always `./<actionName>.ts`.
    call). Allowed forms are `number`, `string`, `boolean`, `any`,
    `T[]`, `Record<string, T>`, and `IDENTIFIER`. Use the
    unqualified class name as the type — `SubmitOrderInput`, not
-   `app.expense_tracker.actions.SubmitOrderInput` — because the
-   runtime infers the namespace from the action's registered
-   input/output classes. Generics other than `Record<string, T>`
+   `app.expense_tracker.actions.SubmitOrderInput`. A bare type name
+   resolves only against **imported** namespaces, so import the
+   actions namespace (`import * as actions from
+   "app.<app_name>.actions";`) whenever you annotate with its
+   input/output classes, and the domain namespace for domain
+   classes; the server's type check rejects an unresolved name.
+   Generics other than `Record<string, T>`
    are not supported.
 
 8. **Ask questions in plain text.** `AskUserQuestion` is not available
@@ -269,9 +293,9 @@ filename, so the link is always `./<actionName>.ts`.
    the architect after calling
    `mcp__bootstrapp__generate_platform_definitions` — is the
    authoritative list of runtime modules available to your
-   scripts, including the typed `<app_name>.create__X` /
-   `update__X` / `delete__X` / `filter__X` helpers for the app's
-   classes. If the file is missing, stop and ask the architect to
+   scripts, including the typed `filter<Class>` /
+   `create<Class>` / `update<Class>ById` functions for the app's
+   top-level classes. If the file is missing, stop and ask the architect to
    regenerate it; do not draft against guessed module names.
 
 7. **Draft each script.** For each action in scope, sketch the
@@ -279,8 +303,9 @@ filename, so the link is always `./<actionName>.ts`.
    `scripts/platform.d.ts` declares. Use the input's
    scope-required field (`input.id` or `input.ids`) as the entry
    point. Make every filter call honor the target class's indexed
-   fields. End with a `return` matching the output class's schema,
-   or with `throw { code, message }` on the abort paths.
+   fields. End `execute` with a `return` matching the output class's
+   schema, or with `throw { code, message }` on the abort paths, and
+   end the file with `return execute(input);`.
 
 8. **Present the drafts in chat — before writing.** For each action
    in scope, summarize in chat: name, the steps the script takes,
@@ -312,19 +337,19 @@ filename, so the link is always `./<actionName>.ts`.
    - No two `.ts` files in `scripts/` share a name (action-name
      collisions across namespaces must be surfaced, not silently
      overwritten).
-   - Each `.ts` file contains exactly one `execute` function plus its
-     `import * as X from "<m>";` statements — no Markdown, no extra
-     top-level code.
+   - Each `.ts` file contains its `import * as X from "<m>";`
+     statements, exactly one `execute` function, and a final
+     `return execute(input);` — no Markdown, no other top-level code.
    - Every `import * as X from "<m>";` statement in a `.ts` file
      matches the **External functions used** line in the matching
      index section.
    - Every imported module name is one the current
      `scripts/platform.d.ts` declares — no invented names.
-   - Every typed CRUD/filter call (`<app>.create__X`,
-     `<app>.update__X`, `<app>.delete__X`, `<app>.filter__X`)
+   - Every typed CRUD/filter call (`app.filter<Class>`,
+     `app.create<Class>`, `app.update<Class>ById`, ...)
      uses a function that exists in the app namespace as declared
      in the d.ts.
-   - Every filter call's `Conditions` hit only `indexedFields`
+   - Every filter call's conditions hit only `indexedFields`
      entries on the target class.
    - Every `execute` returns an object whose shape matches the
      declared output class, or aborts via
@@ -364,5 +389,6 @@ filename, so the link is always `./<actionName>.ts`.
 - Running, deploying, or otherwise executing the scripts you write.
   `bootstrapp-architect` ships them to the runtime by reading each
   `scripts/<actionName>.ts` and passing its contents verbatim to
-  `mcp__bootstrapp__update_action_script` as `actionScript` — you
-  only author the files.
+  `mcp__bootstrapp__replace_action_script` as `actionScript` — you
+  only author the files (and fix them when the server's type check
+  rejects one).

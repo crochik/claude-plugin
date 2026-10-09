@@ -212,6 +212,12 @@ for (const file of files) {
     if (!t[1].trim().startsWith("{")) report("warning", lineOf(t.index), "throw an object: { code: \"...\", message: \"...\" }");
   }
 
+  // transactions: an open one is aborted when the run ends, even on success
+  const begin = code.match(/\b\w+\.createTransaction\s*\(/);
+  if (begin && !/\b\w+\.commitTransaction\s*\(/.test(code)) {
+    report("error", lineOf(begin.index), "transaction is never committed; it is aborted when the script ends, discarding its writes. Call commitTransaction(t) before returning");
+  }
+
   problems.sort((a, b) => a.line - b.line);
   const errors = problems.filter((p) => p.level === "error").length;
   errorCount += errors;

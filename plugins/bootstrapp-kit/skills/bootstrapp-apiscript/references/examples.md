@@ -112,6 +112,37 @@ function execute(input: AddReviewInput): AddReviewOutput {
 return execute(input);
 ```
 
+## Several writes that must succeed together
+
+```ts
+import * as app from "app.shop";
+import * as actions from "app.shop.actions";
+import * as mongodb from "mongodb";
+
+function execute(input: PlaceOrderInput): PlaceOrderOutput {
+  const products = app.filterProduct([{ field: "_id", operator: "Eq", value: input.productId }], ["_id", "stock", "priceCents"]);
+  if (products.length == 0) {
+    throw { code: "NOT_FOUND", message: "Product not found" };
+  }
+  const product: Product = products[0];
+  if (product.stock < input.quantity) {
+    throw { code: "OUT_OF_STOCK", message: "Only " + product.stock + " left" };
+  }
+
+  const t = mongodb.createTransaction();
+  const orderId = app.createOrder({ productId: product._id, quantity: input.quantity, totalCents: product.priceCents * input.quantity }, t);
+  app.updateProductById(product._id, { stock: product.stock - input.quantity }, t);
+  mongodb.commitTransaction(t);
+
+  return { orderId: orderId };
+}
+
+return execute(input);
+```
+
+Without the transaction, a failure between the two writes would leave an
+order whose stock was never taken.
+
 ## Porting cheatsheet
 
 | Existing code | ApiScript |
@@ -124,4 +155,5 @@ return execute(input);
 | `x?.y` | `x != null ? x.y : null` |
 | `i++`, `n += 2` | `i = i + 1`, `n = n + 2` |
 | `try { … } catch { … }` | validate first, then `throw { code, message }` |
-| transaction | read and validate everything, then write; keep writes few |
+| `session.withTransaction(...)` / `BEGIN … COMMIT` | `const t = mongodb.createTransaction();`, pass `t` last to every write, `mongodb.commitTransaction(t);` before returning |
+| `ROLLBACK` on error | `throw { code, message }` before the commit (the open transaction is aborted) |

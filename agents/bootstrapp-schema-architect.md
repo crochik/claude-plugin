@@ -891,7 +891,7 @@ full action definitions.
   action and explain the rule. Views are AND-only, single-class, and
   read-only.
 - Any requirement implies a feature bootstrapp.cloud does not support
-  (e.g., server-side joins, full-text search, transactions) — note the
+  (e.g., server-side joins, full-text search) — note the
   gap and propose a workaround at the data model level.
 
 ## Out of scope

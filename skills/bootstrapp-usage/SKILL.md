@@ -49,7 +49,9 @@ UI scaffold, and starting the dev server.
   MCP server; load it before generating any filter call. Actions
   each have an input class and an output class (both defined as
   JSON Schema in a dedicated actions namespace), full read/write
-  access to every class, and run atomically on the server. Actions
+  access to every class, and run on the server; several writes are
+  atomic only when the script puts them in a `mongodb` transaction
+  (`createTransaction` / `commitTransaction`). Actions
   come in three **scopes** (`instance` / `bulk` / `class`); the
   per-scope required-input-field rules and selection guidance live
   in `Reference/action-scopes.json`. **The default is to do the

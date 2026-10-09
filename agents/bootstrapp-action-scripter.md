@@ -253,7 +253,67 @@ filename, so the link is always `./<actionName>.ts`.
    Generics other than `Record<string, T>`
    are not supported.
 
-8. **Ask questions in plain text.** `AskUserQuestion` is not available
+8. **Make multi-write actions atomic with a transaction.** Each
+   create / update / delete commits on its own, so a `throw` after
+   the first write leaves it behind. When an action writes more than
+   one document and the writes must land together, use the `mongodb`
+   module (confirm it is in `scripts/platform.d.ts`; it needs
+   BootstrApp PR #36, and without it fall back to "validate
+   everything, then write"):
+
+   ```typescript
+   import * as app from "app.<app_name>";
+   import * as actions from "app.<app_name>.actions";
+   import * as mongodb from "mongodb";
+
+   function execute(input: PlaceOrderInput): PlaceOrderOutput {
+     const products = app.filterProduct(
+       [{ field: "_id", operator: "Eq", value: input.productId }],
+       ["_id", "stock"]
+     );
+     if (products.length == 0) {
+       throw { code: "NOT_FOUND", message: "Product not found" };
+     }
+     const product: Product = products[0];
+     if (product.stock < input.quantity) {
+       throw { code: "OUT_OF_STOCK", message: "Not enough stock" };
+     }
+
+     const t = mongodb.createTransaction();
+     const orderId = app.createOrder({ productId: product._id, quantity: input.quantity }, t);
+     app.updateProductById(product._id, { stock: product.stock - input.quantity }, t);
+     mongodb.commitTransaction(t);
+
+     return { orderId: orderId };
+   }
+
+   return execute(input);
+   ```
+
+   - Pass `t` as the **last** argument of every `create<Class>`,
+     `update<Class>ById` and `delete<Class>ById` that belongs in it.
+     A write without `t` commits at once and is never rolled back.
+   - **Commit before returning.** A transaction still open when the
+     script ends is aborted, even on success, so a missing
+     `mongodb.commitTransaction(t)` silently discards the writes.
+   - A `throw` before the commit rolls the transaction back; no
+     `abortTransaction` needed. Use `mongodb.abortTransaction(t)` only
+     to undo the writes and still return normally.
+   - `filter<Class>` takes no transaction and sees only committed
+     data, not the transaction's own writes: read and validate
+     first, keep values in variables, then open the transaction and
+     write.
+   - Object events (flows) of writes in `t` fire after the commit,
+     never on abort. A committed or aborted `t` can't be reused.
+   - Calling another action does not join the transaction; call
+     writing actions after the commit, or inline their logic.
+   - A single write is already atomic; don't wrap it.
+
+   Note the transaction in the index's **Notes** line and list
+   `mongodb.createTransaction` / `mongodb.commitTransaction` under
+   **External functions used**.
+
+9. **Ask questions in plain text.** `AskUserQuestion` is not available
    inside subagents. List options inline ("approve script as drafted, or
    revise step N?") and let the user reply in chat.
 
@@ -354,6 +414,9 @@ filename, so the link is always `./<actionName>.ts`.
    - Every `execute` returns an object whose shape matches the
      declared output class, or aborts via
      `throw { code, message }`.
+   - Every `mongodb.createTransaction()` is followed by a
+     `mongodb.commitTransaction(t)` on every path that returns, and
+     every write meant to be atomic receives `t`.
 
    Report the touched paths back to the user (both the `.md`
    indexes and the per-action `.ts` files), plus any remaining open

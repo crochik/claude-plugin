@@ -72,12 +72,21 @@ what you are relying on from this page.
   the platform owner).
 - Functions per top-level class (module = the class's namespace):
   `filter<Class>(conditions, fields, orderBy?, reverseOrder?, top?, skip?)`
-  → array, `create<Class>(fields)` → new id, `update<Class>ById(id, fields)`
-  → boolean (partial update), `delete<Class>ById(id)`. Registered actions
-  are also callable, as `<actionName>(input)` in the input class's namespace.
-- `delete<Class>ById` is declared but at the time of writing the runtime
-  invoker has no delete branch, so it may do nothing. Prefer a status field
-  (soft delete) until confirmed.
+  → array, `create<Class>(fields, t?)` → new id,
+  `update<Class>ById(id, fields, t?)` → boolean (partial update),
+  `delete<Class>ById(id, t?)` → boolean. Registered actions are also
+  callable, as `<actionName>(input)` in the input class's namespace.
+- `delete<Class>ById` works since BootstrApp PR #36 (2026-10-09); before
+  that the invoker had no delete branch and it did nothing.
+- Transactions (PR #36): the `mongodb` module has `createTransaction()`,
+  `commitTransaction(t)` and `abortTransaction(t)`. Create, update and
+  delete take the transaction as an optional last argument. Writes in it and
+  their object events (flows) only take effect on commit. Every transaction
+  still open when the run ends is aborted, whether the script threw or
+  returned, so a script must commit before returning. `filter<Class>` takes
+  no transaction and doesn't see its uncommitted writes; update and delete
+  in the transaction do. Actions called from a script don't join it. How to
+  write one: the `bootstrapp-apiscript` skill, "Atomic writes".
 - Script filter operators: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. The REST
   filter endpoint documents `Exists` instead of `Nin`. Use what the `.d.ts`
   lists for scripts.

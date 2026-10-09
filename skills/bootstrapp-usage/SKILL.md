@@ -50,7 +50,7 @@ UI scaffold, and starting the dev server.
   each have an input class and an output class (both defined as
   JSON Schema in a dedicated actions namespace), full read/write
   access to every class, and run on the server; several writes are
-  atomic only when the script puts them in a `mongodb` transaction
+  atomic only when the script puts them in a `system.mongodb` transaction
   (`createTransaction` / `commitTransaction`). Actions
   come in three **scopes** (`instance` / `bulk` / `class`); the
   per-scope required-input-field rules and selection guidance live

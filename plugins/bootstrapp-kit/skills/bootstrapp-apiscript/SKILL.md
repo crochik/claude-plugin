@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-apiscript
-description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), and atomic multi-write scripts with mongodb transactions. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), and atomic multi-write scripts with system.mongodb transactions. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
 ---
 
 # Writing ApiScripts
@@ -78,7 +78,7 @@ For each top-level class `X` in namespace `ns` the profile can access:
 
 Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`.
 
-`t` is an optional transaction from the `mongodb` module, always the last
+`t` is an optional transaction from the `system.mongodb` module, always the last
 argument. `filterX` takes none.
 
 ## Atomic writes (transactions)
@@ -90,7 +90,7 @@ together or not at all, use a transaction:
 ```ts
 import * as app from "app.expense_tracker";
 import * as actions from "app.expense_tracker.actions";
-import * as mongodb from "mongodb";
+import * as mongodb from "system.mongodb";
 
 function execute(input: ApproveExpenseInput): ApproveExpenseOutput {
   // 1. read and validate everything
@@ -138,9 +138,11 @@ return execute(input);
   their own. Call writing actions after the commit, or inline their logic.
 - A single write doesn't need one. Open the transaction after the reads and
   keep it short.
-- It needs the `mongodb` module in `platform.d.ts` (BootstrApp PR #36,
-  2026-10-09). If it's missing after regenerating, the server is older: say
-  so, and order the script as validate everything, then write.
+- It needs the `system.mongodb` module in `platform.d.ts` (BootstrApp PRs #36
+  and #43). A server between those two declares it as plain `mongodb`;
+  import whichever name the file declares. If neither is there after
+  regenerating, the server is older: say so, and order the script as
+  validate everything, then write.
 
 ## Workflow
 
@@ -168,6 +170,6 @@ When migrating a handler from an existing backend, translate the logic, not
 the syntax: replace ORM queries with `filterX` calls on indexed fields,
 `async`/`await` with plain calls (calls are synchronous in scripts), `try`/
 `catch` with up-front checks and `throw`, database transactions with a
-`mongodb` transaction passed to every write (see Atomic writes), classes and closures with plain
+`system.mongodb` transaction passed to every write (see Atomic writes), classes and closures with plain
 functions, `for…of` with index loops, template strings with `+`. More
 examples: [references/examples.md](references/examples.md).

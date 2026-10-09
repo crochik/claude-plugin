@@ -78,7 +78,7 @@ what you are relying on from this page.
   callable, as `<actionName>(input)` in the input class's namespace.
 - `delete<Class>ById` works since BootstrApp PR #36 (2026-10-09); before
   that the invoker had no delete branch and it did nothing.
-- Transactions (PR #36): the `mongodb` module has `createTransaction()`,
+- Transactions (PR #36): the `system.mongodb` module has `createTransaction()`,
   `commitTransaction(t)` and `abortTransaction(t)`. Create, update and
   delete take the transaction as an optional last argument. Writes in it and
   their object events (flows) only take effect on commit. Every transaction
@@ -87,6 +87,9 @@ what you are relying on from this page.
   no transaction and doesn't see its uncommitted writes; update and delete
   in the transaction do. Actions called from a script don't join it. How to
   write one: the `bootstrapp-apiscript` skill, "Atomic writes".
+- The transaction module was named `mongodb` when PR #36 shipped and moved
+  under `system` in PR #43 (`import * as mongodb from "system.mongodb";`).
+  Use whichever name the app's `platform.d.ts` declares.
 - Script filter operators: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. The REST
   filter endpoint documents `Exists` instead of `Nin`. Use what the `.d.ts`
   lists for scripts.

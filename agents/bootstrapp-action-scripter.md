@@ -256,7 +256,7 @@ filename, so the link is always `./<actionName>.ts`.
 8. **Make multi-write actions atomic with a transaction.** Each
    create / update / delete commits on its own, so a `throw` after
    the first write leaves it behind. When an action writes more than
-   one document and the writes must land together, use the `mongodb`
+   one document and the writes must land together, use the `system.mongodb`
    module (confirm it is in `scripts/platform.d.ts`; it needs
    BootstrApp PR #36, and without it fall back to "validate
    everything, then write"):
@@ -264,7 +264,7 @@ filename, so the link is always `./<actionName>.ts`.
    ```typescript
    import * as app from "app.<app_name>";
    import * as actions from "app.<app_name>.actions";
-   import * as mongodb from "mongodb";
+   import * as mongodb from "system.mongodb";
 
    function execute(input: PlaceOrderInput): PlaceOrderOutput {
      const products = app.filterProduct(

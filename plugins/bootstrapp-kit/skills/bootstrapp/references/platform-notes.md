@@ -62,6 +62,13 @@ what you are relying on from this page.
   `generate_openapi_spec` also wires any stored scripts. On servers before
   PR #28, storing a script did not wire it: invoke one action through the
   generated client to confirm it runs, and tell the user if it doesn't.
+- `replace_action_script` takes `elevated` since BootstrApp PR #46. It sets
+  the runtime's `ElevateContext` on the script's flow step: the object
+  functions then run with an account-level context (no profile, so no
+  permissions or constraints) that keeps the caller as the actor;
+  `system.session` still reads the caller. Older servers ignore the
+  argument and every script runs with the caller's access. `get_actions`
+  shows `elevated` on servers that have it.
 
 ## Script runtime
 

@@ -78,6 +78,11 @@ function strip(value) {
 }
 
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
+
+// "elevated" in an action manifest goes to replace_action_script, not register_action,
+// so it is part of the script's hash and not the action's.
+const actionArgs = (data) => { const { elevated, ...rest } = strip(data); return rest; };
+const scriptHash = (text, action) => hash(action?.elevated === true ? `${text}\n// elevated` : text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
 
 function load() {
@@ -210,6 +215,8 @@ function check(state) {
     if (basename(file) !== `${action.actionName}.json`) warn(where, `file name should be ${action.actionName}.json`);
     if (!CAMEL.test(action.actionName)) warn(where, "actionName should be camelCase");
     if (!SCOPES.includes(action.scope)) error(where, `scope must be one of ${SCOPES.join(", ")}`);
+    if (action.elevated === undefined) warn(where, "elevated is not set; the script runs with the caller's access. Decide and set true or false (bootstrapp-apiscript skill, Elevated scripts)");
+    else if (typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
 
     const target = byName.get(action.fullObjectType);
     if (!target) warn(where, `target ${action.fullObjectType} has no local manifest`);
@@ -442,11 +449,14 @@ function diff(state) {
   for (const { data } of state.actions) {
     if (data.$error || !data.actionName) continue;
     const prev = ledger.actions[data.actionName];
-    items.push({ kind: "action", name: data.actionName, hash: hashJson(data), state: !prev ? "new" : prev.hash === hashJson(data) ? "applied" : "changed" });
+    const h = hashJson(actionArgs(data));
+    items.push({ kind: "action", name: data.actionName, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
   for (const script of state.scripts) {
     const prev = ledger.scripts[script.name];
-    items.push({ kind: "script", name: script.name, hash: hash(script.text), state: !prev ? "new" : prev.hash === hash(script.text) ? "applied" : "changed" });
+    const action = state.actions.find((a) => !a.data.$error && a.data.actionName === script.name)?.data;
+    const h = scriptHash(script.text, action);
+    items.push({ kind: "script", name: script.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
   const manifestItem = (kind, name, data, prev) => ({ kind, name, hash: hashJson(data), state: !prev ? "new" : prev.hash === hashJson(data) ? "applied" : "changed" });
   for (const { data } of state.profiles) {
@@ -502,7 +512,7 @@ function plan(state) {
   for (const item of items.filter((i) => i.kind === "action")) {
     const { data } = state.actions.find((a) => a.data.actionName === item.name);
     if (item.state === "new" || item.state === "changed") {
-      calls.push({ tool: item.state === "new" ? "register_action" : "replace_action", record: ["action", item.name], args: strip(data) });
+      calls.push({ tool: item.state === "new" ? "register_action" : "replace_action", record: ["action", item.name], args: actionArgs(data) });
     }
     registered.add(item.name);
   }
@@ -516,7 +526,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>` } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
   }
   for (const item of pending("auth")) {
     calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });

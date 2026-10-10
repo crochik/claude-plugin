@@ -129,7 +129,20 @@ filter calls." Reach for an action only when that default doesn't work.
 **Authorization is not a reason to design an action** — the backend
 enforces access rules on every object operation (CRUD, filter, *and*
 action) regardless of how it is invoked, so "the client shouldn't be
-trusted with this" is already handled by the platform.
+trusted with this" is already handled by the platform. The one
+exception is a controlled step a profile must not be able to do freely
+(bump a balance it can only read, approve another user's request):
+that is an **elevated** action whose script checks the caller itself.
+
+An action's script runs with the **caller's access** (their profile's
+permissions and constraints) unless the action is marked **elevated**,
+which makes its reads and writes ignore the caller's profile. Decide it
+per action from the Access section: elevated only when the action must
+read or write what the invoking profiles can't (a total or uniqueness
+check over records a constraint hides, a field or class they may only
+read such as a stock level or a balance, a controlled change to someone
+else's record). Everything else is not elevated. Never elevate to work
+around access a profile should simply be granted.
 
 The three action scopes (`instance` / `bulk` / `class`) and the
 required input-class field per scope are documented in
@@ -321,8 +334,10 @@ the schemas file in the same turn; never one without the other.
    - Every relation names real fields on real classes.
    - No circular embeddings (a class embedding itself transitively).
    - Every action targets a specific top-level class, declares a
-     scope (`instance` | `bulk` | `class`), and has an input class
-     and an output class.
+     scope (`instance` | `bulk` | `class`), has an input class
+     and an output class, and says whether it is elevated (`yes`
+     only when the Access section doesn't let its profiles do the
+     work, with the replacement checks in its description).
    - Every action's input class declares the field its scope requires,
      and only that one:
      - `instance` scope → required `id`
@@ -513,9 +528,15 @@ the schemas file in the same turn; never one without the other.
     field (`id` for instance, `ids` for bulk, neither for class), an
     **output class** (in the actions namespace) with its JSON
     Schema, and a one-paragraph description of what it does and
-    which invariants it enforces. Add the input and output classes
-    to the Classes section so they appear alongside the domain
-    model.
+    which invariants it enforces. Then decide whether it is
+    **elevated**: compare what the script must read and write with
+    what the profiles that run it are granted in the Access section.
+    Default to not elevated; mark it elevated only when those
+    profiles' access is not enough, and say in the description which
+    checks the script does in their place (for example "only the
+    expense's submitter may withdraw it"). Add the input and output
+    classes to the Classes section so they appear alongside the
+    domain model.
 
 12. **Present the proposed design — before writing anything.** Once you
     have a coherent draft in mind, lay it out for the user *in chat*, not
@@ -624,13 +645,15 @@ filter endpoints for top-level classes are generated automatically and
 are not listed. Full action definitions (description, example
 invocation) live in the actions namespace's schemas file. The Scope
 column is one of `instance` / `bulk` / `class` and dictates the
-required field on the input class (`id`, `ids`, or neither).
+required field on the input class (`id`, `ids`, or neither). The
+Elevated column is `yes` when the action's script ignores the caller's
+profile, `no` when it runs with the caller's access.
 
-| Action | Target | Scope | Input class | Output class | Summary |
-|---|---|---|---|---|---|
-| submitOrder        | `app.<app_name>`.Order     | instance | `app.<app_name>.actions`.SubmitOrderInput        | `app.<app_name>.actions`.SubmitOrderOutput        | Submits a drafted order.              |
-| approveExpenses    | `app.<app_name>`.Expense   | bulk     | `app.<app_name>.actions`.ApproveExpensesInput    | `app.<app_name>.actions`.ApproveExpensesOutput    | Approves several expenses at once.    |
-| importCustomersCsv | `app.<app_name>`.Customer  | class    | `app.<app_name>.actions`.ImportCustomersCsvInput | `app.<app_name>.actions`.ImportCustomersCsvOutput | Imports customers from a CSV file.    |
+| Action | Target | Scope | Input class | Output class | Elevated | Summary |
+|---|---|---|---|---|---|---|
+| submitOrder        | `app.<app_name>`.Order     | instance | `app.<app_name>.actions`.SubmitOrderInput        | `app.<app_name>.actions`.SubmitOrderOutput        | yes | Submits a drafted order.              |
+| approveExpenses    | `app.<app_name>`.Expense   | bulk     | `app.<app_name>.actions`.ApproveExpensesInput    | `app.<app_name>.actions`.ApproveExpensesOutput    | no  | Approves several expenses at once.    |
+| importCustomersCsv | `app.<app_name>`.Customer  | class    | `app.<app_name>.actions`.ImportCustomersCsvInput | `app.<app_name>.actions`.ImportCustomersCsvOutput | no  | Imports customers from a CSV file.    |
 
 ## Views
 
@@ -836,6 +859,11 @@ full action definitions.
     `minItems: 1`, `uniqueItems: true`).
   - `class` → neither `id` nor `ids`.
 - **Output class:** `app.<app_name>.actions`.<Name>Output
+- **Elevated:** `yes` | `no`. `no` runs the script with the caller's
+  access. `yes` makes it ignore the caller's profile; then say which
+  checks it does instead (e.g. "Member may only submit their own
+  drafts: the script checks `customerId` against the caller"). Passed
+  to the MCP server as `elevated` on `replace_action_script`.
 - **Example invocation:**
   ```json
   {

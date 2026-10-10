@@ -232,11 +232,14 @@ canonical sequence shown is just a readable default.
 
 The `bootstrapp-architect` walks the action registry and calls
 `mcp__bootstrapp__replace_action_script` once per action — passing
-`fullObjectType` (the action's target class), `actionName`, and
+`fullObjectType` (the action's target class), `actionName`,
 `actionScript` (the **full contents of `scripts/<actionName>.ts`,
 read verbatim**: the file already holds only the ApiScript body —
 its `import` statements, the `execute` function, and
-`return execute(input);` — with no Markdown fences to strip).
+`return execute(input);` — with no Markdown fences to strip), and
+`elevated` (`true` only when the registry's Elevated column says
+`yes`: the script then ignores the caller's profile and does its own
+checks; otherwise `false`, the caller's access).
 **Fire every `replace_action_script` call in parallel** — they are
 independent of each other. The server type-checks each script and
 wires it so invoking the action runs it. A rejected script comes

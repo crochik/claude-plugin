@@ -104,7 +104,7 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 | `register_action` | Register one action. Refuses a name the class already has. |
 | `replace_action` | Change a registered action's input/output classes, scope, summary, description. |
 | `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
-| `replace_action_script` | Validate a script on the server, then store it and wire it to run. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
+| `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated`. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
 | `get_action_script` | Read the script stored on an action. |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
 | `get_namespaces`, `get_object_classes` | List what exists (names only). |
@@ -156,7 +156,7 @@ and you can grep them when needed.
 When the state helper reports something changed after it was applied, `plan`
 lists the replace call for it:
 
-- **Script changed** → `replace_action_script` again.
+- **Script changed**, or its action's `elevated` → `replace_action_script` again.
 - **Action changed** → `replace_action`. It keeps the action's id and script.
 - **Class changed** → `replace_object_class`. Records already stored are not
   migrated: a removed property stays in old documents, and a new required

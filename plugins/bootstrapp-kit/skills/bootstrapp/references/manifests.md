@@ -133,16 +133,22 @@ Maps to `add_object_class` as: `appName` (from `app.json`),
   "actionDescription": "Marks a submitted expense approved and adds it to the submitter's monthly total in one step. Fails if the expense is not in the submitted state.",
   "scope": "Instance",
   "actionInputObjectType": "app.expense_tracker.actions.ApproveExpenseInput",
-  "actionOutputObjectType": "app.expense_tracker.actions.ApproveExpenseOutput"
+  "actionOutputObjectType": "app.expense_tracker.actions.ApproveExpenseOutput",
+  "elevated": true
 }
 ```
 
-Maps 1:1 to `register_action`. `scope` is `Instance` | `Bulk` | `Class`.
-The script is `scripts/<actionName>.ts` by convention; no field needed.
+Maps 1:1 to `register_action`, except `elevated`. `scope` is `Instance` |
+`Bulk` | `Class`. The script is `scripts/<actionName>.ts` by convention; no
+field needed. `elevated` (`true` | `false`) is sent with the script to
+`replace_action_script`: `false` runs it with the caller's access, `true`
+ignores the caller's profile (see the `bootstrapp-apiscript` skill). `check`
+warns when it is missing; changing it re-pushes the script, not the action.
 
 ## `scripts/<actionName>.ts`
 
-The ApiScript body sent verbatim as `replace_action_script.actionScript`. See
+The ApiScript body sent verbatim as `replace_action_script.actionScript`, with
+`elevated` from the action manifest. See
 the `bootstrapp-apiscript` skill.
 
 ## `profiles/<Profile>.json`

@@ -177,6 +177,7 @@ embed the script body here.**
 - **Output class:** `app.<app_name>.actions`.SubmitOrderOutput
 - **External functions used:** `app.<app_name>.filterOrder`,
   `app.<app_name>.updateOrderById`
+- **Elevated:** yes — checks the order belongs to the caller.
 - **Script:** [submitOrder.ts](./submitOrder.ts)
 - **Notes:** Anything worth flagging for a reader — invariants
   enforced, multi-step ordering, side effects, follow-up actions to
@@ -313,7 +314,50 @@ filename, so the link is always `./<actionName>.ts`.
    `mongodb.createTransaction` / `mongodb.commitTransaction` under
    **External functions used**.
 
-9. **Ask questions in plain text.** `AskUserQuestion` is not available
+9. **Write to the action's access level.** The Actions registry's
+   Elevated column (and the action's **Elevated** line in its schemas
+   file) says how the script runs; the schema architect decides it,
+   you don't change it.
+   - `no`: every `filter` / `create` / `update` / `delete` call runs
+     with the caller's access, so the profile's permissions and
+     constraints already apply. Don't re-check them. If the logic
+     needs data the invoking profiles can't read or write (per the
+     Access section), stop and raise it: the action probably needs
+     to be elevated, which is the schema architect's call.
+   - `yes`: those calls ignore the caller's profile and see every
+     record, hidden fields included. The script is the only guard,
+     so it does the checks the description names, and the ones the
+     profile's constraints would have done, using the caller's ids
+     from the `system.session` module (confirm it is in
+     `scripts/platform.d.ts`; if it isn't, raise it instead of
+     writing an unchecked elevated script):
+
+     ```typescript
+     import * as app from "app.<app_name>";
+     import * as actions from "app.<app_name>.actions";
+     import * as session from "system.session";
+
+     function execute(input: SubmitOrderInput): SubmitOrderOutput {
+       const found = app.filterOrder(
+         [{ field: "_id", operator: "Eq", value: input.id }],
+         ["_id", "customerId", "status"]
+       );
+       if (found.length == 0) {
+         throw { code: "NOT_FOUND", message: "Order not found" };
+       }
+       const order: Order = found[0];
+       // Member's "customerId Eq UserId" constraint doesn't apply here
+       if (order.customerId != session.getUserId()) {
+         throw { code: "NOT_FOUND", message: "Order not found" };
+       }
+       ...
+     }
+     ```
+
+     Return only fields the caller may see; elevated reads include
+     hidden ones. Note the checks on the index's **Elevated** line.
+
+10. **Ask questions in plain text.** `AskUserQuestion` is not available
    inside subagents. List options inline ("approve script as drafted, or
    revise step N?") and let the user reply in chat.
 
@@ -327,8 +371,8 @@ filename, so the link is always `./<actionName>.ts`.
 
 2. **Read the action registry.** Open `BOOTSTRAPP.md`. The Actions table
    names every action plus its target class, scope, input class, and
-   output class. Note the actions namespaces (the namespace column on
-   the input/output classes).
+   output class, and whether it is elevated. Note the actions
+   namespaces (the namespace column on the input/output classes).
 
 3. **Read each touched actions schemas file.** For every actions
    namespace that has at least one action you need to script, load
@@ -385,7 +429,8 @@ filename, so the link is always `./<actionName>.ts`.
    - For each touched actions namespace, create or update
      `scripts/<ActionsNamespace>.md` so it has one section per action
      in the namespace (in registry order) with target/scope, input
-     class, output class, external functions used, a `[<actionName>.ts](./<actionName>.ts)`
+     class, output class, elevated (and the checks an elevated script
+     does), external functions used, a `[<actionName>.ts](./<actionName>.ts)`
      link, and any notes. **Never embed the script body in the
      `.md`.**
 
@@ -417,6 +462,9 @@ filename, so the link is always `./<actionName>.ts`.
    - Every `mongodb.createTransaction()` is followed by a
      `mongodb.commitTransaction(t)` on every path that returns, and
      every write meant to be atomic receives `t`.
+   - Every elevated script checks the caller (via `system.session`)
+     before touching a record the invoking profiles couldn't, and
+     every non-elevated script stays within those profiles' access.
 
    Report the touched paths back to the user (both the `.md`
    indexes and the per-action `.ts` files), plus any remaining open

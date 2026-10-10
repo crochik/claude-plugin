@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-actions
-description: Decide whether a BootstrApp operation needs a server-side action, and define it - target class, scope (Instance/Bulk/Class), typed input and output classes, and registration. Use when the user needs an API operation beyond the auto-generated CRUD and filter endpoints, or when mapping an existing app's custom endpoints onto BootstrApp.
+description: Decide whether a BootstrApp operation needs a server-side action, and define it - target class, scope (Instance/Bulk/Class), typed input and output classes, whether its script runs elevated, and registration. Use when the user needs an API operation beyond the auto-generated CRUD and filter endpoints, or when mapping an existing app's custom endpoints onto BootstrApp.
 ---
 
 # Defining actions
@@ -28,7 +28,14 @@ Make it an action only when the client genuinely can't do it that way:
 
 Authorization is **not** a reason: the platform enforces group-based access
 on every CRUD, filter, and action call. If one of the generated endpoints
-already does the job, drop the action.
+already does the job, drop the action. The exception is a controlled step the
+caller's profile must not be able to do freely (bump a balance they can only
+read, approve someone else's request): that is an action whose script runs
+**elevated**, and it checks the caller itself.
+
+The two cases above that touch data the caller can't see or change need an
+elevated script too. Everything else runs with the caller's access; see
+"Elevated or the caller's access" in the `bootstrapp-apiscript` skill.
 
 When migrating, each custom endpoint of the old backend gets this test. Plain
 reads and writes map to the generated endpoints; the rest become actions.
@@ -44,6 +51,7 @@ reads and writes map to the generated endpoints; the rest become actions.
 | Output class | Embedded class in `app.<app>.actions`, named `<ActionName>Output`. Always a dedicated class, even for one value. |
 | `actionSummary` | 5–10 words; the action's label in API docs. |
 | `actionDescription` | 1–3 sentences: what it does, side effects, invariants it enforces, errors it throws. |
+| `elevated` | `false` (the script runs with the caller's access) unless it must read or write what the caller's profile doesn't allow; then `true`, and say in `actionDescription` what the script checks instead. Sent with the script, not with `register_action`. |
 
 Never reuse a domain class as an input or output. Payload classes describe a
 request/response, not a stored document.

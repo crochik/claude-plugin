@@ -26,7 +26,10 @@ matters, since **the server's copy wins**.
 
 The backend enforces all of it on every CRUD, filter and action call, so the
 client never needs actions "for security". The client should still hide
-controls a profile can't use.
+controls a profile can't use. Action scripts follow the same rules, except a
+script saved `elevated`, which ignores the caller's profile and does its own
+checks; when a profile is denied something only so an action can do it in a
+controlled way, that action is elevated (the `bootstrapp-apiscript` skill).
 
 ## Interview before writing anything
 

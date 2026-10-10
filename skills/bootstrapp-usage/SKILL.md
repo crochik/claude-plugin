@@ -63,7 +63,11 @@ UI scaffold, and starting the dev server.
   failure would corrupt state, or computations over data the
   client shouldn't or can't reasonably fetch. Authorization is
   **not** a reason — the backend enforces access rules on every
-  CRUD, filter, and action call equally.
+  CRUD, filter, and action call equally. An action's script runs
+  with the caller's access unless it is **elevated**, which is only
+  for work the caller's profile doesn't allow (a controlled change
+  to data they may only read, a check over records they can't see);
+  an elevated script checks the caller itself.
 - **Classes live in namespaces rooted at `app.<app_name>`.** The domain
   model sits under `app.<app_name>` and action I/O classes sit under
   `app.<app_name>.actions`. Reference classes in generated code with their
@@ -183,13 +187,16 @@ error.
 - **Read the backend:** `get_namespaces`, `get_object_classes` (class
   names in a namespace, no schemas), `get_object_class` (one class in
   full: type, base, indexed fields, foreign keys, OpenAPI schemas),
-  `get_actions` (a class's actions, whether each has a script, and who
-  can run it), `get_action_script`.
+  `get_actions` (a class's actions, whether each has a script, whether
+  it runs elevated, and who can run it), `get_action_script`.
 - **Change the model:** `init_app` (once per app), `add_object_class` /
   `replace_object_class` (no record migration; can't change
   TopLevel/Embedded), `register_action` / `replace_action`,
   `replace_action_script` (type-checks the script and wires it so the
-  action runs it; rejects invalid scripts with line/column errors).
+  action runs it; rejects invalid scripts with line/column errors;
+  `elevated` picks whether it runs with the caller's access or
+  ignores the caller's profile, as the registry's Elevated column
+  says).
   Nothing deletes a class or action.
 - **Access and sign-in:** `get_profiles`, `add_profile`,
   `replace_profile`, `remove_profile`, `get_class_access`,

@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-apiscript
-description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), and atomic multi-write scripts with system.mongodb transactions. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
 ---
 
 # Writing ApiScripts
@@ -144,6 +144,67 @@ return execute(input);
   regenerating, the server is older: say so, and order the script as
   validate everything, then write.
 
+## Elevated or the caller's access
+
+Every script is pushed with `elevated`, set in the action manifest
+(`"elevated": false` or `true`). Decide it for each action; don't copy it
+from another one.
+
+- **`false`, the caller's access.** `filterX`, `createX`, `updateXById` and
+  `deleteXById` run as the user who invoked the action, with their profile's
+  permissions and constraints. The script can't do anything the caller
+  couldn't do through the CRUD endpoints.
+- **`true`, elevated.** Those calls ignore the caller's profile: they see and
+  change every record of the app's classes, hidden fields and other users'
+  and organizations' records included. Writes are still attributed to the
+  caller, and `system.session` still returns the caller's ids.
+
+Pick `false` unless the action needs what the caller's profile doesn't give:
+
+- a total, count or uniqueness check over records the caller can't see (a
+  member who only sees their own expenses submits one against a team
+  budget);
+- a write to a class or field the caller may only read (a stock level, a
+  balance, a status only the action sets, an audit record);
+- a controlled change to someone else's record (accept an invite, approve a
+  request).
+
+If the action would run fine with the caller's access, it is `false`. A
+permission error a profile should allow is fixed with access (the
+`bootstrapp-access` skill), never by elevating.
+
+An elevated script is the only guard on what it touches, so it does the
+checks the profile would have done:
+
+```ts
+import * as app from "app.expense_tracker";
+import * as actions from "app.expense_tracker.actions";
+import * as session from "system.session";
+
+function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
+  const found = app.filterExpense([{ field: "_id", operator: "Eq", value: input.id }], ["_id", "submittedById", "status"]);
+  if (found.length == 0) {
+    throw { code: "NOT_FOUND", message: "Expense not found" };
+  }
+  const expense: Expense = found[0];
+  // the Member profile's "submittedById Eq UserId" constraint doesn't apply here
+  if (expense.submittedById != session.getUserId()) {
+    throw { code: "NOT_FOUND", message: "Expense not found" };
+  }
+  ...
+}
+```
+
+- Filter by the caller (`session.getUserId()`, `session.getOrganizationId()`)
+  wherever the profile has a constraint, and check state the profile's field
+  permissions would have protected.
+- Return only what the caller may see; elevated reads include hidden fields.
+- Who may run the action is still its action access (`access/actions/`),
+  elevated or not. Elevated actions are usually limited to the profiles
+  that need them.
+- Confirm `system.session` is in `platform.d.ts` before relying on it; if it
+  isn't, say so instead of elevating without the checks.
+
 ## Workflow
 
 1. Read the action manifest, its input/output class manifests, and the
@@ -158,7 +219,8 @@ return execute(input);
    transaction that is never committed. It is a lint,
    not the real type checker; fix what it reports, then reason through the
    rest.
-5. Push with `replace_action_script` (safe to repeat). The server type-checks
+5. Push with `replace_action_script` (safe to repeat), passing `elevated`
+   from the action manifest (`bootstrapp-state.mjs plan` fills it in). The server type-checks
    the script against the real classes and modules and returns errors with
    line and column instead of saving a broken script; fix and push again.
    Record it with `bootstrapp-state.mjs record script <actionName>`, then call

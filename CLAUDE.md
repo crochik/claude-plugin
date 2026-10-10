@@ -120,6 +120,13 @@ extending:
   fetch. Authorization is **not** a reason for an action — the
   backend enforces access rules on every CRUD, filter, and action
   call equally.
+- **Scripts run with the caller's access unless elevated.** Each
+  action is pushed with `replace_action_script(elevated)`. Elevated
+  (the script ignores the caller's profile) is only for steps the
+  invoking profiles must not do freely, and the script then checks
+  the caller via `system.session`. The schema architect decides it
+  (Elevated column in the Actions registry); the kit puts it in the
+  action manifest. Preserve this split when editing either plugin.
 - **Namespaces are load-bearing.** Domain model and action I/O classes live
   in separate namespaces, both rooted at `app.<app_name>` (the literal
   prefix `app.` followed by the app name); action payload classes are

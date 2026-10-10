@@ -26,7 +26,7 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
 5. If classes or actions were added, regenerate
    `bootstrapp/generated/platform.d.ts`, re-run the script check, then attach
    new or changed scripts with `replace_action_script` (reading each file
-   verbatim) and record them. If the server rejects a script, show its
+   verbatim, with `elevated` as `plan` lists it) and record them. If the server rejects a script, show its
    errors, fix the script, and push again.
 6. Before replacing a class, say what changes for records already stored
    (see "Changing things already applied" in the skill). Report blocked items.

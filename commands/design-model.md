@@ -91,7 +91,8 @@ document.
   scripts) → invoke the scripter to rewrite the affected
   `scripts/<actionName>.ts` files (and refresh the matching
   index) → architect reads each updated `.ts` file and calls
-  `replace_action_script` with its contents passed verbatim (the
+  `replace_action_script` with its contents passed verbatim and
+  `elevated` from the registry's Elevated column (the
   server type-checks it; on rejection the scripter fixes the
   reported lines and the architect retries). The
   scripter itself is design-only and never touches the backend,

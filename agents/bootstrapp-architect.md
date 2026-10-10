@@ -102,8 +102,8 @@ small, working slice and then iterating with the user.
    `mcp__bootstrapp__get_object_classes` with the namespace returns
    the class **names** there (not schemas), and
    `mcp__bootstrapp__get_actions` with a target class returns its
-   actions (name, scope, input/output, `hasScript`, and the profiles
-   that can run it). Use `mcp__bootstrapp__get_object_class` to read
+   actions (name, scope, input/output, `hasScript`, `elevated`, and the
+   profiles that can run it). Use `mcp__bootstrapp__get_object_class` to read
    one class in full (type, base class, indexed fields, foreign keys,
    and its OpenAPI schemas) when you need to compare it with the
    blueprint. Then:
@@ -187,10 +187,17 @@ small, working slice and then iterating with the user.
    per action, plus a thin `scripts/<ActionsNamespace>.md` index
    per namespace. Once the scripts exist on disk, attach each one
    with `mcp__bootstrapp__replace_action_script` — passing
-   `fullObjectType` (the action's target class), `actionName`, and
+   `fullObjectType` (the action's target class), `actionName`,
    `actionScript` (the **full contents of `scripts/<actionName>.ts`,
    read verbatim** — no fence stripping, no transformation; the file
-   already holds only the ApiScript body). **Fire every
+   already holds only the ApiScript body), and `elevated` (`true`
+   when the action's Elevated column in the registry says `yes`,
+   otherwise `false`). `elevated: false` runs the script with the
+   caller's access; `true` makes it ignore the caller's profile, so
+   it must do its own checks (the scripter writes them). The schema
+   architect decides it; if a registry has no Elevated column (an
+   older blueprint), send `false` and ask the schema architect to
+   add the column before changing any action. **Fire every
    `replace_action_script` call in parallel.** The server
    type-checks each script against the app's classes and runtime
    modules and wires it into the class's flow, so invoking the
@@ -207,7 +214,9 @@ small, working slice and then iterating with the user.
    before invoking any action.
 
    On an existing app, before overwriting a script, check
-   `get_actions` for `hasScript`. When the backend already has a
+   `get_actions` for `hasScript` and `elevated`. An `elevated` value
+   that differs from the registry is a change in what the action may
+   touch: tell the user before replacing it. When the backend already has a
    script and the local `scripts/<actionName>.ts` is missing or
    differs, fetch it with `mcp__bootstrapp__get_action_script` and
    show the user the difference before replacing it — someone may
@@ -418,11 +427,12 @@ small, working slice and then iterating with the user.
 10. **Attach action scripts to the backend.** Walk the action
     registry and call `mcp__bootstrapp__replace_action_script` once
     per action — passing `fullObjectType` (the target class),
-    `actionName`, and `actionScript` (the **full contents of
+    `actionName`, `actionScript` (the **full contents of
     `scripts/<actionName>.ts`, read verbatim**: the file already
     holds only the ApiScript body — its `import` statements, the
     `execute` function, and `return execute(input);` — with no
-    Markdown fences to strip). **Fire every `replace_action_script`
+    Markdown fences to strip), and `elevated` from the registry's
+    Elevated column (principle 6). **Fire every `replace_action_script`
     call in parallel.** If the server rejects a script, show the
     user its `Syntax`/`Type`/`Reference` errors, have
     `bootstrapp-action-scripter` fix the file, and attach it again

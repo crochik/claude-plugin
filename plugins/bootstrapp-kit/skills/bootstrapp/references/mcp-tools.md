@@ -64,7 +64,8 @@ action id and its script.
 ## `get_actions`
 
 `get_actions(fullObjectType)` → `{ objectClass, actions: [{ name, summary,
-description, inputObjectType, outputObjectType, scope, hasScript }] }`.
+description, inputObjectType, outputObjectType, scope, hasScript, elevated,
+profiles }] }`.
 
 ## `replace_action_script` (and `update_action_script`)
 
@@ -73,6 +74,7 @@ description, inputObjectType, outputObjectType, scope, hasScript }] }`.
 | `fullObjectType` | The action's target class. |
 | `actionName` | As registered. |
 | `actionScript` | The full ApiScript source. |
+| `elevated` | Required boolean. `false`: the script's reads and writes run with the caller's access. `true`: they ignore the caller's profile (permissions and constraints); writes are still attributed to the caller. Optional on `update_action_script`, where omitting it keeps the current setting. |
 
 Validates the script against the app's classes and the system modules
 (`input` is a global), and rejects it with `Syntax`/`Type`/`Reference` errors

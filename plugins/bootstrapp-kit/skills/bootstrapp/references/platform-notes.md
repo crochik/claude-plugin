@@ -59,8 +59,9 @@ what you are relying on from this page.
   name) turns it off. Search with the filter condition `{ field: "#text",
   operator: "Eq", value: "words" }`, in the REST filter and in scripts:
   whole words, any of them (OR); wrap the value in double quotes for a
-  phrase. Results then sort by relevance. Nothing changes the flag alone:
-  it goes through `replace_object_class` with the full class.
+  phrase. Results then sort by relevance. `set_class_full_text_search`
+  (PR #67) changes the flag alone; older servers need
+  `replace_object_class` with the full class.
 - **Property names that are ApiScript keywords** (`from`, `as`, `of`,
   `number`, `string`, `boolean`, `any`, `Record`, and `if`, `for`,
   `return`, `null`, …) can't be read or written by a script (`input.from`
@@ -98,10 +99,13 @@ what you are relying on from this page.
   permissions or constraints) that keeps the caller as the actor;
   `system.session` still reads the caller. Older servers ignore the
   argument and every script runs with the caller's access. `get_actions`
-  shows `elevated` on servers that have it. There is no call that changes
-  only the flag: `replace_action_script` sends the script again with it.
-- Nothing in MCP runs an action. Test one through the generated client (or
-  ask the user to), and read the error it returns.
+  shows `elevated` on servers that have it. To change only the flag, call
+  `update_action_script` with `elevated` and no `actionScript` (BootstrApp
+  PR #67); older servers need the script sent again.
+- `invoke_action(fullObjectType, actionName, input?, profileName?)`
+  (PR #66) runs the stored script as the app owner and returns its result
+  or the script error. Its writes are real. Without it, test through the
+  generated client (or ask the user to) and read the error it returns.
 
 ## Script runtime
 
@@ -223,15 +227,16 @@ missing; access can then only be set in the BootstrApp admin.
 ## MCP errors
 
 A tool error that the server didn't anticipate reaches you as
-`Tool '<name>' failed unexpectedly. See server logs.`, with no cause. Check
-the arguments against this page and the live schema, then ask the user to
-look at the server log; don't guess a cause.
+`Tool '<name>' failed unexpectedly`. Since PR #66 it carries the exception
+type and message; before that it had no cause. Check the arguments against
+this page and the live schema, then ask the user to look at the server log;
+don't guess a cause.
 
 ## Gaps (October 2026)
 
-No MCP tool runs an action, deletes a class or action, changes only the
-`elevated` or `isFullTextSearchable` flag, edits role access entries, or
-returns a compact `get_object_class`. Scripts are sent in full on every
-save. MCP sessions can drop when the server restarts, and a client may not
+No MCP tool deletes a class or action or edits role access entries.
+Servers without BootstrApp PRs #66 and #67 also lack `invoke_action`, the
+flag-only changes and `get_object_class(compact)`. Scripts are sent in full
+on every save. MCP sessions can drop when the server restarts, and a client may not
 pick up new tool parameters until it reconnects. If the user owns the
 platform, these are worth raising when a gap blocks them.

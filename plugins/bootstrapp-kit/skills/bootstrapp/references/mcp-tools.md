@@ -83,8 +83,18 @@ and line/column when invalid, leaving the stored script unchanged.
 Otherwise stores it and adds or updates the step that runs it when the action
 is invoked (top-level classes in `app.<app_name>` only). Safe to repeat.
 `update_action_script` is the older name; on servers before PR #28 it only
-stores the script. Both always need the full script: there is no call that
-changes only `elevated`.
+stores the script. On servers with PR #67, `update_action_script` without
+`actionScript` keeps the stored script, so it can change only `elevated`.
+
+## `invoke_action`
+
+`invoke_action(fullObjectType, actionName, input?, profileName?)` (BootstrApp
+PR #66) runs the action's stored script now, as the app owner, with the
+default profile's access or `profileName`'s, and returns the script's value
+or its error (line, source, call stack). Elevated actions still run
+elevated. It is a real run: writes change the app's data. Input is checked
+for required fields like an API call; an Instance action's object isn't
+loaded, so pass its `id` in `input`.
 
 ## `get_action_script`
 
@@ -93,7 +103,7 @@ Use it to pull scripts written elsewhere into `scripts/<actionName>.ts`.
 
 ## `get_object_class`
 
-`get_object_class(fullObjectType)` → `{ fullObjectType, type, baseObjectType,
+`get_object_class(fullObjectType, compact?)` → `{ fullObjectType, type, baseObjectType,
 label, description, indexedFields, foreignKeys: [{ localFieldName,
 referenceObjectType, referenceFieldName }], schemas }`.
 
@@ -108,7 +118,14 @@ manifest. Use it to adopt a class built elsewhere, or to compare the backend
 with `classes/<Class>.json`. The output is large (read, create and update
 schemas for the class and every class it relates to), so read the local
 manifest when there is one and call this only when it is missing or
-suspect.
+suspect. `compact: true` (PR #67) keeps only the class's read schema and
+the embedded and base classes it uses.
+
+## `set_class_full_text_search`
+
+`set_class_full_text_search(fullObjectType, isFullTextSearchable)` (PR #67)
+turns `#text` search on or off for a top-level class without sending the
+class again. Update the manifest's `isFullTextSearchable` to match.
 
 ## `get_namespaces` / `get_object_classes`
 
@@ -190,7 +207,7 @@ broke; apply the class's access files again after it.
 | Tool | Args | Notes |
 |---|---|---|
 | `get_users` | `appName`, `profileName?`, `search?` | Users holding a profile of the app: name, email, profile, organization, `active` / `invited` / `inactive`. |
-| `invite_user` | `appName`, `email`, `profileName`, `name?`, `organizationName?` | Creates an invitation (an inactive user with no sign-ins) that becomes the user on their first sign in with a provider that verifies the email, keeping the same id; if the account already has that email, sets their profile instead. Sends nothing and returns no id (`get_users` lists them; scripts get the id from `system.user.invite`). |
+| `invite_user` | `appName`, `email`, `profileName`, `name?`, `organizationName?` | Creates an invitation (an inactive user with no sign-ins) that becomes the user on their first sign in with a provider that verifies the email, keeping the same id; if the account already has that email, sets their profile instead. Sends nothing. Reports the user id since PR #67 (`system.user.invite` returns it in scripts). |
 | `assign_user_profile` | `appName`, `email`, `profileName` | Applies from the next sign in. |
 | `remove_user_access` | `appName`, `email` | Removes the app from the user; the user stays in the account. Refuses the caller. |
 | `set_user_organization` | `appName`, `email`, `organizationName` | |

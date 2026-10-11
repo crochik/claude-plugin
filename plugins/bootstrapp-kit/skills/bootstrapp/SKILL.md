@@ -116,7 +116,7 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 | `get_class_access`, `replace_class_access`, `remove_class_access`, `replace_action_access` | What a profile may do and see. |
 | `get_app_auth`, `replace_app_auth`, `add_oidc_client_origin` | Sign-in providers, sign-up, browser origins. |
 | `get_users`, `invite_user`, `assign_user_profile`, `remove_user_access`, `get_organizations`, `add_organization`, `set_user_organization` | People. They change real access: confirm each call. |
-| `get_buckets`, `add_bucket`, `update_bucket`, `get_folders`, `create_folder` | Where `system.files` stores files. Bucket keys come from the person; confirm before adding or changing a bucket. |
+| `get_buckets`, `add_bucket`, `update_bucket`, `get_folders`, `create_folder`, `get_folder_access`, `replace_folder_access` | Where `system.files` stores files. Bucket keys come from the person; confirm before adding or changing a bucket. |
 
 Only the app's owner can call the tools that take an app (or a class or
 action of it); see the `bootstrapp-access` skill for the access tools.

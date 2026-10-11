@@ -157,14 +157,15 @@ what you are relying on from this page.
   urls (S3). How to use it: the `bootstrapp-apiscript` skill, "Uploading
   files".
 - Buckets and folders (PR #69): the MCP tools `get_buckets`, `add_bucket`,
-  `update_bucket`, `get_folders` and `create_folder` manage them, and
+  `update_bucket`, `get_folders`, `create_folder`, `get_folder_access` and
+  `replace_folder_access` manage them, and
   `system.files.createFolder(parentFolderId, path)` makes subfolders that
   copy the parent's upload permissions. Buckets have no permissions of
   their own. A folder's uploaders are app profiles (by id) plus the Admin
   role, which elevated scripts run as. Folders made before PR #69 (or
   through PI.Files) have no permissions, so nobody can upload to them
-  through `system.files` until `create_folder` is run for them with
-  `uploadProfiles`.
+  through `system.files` until `create_folder` or `replace_folder_access`
+  is run for them.
 - A failing script reports the line, column and source line where it
   failed, plus the call stack when it failed inside a function (PRs #53,
   #54). A server without them reports the script's last line

@@ -246,7 +246,10 @@ function execute(req: StartUploadInput): StartUploadOutput {
 return execute(input);
 ```
 
-- `create(folderId, name, contentType?)` returns `{ id, name, uploadUrl }`.
+- `create(folderId, name, contentType?, downloadProfiles?)` returns
+  `{ id, name, uploadUrl }`. `downloadProfiles` lists the profiles (names
+  or ids, from `profiles/`) that may also download the file; the caller
+  always may.
   The client `PUT`s the raw bytes to `uploadUrl` (no auth header), which
   expires 10 minutes after it is created. The `Content-Type` header of that
   `PUT` is what the confirm stores, so the client sends the real one.
@@ -269,11 +272,15 @@ return execute(input);
 - The caller needs upload access to the folder. In an elevated script the
   account's access is checked instead, and the file then belongs to the
   account: the caller can't confirm or download it through REST, so
-  confirm with `confirmUpload` from an elevated action too.
-- Only the user who created the file (or an account admin) can read it back
-  (`GET /files/api/File({id})/Download`, which redirects to a short-lived
-  url). No script function returns a download url, so files other users
-  must open are a gap to raise with the platform owner.
+  confirm with `confirmUpload` from an elevated action too, and pass
+  `downloadProfiles` so the caller's profile can read it.
+- `files.getDownloadUrl(fileId)` returns `{ id, name, contentType,
+  downloadUrl }`, a presigned `GET` url valid for 10 minutes. It needs read
+  access to the file (its creator or a listed download profile), or an
+  elevated script; an elevated script checks the caller via
+  `system.session` before returning the url, since the url needs no token.
+  Clients can also use `GET /files/api/File({id})/Download` with their
+  token under the same rule.
 
 ## Workflow
 

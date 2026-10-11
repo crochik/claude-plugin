@@ -88,8 +88,9 @@ File bytes never go through an action. When the app uploads files:
    or call the confirm action if the app has one.
 
 Show the file later through `GET /files/api/File({id})/Download` with the
-user's token; it redirects to a short-lived url. Only the user who
-uploaded the file may read it.
+user's token (it redirects to a short-lived url), or through an action
+whose script returns `files.getDownloadUrl(id)`. Only the uploader and the
+profiles the upload action listed in `downloadProfiles` may read it.
 
 ## Named views
 

@@ -156,6 +156,11 @@ what you are relying on from this page.
   account's Admin role gets them instead. The bucket must support presigned
   urls (S3). How to use it: the `bootstrapp-apiscript` skill, "Uploading
   files".
+- Downloads (PR #70): `create` takes `downloadProfiles` (profile names or
+  ids), which get Read on the file. `getDownloadUrl(fileId)` returns
+  `{ id, name, contentType, downloadUrl }`, a presigned `GET` valid for 10
+  minutes, when the caller has Read on the file, the file allows anonymous
+  download, the caller uploaded it, or the script is elevated.
 - Buckets and folders (PR #69): the MCP tools `get_buckets`, `add_bucket`,
   `update_bucket`, `get_folders`, `create_folder`, `get_folder_access` and
   `replace_folder_access` manage them (buckets are added without
@@ -258,8 +263,9 @@ don't guess a cause.
 
 No MCP tool deletes a class or action or edits role access entries.
 Servers without BootstrApp PR #69 have no bucket or folder tools, so a
-script's folder id comes from the user. Only a file's creator can download it
-(no script function returns a download url), and servers without
+script's folder id comes from the user. Servers without PR #70 let only a
+file's creator download it (no `downloadProfiles` or `getDownloadUrl`), and
+servers without
 BootstrApp PR #68 fail `invoke_action` on scripts that import
 `system.files` (the action itself runs them).
 Servers without BootstrApp PRs #66 and #67 also lack `invoke_action`, the

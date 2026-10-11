@@ -4,17 +4,12 @@ A Claude Code plugin (whose skills also work in other agent harnesses) for
 building apps on the [BootstrApp](https://bootstrapp.cloud) PaaS, or moving an
 existing app's backend onto it.
 
-It is the successor experiment to the `bootstrapp` plugin at the root of this
-repository. Same platform, different approach:
-
-| | `bootstrapp` (original) | `bootstrapp-kit` |
-|---|---|---|
-| Entry | `/bootstrapp:new-app` runs a fixed 12-phase flow from an empty folder | Any command or plain request, from any state; nothing is required to run first |
-| Existing apps | Refuses non-empty folders without `BOOTSTRAPP.md` | First-class: `/bootstrapp-kit:migrate` inventories the codebase and plans slices |
-| Source of truth | Markdown blueprint (`BOOTSTRAPP.md` + `schemas/*.md`) | JSON manifests that are the exact MCP tool arguments, plus an `applied.json` ledger |
-| Knowledge | Mostly inside agent prompts | In skills (portable), with agents as optional helpers |
-| Checks | Manual checklists | `bootstrapp-state.mjs` (manifests, diff, sync plan) and `check-apiscript.mjs` (script lint against `platform.d.ts`) |
-| Script runtime | `function execute` only | Matches the runtime: `input` global, `return execute(input);` |
+It replaces the original `bootstrapp` plugin that used to live at the root of
+this repository: no fixed flow, works from any state (empty repo, existing
+codebase, half-applied app), keeps the app record as JSON manifests that are
+the exact MCP tool arguments, and puts its knowledge in portable skills.
+`/bootstrapp-kit:new-app` is the guided path for a brand-new app, from intake
+to a running UI.
 
 ## What's inside
 
@@ -32,9 +27,9 @@ agents/
   bootstrapp-modeler             drafts class/action manifests
   bootstrapp-script-author       writes/ports ApiScripts
 commands/
-  /bootstrapp-kit:status   /bootstrapp-kit:init     /bootstrapp-kit:model
-  /bootstrapp-kit:action   /bootstrapp-kit:sync     /bootstrapp-kit:client
-  /bootstrapp-kit:migrate  /bootstrapp-kit:access
+  /bootstrapp-kit:new-app  /bootstrapp-kit:status   /bootstrapp-kit:init
+  /bootstrapp-kit:model    /bootstrapp-kit:action   /bootstrapp-kit:sync
+  /bootstrapp-kit:client   /bootstrapp-kit:migrate  /bootstrapp-kit:access
 ```
 
 The commands are shortcuts. Asking in plain words ("add an approval action
@@ -49,9 +44,6 @@ skills.
 ```
 
 Or from a checkout: `claude --plugin-dir ./plugins/bootstrapp-kit`.
-
-Install either this plugin or the original one in a session, not both: both
-bundle the `bootstrapp` MCP server and their guidance differs.
 
 The helper scripts need Node 18+. The first MCP call opens a browser to log
 in to BootstrApp.

@@ -86,8 +86,9 @@ Other system modules, when `platform.d.ts` declares them:
 also in elevated scripts) and `system.user` (`invite(email, profile,
 name?, organizationId?)` → user id; check who the caller is before
 inviting from an elevated script, and pick the profile in the script)
-and `system.files` (`create(folderId, name, contentType?)` and
-`confirmUpload(id)`, see Uploading files).
+and `system.files` (`create(folderId, name, contentType?)`,
+`confirmUpload(id)` and `createFolder(parentFolderId, path)`, see
+Uploading files).
 
 Strings have no methods (`trim`, `toLowerCase`, `split`, …): have the
 caller send normalized values. Property names that are keywords (`from`,
@@ -255,10 +256,14 @@ return execute(input);
   `{ id, name, contentType, size }`. An unconfirmed file has no size.
 - Keep the file id on the domain object it belongs to (a string field such
   as `attachmentFileId`), in the same action or after the confirm.
-- The folder id comes from the account's file setup (a folder on a bucket
-  that supports presigned urls, such as S3). No MCP tool lists or creates
-  folders: ask the user for the id, and keep it in the script, not in
-  `input`.
+- The folder comes from the MCP tools: `get_buckets` (or `add_bucket`,
+  with S3 keys the person gives you), then `create_folder` with the
+  profiles that may upload, and `get_folders` for its id. Keep the id in
+  the script, not in `input`, and never write the bucket keys anywhere.
+- `files.createFolder(parentFolderId, path)` makes folders below that one
+  (`"invoices/2026"`, existing levels reused) and returns
+  `{ id, name, path }`. New folders get the parent's upload permissions,
+  and it needs the same upload access as `create`.
 - The caller needs upload access to the folder. In an elevated script the
   account's access is checked instead, and the file then belongs to the
   account: the caller can't confirm or download it through REST, so

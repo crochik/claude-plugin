@@ -156,6 +156,15 @@ what you are relying on from this page.
   account's Admin role gets them instead. The bucket must support presigned
   urls (S3). How to use it: the `bootstrapp-apiscript` skill, "Uploading
   files".
+- Buckets and folders (PR #69): the MCP tools `get_buckets`, `add_bucket`,
+  `update_bucket`, `get_folders` and `create_folder` manage them, and
+  `system.files.createFolder(parentFolderId, path)` makes subfolders that
+  copy the parent's upload permissions. Buckets have no permissions of
+  their own. A folder's uploaders are app profiles (by id) plus the Admin
+  role, which elevated scripts run as. Folders made before PR #69 (or
+  through PI.Files) have no permissions, so nobody can upload to them
+  through `system.files` until `create_folder` is run for them with
+  `uploadProfiles`.
 - A failing script reports the line, column and source line where it
   failed, plus the call stack when it failed inside a function (PRs #53,
   #54). A server without them reports the script's last line
@@ -246,8 +255,8 @@ don't guess a cause.
 ## Gaps (October 2026)
 
 No MCP tool deletes a class or action or edits role access entries.
-No MCP tool lists or creates file buckets and folders, so a script's
-folder id comes from the user. Only a file's creator can download it
+Servers without BootstrApp PR #69 have no bucket or folder tools, so a
+script's folder id comes from the user. Only a file's creator can download it
 (no script function returns a download url), and servers without
 BootstrApp PR #68 fail `invoke_action` on scripts that import
 `system.files` (the action itself runs them).

@@ -213,3 +213,18 @@ broke; apply the class's access files again after it.
 | `set_user_organization` | `appName`, `email`, `organizationName` | |
 | `get_organizations` | `appName`, `search?` | Every organization in the account, with how many of the app's users are in each. |
 | `add_organization` | `appName`, `name`, `email?`, `phone?` | Names are unique in the account. |
+
+### File buckets and folders (BootstrApp PR #69)
+
+Owner only, like the tools above. Buckets and folders belong to the account
+and are shared by its apps. Buckets take an id or a name. Only S3 buckets can
+be added, since `system.files` needs presigned urls.
+
+| Tool | Args | Notes |
+|---|---|---|
+| `get_buckets` | `appName` | Id, name, provider, S3 bucket name, `supportsUploadUrls`. Never the keys. |
+| `add_bucket` | `appName`, `name`, `remoteName`, `accessKey`, `secretKey` | `remoteName` is the S3 bucket. The key needs `s3:PutObject` and `s3:GetObject` on it. The secret is stored encrypted. Ask the person for the keys and never write them to the repo. |
+| `update_bucket` | `appName`, `bucket`, `name?`, `remoteName?`, `accessKey?`, `secretKey?` | Changes only what is given. Changing `remoteName` doesn't move stored files. |
+| `get_folders` | `appName`, `bucket?` | Id, name, path, bucket and `uploaders` (profile names, plus `elevated scripts`). The id is what `system.files.create` takes. |
+| `create_folder` | `appName`, `bucket`, `path`, `uploadProfiles?` | Creates the missing levels of `path` (`uploads/invoices`) and returns the folder id. `uploadProfiles` are the profiles that may upload to it: all of the app's when omitted, none (only elevated scripts) for `[]`. Elevated scripts always may. Passing it for an existing folder replaces its list. |
+

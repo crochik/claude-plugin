@@ -165,8 +165,12 @@ what you are relying on from this page.
   `update_bucket`, `get_folders`, `create_folder`, `get_folder_access` and
   `replace_folder_access` manage them (buckets are added without
   credentials; the platform owner sets keys outside MCP), and
-  `system.files.createFolder(parentFolderId, path)` makes subfolders that
-  copy the parent's upload permissions. Buckets have no permissions of
+  `system.files.createFolder` makes subfolders that copy the parent's
+  upload permissions. Since PR #71, `create(bucket, path, name, ...)` and
+  `createFolder(bucket, path)` take a bucket name or id and a folder path
+  instead of folder ids, creating missing levels under the deepest
+  existing folder (servers without it take `create(folderId, name, ...)`
+  and `createFolder(parentFolderId, path)`). Buckets have no permissions of
   their own. A folder's uploaders are app profiles (by id) plus the Admin
   role, which elevated scripts run as. Folders made before PR #69 (or
   through PI.Files) have no permissions, so nobody can upload to them

@@ -86,8 +86,9 @@ Other system modules, when `platform.d.ts` declares them:
 also in elevated scripts) and `system.user` (`invite(email, profile,
 name?, organizationId?)` → user id; check who the caller is before
 inviting from an elevated script, and pick the profile in the script)
-and `system.files` (`create(folderId, name, contentType?)`,
-`confirmUpload(id)` and `createFolder(parentFolderId, path)`, see
+and `system.files` (`create(bucket, path, name, contentType?,
+downloadProfiles?)`, `confirmUpload(id)`, `getDownloadUrl(id)` and
+`createFolder(bucket, path)`, see
 Uploading files).
 
 Strings have no methods (`trim`, `toLowerCase`, `split`, …): have the
@@ -238,16 +239,19 @@ function execute(req: StartUploadInput): StartUploadOutput {
   if (req.fileName == null || req.fileName == "") {
     throw { code: "NAME_REQUIRED", message: "fileName is required" };
   }
-  // the folder is app configuration, never taken from input
-  const file = files.create("<folder-id>", req.fileName, req.contentType);
+  // bucket and folder are app configuration, never taken from input
+  const file = files.create("<bucket>", "attachments/2026", req.fileName, req.contentType);
   return { fileId: file.id, uploadUrl: file.uploadUrl };
 }
 
 return execute(input);
 ```
 
-- `create(folderId, name, contentType?, downloadProfiles?)` returns
-  `{ id, name, uploadUrl }`. `downloadProfiles` lists the profiles (names
+- `create(bucket, path, name, contentType?, downloadProfiles?)` returns
+  `{ id, name, uploadUrl }`. `bucket` is the bucket's name or id, `path`
+  the folder's path in it; missing levels are created under the deepest
+  existing folder and copy its upload permissions, but the first level
+  must exist. `downloadProfiles` lists the profiles (names
   or ids, from `profiles/`) that may also download the file; the caller
   always may.
   The client `PUT`s the raw bytes to `uploadUrl` (no auth header), which
@@ -262,14 +266,13 @@ return execute(input);
 - The folder comes from the MCP tools: `get_buckets` (or `add_bucket`,
   which adds it without credentials; the platform owner sets the keys
   outside MCP and `hasCredentials` turns true), then `create_folder` with the
-  profiles that may upload (`replace_folder_access` changes them later),
-  and `get_folders` for its id. Keep the id in
-  the script, not in `input`. Never ask for bucket keys.
-- `files.createFolder(parentFolderId, path)` makes folders below that one
-  (`"invoices/2026"`, existing levels reused) and returns
-  `{ id, name, path }`. New folders get the parent's upload permissions,
-  and it needs the same upload access as `create`.
-- The caller needs upload access to the folder. In an elevated script the
+  profiles that may upload (`replace_folder_access` changes them later)
+  for the top folder. Keep the bucket and path in the script, not in
+  `input`. Never ask for bucket keys.
+- `files.createFolder(bucket, path)` makes the folders without a file and
+  returns `{ id, name, path }`.
+- The caller needs upload access to the folder (the deepest existing one
+  when levels are created). In an elevated script the
   account's access is checked instead, and the file then belongs to the
   account: the caller can't confirm or download it through REST, so
   confirm with `confirmUpload` from an elevated action too, and pass

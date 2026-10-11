@@ -224,7 +224,7 @@ be added, since `system.files` needs presigned urls.
 |---|---|---|
 | `get_buckets` | `appName` | Id, name, provider, S3 bucket name, `supportsUploadUrls`, `hasCredentials`. Never the keys. |
 | `add_bucket` | `appName`, `name`, `remoteName` | `remoteName` is the S3 bucket. Added without credentials: no tool takes keys, so they never pass through the model. The platform owner sets them outside MCP (a key with `s3:PutObject` and `s3:GetObject`); until then `create_folder` refuses the bucket. |
-| `update_bucket` | `appName`, `bucket`, `name?`, `remoteName?` | Changes only what is given, never credentials. Changing `remoteName` doesn't move stored files. |
+| `update_bucket` | `appName`, `bucket`, `name?`, `remoteName?` | Changes only what is given. Changing `remoteName` clears the bucket's credentials (the platform owner sets new ones outside MCP) and doesn't move stored files. |
 | `get_folders` | `appName`, `bucket?` | Id, name, path, bucket and `uploaders` (profile names, plus `elevated scripts`). The id is what `system.files.create` takes. |
 | `create_folder` | `appName`, `bucket`, `path`, `uploadProfiles?` | Creates the missing levels of `path` (`uploads/invoices`) and returns the folder id. `uploadProfiles` are the profiles that may upload to new folders: all of the app's when omitted, none (only elevated scripts) for `[]`. Elevated scripts always may. An existing folder keeps its permissions unless it has none. |
 | `get_folder_access` | `appName`, `folder`, `bucket?` | `folder` is an id or a path (`bucket` when the path is in several buckets). Returns `uploadProfiles`, `elevatedScripts` and `otherEntries` (other apps' profiles, users, roles). |

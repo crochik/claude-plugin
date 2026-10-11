@@ -257,10 +257,11 @@ return execute(input);
 - Keep the file id on the domain object it belongs to (a string field such
   as `attachmentFileId`), in the same action or after the confirm.
 - The folder comes from the MCP tools: `get_buckets` (or `add_bucket`,
-  with S3 keys the person gives you), then `create_folder` with the
+  which adds it without credentials; the platform owner sets the keys
+  outside MCP and `hasCredentials` turns true), then `create_folder` with the
   profiles that may upload (`replace_folder_access` changes them later),
   and `get_folders` for its id. Keep the id in
-  the script, not in `input`, and never write the bucket keys anywhere.
+  the script, not in `input`. Never ask for bucket keys.
 - `files.createFolder(parentFolderId, path)` makes folders below that one
   (`"invoices/2026"`, existing levels reused) and returns
   `{ id, name, path }`. New folders get the parent's upload permissions,

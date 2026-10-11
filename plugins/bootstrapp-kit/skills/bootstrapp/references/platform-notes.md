@@ -158,7 +158,8 @@ what you are relying on from this page.
   files".
 - Buckets and folders (PR #69): the MCP tools `get_buckets`, `add_bucket`,
   `update_bucket`, `get_folders`, `create_folder`, `get_folder_access` and
-  `replace_folder_access` manage them, and
+  `replace_folder_access` manage them (buckets are added without
+  credentials; the platform owner sets keys outside MCP), and
   `system.files.createFolder(parentFolderId, path)` makes subfolders that
   copy the parent's upload permissions. Buckets have no permissions of
   their own. A folder's uploaders are app profiles (by id) plus the Admin

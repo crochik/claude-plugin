@@ -240,8 +240,8 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
    the script against the real classes and modules and returns errors with
    line and column instead of saving a broken script; fix and push again.
    Record it with `bootstrapp-state.mjs record script <actionName>`, then call
-   the action once through the client, or ask the user to, to see it run
-   (no MCP tool runs an action). A runtime error names the line and the
+   it once with `invoke_action` (real writes; pick input that is safe to
+   create), or through the client on servers without that tool. A runtime error names the line and the
    call stack; on an older server it names the last line, so throw
    `{ code, message }` with distinct messages to find the spot.
 

@@ -48,6 +48,25 @@ what you are relying on from this page.
   `number`, `boolean`, arrays of strings/numbers/objects, string arrays with
   `enum` (multi-select), objects. `anyOf`/`oneOf` with more than one branch is rejected. Formats
   `byte`/`binary` are not supported.
+- **`integer` is 32-bit signed** whatever `minimum`/`maximum`/`format`
+  say (it is stored as an Int32). Values beyond ±2,147,483,647, such as
+  ARGB colors or byte counts, need a string (hex for colors) or `number`.
+  `bootstrapp-state.mjs check` rejects an integer whose bounds exceed it.
+- **Full text search is on by default** for top-level classes with text
+  fields (BootstrApp PR #64): a MongoDB text index named `#text` over the
+  class's string fields. `isFullTextSearchable: false` on
+  `add_object_class`/`replace_object_class` (the manifest key of the same
+  name) turns it off. Search with the filter condition `{ field: "#text",
+  operator: "Eq", value: "words" }`, in the REST filter and in scripts:
+  whole words, any of them (OR); wrap the value in double quotes for a
+  phrase. Results then sort by relevance. Nothing changes the flag alone:
+  it goes through `replace_object_class` with the full class.
+- **Property names that are ApiScript keywords** (`from`, `as`, `of`,
+  `number`, `string`, `boolean`, `any`, `Record`, and `if`, `for`,
+  `return`, `null`, …) can't be read or written by a script (`input.from`
+  is a syntax error), so don't use them in classes an action touches,
+  above all action input classes. `to`, `default` and `case` are fine.
+  `bootstrapp-state.mjs check` warns about them.
 - **Top-level classes belong directly in `app.<app_name>`.** Generating the
   spec creates the default flow only for top-level classes whose namespace is
   exactly `app.<app_name>`, and actions run through that flow. Put top-level
@@ -62,13 +81,27 @@ what you are relying on from this page.
   `generate_openapi_spec` also wires any stored scripts. On servers before
   PR #28, storing a script did not wire it: invoke one action through the
   generated client to confirm it runs, and tell the user if it doesn't.
+- Each action has two routes in the generated spec: the plain one streams
+  the run as server-sent events, and the same path plus `/Result` (PR #59)
+  answers once with JSON. Use `/Result` unless the client shows progress of
+  a long action. Actions are under `/openapi/api/Object/<class>/CustomAction(<id>)`
+  (class scope) or `/openapi/api/Object/<class>(<objectId>)/CustomAction(<id>)`
+  (instance and bulk); objects and filter are under `/app/api/Object/...`.
+  Call what the generated client exposes rather than building paths.
+- An action's input is checked for its top-level required fields only;
+  nested values (an embedded object by `$ref`, which works in input
+  classes since PR #63) reach the script unconverted and unvalidated.
+  Validate them in the script.
 - `replace_action_script` takes `elevated` since BootstrApp PR #46. It sets
   the runtime's `ElevateContext` on the script's flow step: the object
   functions then run with an account-level context (no profile, so no
   permissions or constraints) that keeps the caller as the actor;
   `system.session` still reads the caller. Older servers ignore the
   argument and every script runs with the caller's access. `get_actions`
-  shows `elevated` on servers that have it.
+  shows `elevated` on servers that have it. There is no call that changes
+  only the flag: `replace_action_script` sends the script again with it.
+- Nothing in MCP runs an action. Test one through the generated client (or
+  ask the user to), and read the error it returns.
 
 ## Script runtime
 
@@ -80,7 +113,10 @@ what you are relying on from this page.
 - Functions per top-level class (module = the class's namespace):
   `filter<Class>(conditions, fields, orderBy?, reverseOrder?, top?, skip?)`
   → array, `create<Class>(fields, t?)` → new id,
-  `update<Class>ById(id, fields, t?)` → boolean (partial update),
+  `update<Class>ById(id, fields, t?)` → boolean (a patch: fields set to
+  `null` or left out are untouched, `0`, `""` and `false` are written, and
+  an embedded object or array is replaced whole, never merged; so a field
+  can't be cleared back to null through an update),
   `delete<Class>ById(id, t?)` → boolean. Registered actions are also
   callable, as `<actionName>(input)` in the input class's namespace.
 - `delete<Class>ById` works since BootstrApp PR #36 (2026-10-09); before
@@ -97,6 +133,19 @@ what you are relying on from this page.
 - The transaction module was named `mongodb` when PR #36 shipped and moved
   under `system` in PR #43 (`import * as mongodb from "system.mongodb";`).
   Use whichever name the app's `platform.d.ts` declares.
+- Strings have no methods: no `trim`, `toLowerCase`, `split`, `replace`,
+  `startsWith`. Anything normalized (a lowercase key for uniqueness, a
+  trimmed name) comes from the caller as its own field, or is compared as
+  given. Arrays have the methods `language.md` lists.
+- `system.user` (PR #61): `invite(email, profile, name?, organizationId?)`
+  gives a person the app's profile like `invite_user` and returns their
+  user id, which they keep after their first sign-in. It needs the
+  caller's right to create users unless the script is elevated.
+- A failing script reports the line, column and source line where it
+  failed, plus the call stack when it failed inside a function (PRs #53,
+  #54). A server without them reports the script's last line
+  (`return execute(input);`); throw `{ code, message }` with a distinct
+  message to find the spot there.
 - Script filter operators: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. The REST
   filter endpoint documents `Exists` instead of `Nin`. Use what the `.d.ts`
   lists for scripts.
@@ -107,11 +156,32 @@ what you are relying on from this page.
   `break`/`continue`, qualified type names) than the grammar the server
   publishes. Write to the published grammar; the deployed runtime may be
   older.
-- The runtime also exposes `system.session` (`getUserId()`, `getAccountId()`,
+- `system.session` (`getUserId()`, `getAccountId()`,
   `getOrganizationId()`, `getProfileId()`, `getRole()`, `getClientId()`,
-  `getEntityId()`), but the generated `.d.ts` may not declare it (it ships a
-  stale `session` module with `currUser()`). Use `system.session` only after
-  confirming with the user or a test that it validates.
+  `getEntityId()`) is declared in `platform.d.ts`, validates, and returns
+  the caller, in elevated scripts too (PR #52). The same file still starts
+  with a stale `session` module (`currUser()`); ignore that one.
+
+## Filtering and reading data
+
+Same rules in the REST filter and in `filter<Class>`:
+
+- Conditions are ANDed and only on indexed fields. Several conditions on
+  one field all apply, so a range is two conditions (`Gte` and `Lt`).
+  Date and date-time values are converted and compared as dates.
+- Array fields: `Eq` means the array holds every given value and `In` that
+  it holds any. Pass the value as an array, `[x]` for "contains x"; a bare
+  scalar is rejected. Multi-select (string array with `enum`) fields are
+  the exception: there `Eq` with a scalar is "contains".
+- There is no total count. Page with `top` and `skip` until a page comes
+  back short. The REST filter caps `top` at 99; `0`, a missing value or
+  anything above 99 returns 100 rows.
+- `fields` is the projection: only those fields come back, plus `_id`.
+  Name only what the screen or script uses; `["_id"]` for a count.
+- Sorting: script `orderBy` must be an indexed field (the type check says
+  so). The REST filter sorts by any field and silently ignores one it
+  doesn't know. Enums are stored as their strings and sort alphabetically,
+  so a rank order (priority) needs a numeric rank field.
 
 ## Auth
 
@@ -142,10 +212,26 @@ missing; access can then only be set in the BootstrApp admin.
   reaches the user at their next sign in.
 - Only the app owner can call the access, sign-in and user tools, and the
   class, action, script and generate tools for an app.
+- The access tools manage profiles only. `get_class_access` also lists role
+  entries (account, admin) under `otherEntries`; nothing in MCP changes
+  them.
+- A profile constraint such as `ownerId Eq {{context "UserId"}}` gives each
+  user only their own rows on every read, filter and action of that
+  profile. That is the way to make data private per user (the
+  `bootstrapp-access` skill).
 
-## Ideas the platform could add (from the original plugin's notes)
+## MCP errors
 
-Validation tools (`validate_schema`, `validate_api_script`), update/delete for
-classes and actions, an app-state resource returning full schemas, an
-`invoke_action` tool for testing, bulk registration. If the user owns the
+A tool error that the server didn't anticipate reaches you as
+`Tool '<name>' failed unexpectedly. See server logs.`, with no cause. Check
+the arguments against this page and the live schema, then ask the user to
+look at the server log; don't guess a cause.
+
+## Gaps (October 2026)
+
+No MCP tool runs an action, deletes a class or action, changes only the
+`elevated` or `isFullTextSearchable` flag, edits role access entries, or
+returns a compact `get_object_class`. Scripts are sent in full on every
+save. MCP sessions can drop when the server restarts, and a client may not
+pick up new tool parameters until it reconnects. If the user owns the
 platform, these are worth raising when a gap blocks them.

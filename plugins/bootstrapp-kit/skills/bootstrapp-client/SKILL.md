@@ -49,10 +49,29 @@ were never applied won't be in it.
   only, on indexed fields; the response contains only the listed fields plus
   `_id`, so always pass every field the screen shows. Operators and value
   rules: the server's filter-operators resource.
-- Per action: one operation taking the input class, returning the output
-  class.
-- Sort/limit parameters: use them only if the generated signature has them;
-  otherwise sort and slice client-side.
+- Per action: two operations taking the input class. The plain one streams
+  the run as server-sent events; the `/Result` one answers once with the
+  output class as JSON. Use `/Result` unless the screen shows the progress
+  of a long action. Instance and bulk actions take the object id in the
+  path.
+- Filter results have no total. Page with `top` and `skip` (at most 99 per
+  page) until a page comes back short. Array fields: `Eq` with `[x]` is
+  "contains x", `In` is "holds any". Full text search is the condition
+  `{ field: "#text", operator: "Eq", value: "words" }` (any word matches).
+  The rest: platform notes, "Filtering and reading data".
+- Sort parameters: use them only if the generated signature has them.
+
+## Reading data well
+
+- Never load a whole class to filter, count or search on the client. Scope
+  every query with conditions, page lists, and name only the fields shown
+  (`["_id"]` to count).
+- Per-user privacy is a profile constraint (`ownerId Eq UserId`), set with
+  the `bootstrapp-access` skill; the backend then filters every read. Don't
+  filter by owner on the client as a security measure.
+- Nothing is pushed to the client. After a write, refresh or invalidate the
+  queries it affects (React Query/SWR invalidation), and refetch on focus
+  for lists other users change.
 
 ## Named views
 

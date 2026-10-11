@@ -212,6 +212,17 @@ for (const file of files) {
     if (!t[1].trim().startsWith("{")) report("warning", lineOf(t.index), "throw an object: { code: \"...\", message: \"...\" }");
   }
 
+  // names the grammar reserves can't follow a "." or name an object literal key
+  // (switch, case, default, break and continue can)
+  const reserved = "as|from|of|number|string|boolean|any|Record|import|const|let|function|if|else|for|while|return|throw|true|false|null";
+  for (const r of code.matchAll(new RegExp(`\\.\\s*(${reserved})\\b|[{,]\\s*(${reserved})\\s*:`, "g"))) {
+    report("error", lineOf(r.index), `"${r[1] ?? r[2]}" is a reserved word in ApiScript and can't be used as a property name; rename the field (e.g. in the input class)`);
+  }
+  // strings have no methods in the runtime
+  for (const m of code.matchAll(/\.\s*(trim|trimStart|trimEnd|toLowerCase|toUpperCase|split|replace|replaceAll|substring|substr|startsWith|endsWith|padStart|padEnd|charAt|charCodeAt|localeCompare|normalize|repeat|match)\s*\(/g)) {
+    report("error", lineOf(m.index), `${m[1]}() isn't available: strings have no methods in ApiScript. Normalize the value in the caller or store a normalized copy`);
+  }
+
   // transactions: an open one is aborted when the run ends, even on success
   const begin = code.match(/\b\w+\.createTransaction\s*\(/);
   if (begin && !/\b\w+\.commitTransaction\s*\(/.test(code)) {

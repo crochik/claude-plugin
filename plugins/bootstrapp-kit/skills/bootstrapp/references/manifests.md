@@ -121,7 +121,7 @@ A string-keyed dictionary uses `"type": "object", "additionalProperties":
 Maps to `add_object_class` as: `appName` (from `app.json`),
 `fullObjectType`, `type` (`TopLevel` | `Embedded`), `baseObjectType`
 (optional), `indexedFields` (required; `[]` for embedded), `foreignKeys`
-(optional), `schema`.
+(optional), `schema`, `isFullTextSearchable` (optional, default `true`).
 
 ## `actions/<actionName>.json`
 

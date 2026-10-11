@@ -29,6 +29,7 @@ calling user a profile on the app so they can log in.
 | `foreignKeys` | Optional `[{ localFieldName, referenceObjectType, referenceFieldName }]`. Each `localFieldName` must be a property in the schema (else the call fails). Turns the field into a reference and adds a one-to-one relation. |
 | `baseObjectType` | Optional parent class (must also be under `app.<appName>`). |
 | `schema` | JSON Schema of the object (parsed as an OpenAPI 3.1 schema object). |
+| `isFullTextSearchable` | Optional, default `true`. Top-level classes with text fields get a `#text` index for full text search; `false` turns it off. |
 
 Fails if the class already exists. `_id` gets a server-generated UUID on
 create. Scalar `default` values are kept as field defaults.
@@ -82,7 +83,8 @@ and line/column when invalid, leaving the stored script unchanged.
 Otherwise stores it and adds or updates the step that runs it when the action
 is invoked (top-level classes in `app.<app_name>` only). Safe to repeat.
 `update_action_script` is the older name; on servers before PR #28 it only
-stores the script.
+stores the script. Both always need the full script: there is no call that
+changes only `elevated`.
 
 ## `get_action_script`
 
@@ -103,7 +105,10 @@ every embedded or base class it depends on. `$ref`s use
 takes. The read model also carries generated fields (`{field}|Name` per
 reference field, relation fields); leave them out when turning it into a
 manifest. Use it to adopt a class built elsewhere, or to compare the backend
-with `classes/<Class>.json`.
+with `classes/<Class>.json`. The output is large (read, create and update
+schemas for the class and every class it relates to), so read the local
+manifest when there is one and call this only when it is missing or
+suspect.
 
 ## `get_namespaces` / `get_object_classes`
 
@@ -163,7 +168,7 @@ ids. The `access-control.md` server resource explains the model; the
 
 | Tool | Args | Notes |
 |---|---|---|
-| `get_class_access` | `fullObjectType`, `profileName?` | Per profile: class permissions, field and relation permissions, constraints. |
+| `get_class_access` | `fullObjectType`, `profileName?` | Per profile: class permissions, field and relation permissions, constraints. Role entries (account, admin) come back under `otherEntries` and can't be changed through MCP. |
 | `replace_class_access` | `fullObjectType`, `profileName`, `permissions`, `fieldPermissions?`, `defaultFieldPermissions?`, `relationPermissions?`, `constraints?` | Replaces everything the profile has on the class. Validates fields (own fields only; base-class fields go on the base class), relations, operators and context keys before writing. `permissions: []` removes access. Refuses `Admin`. Returns the hidden fields, the constraint, and the fields an `Eq` constraint stamps on create. |
 | `remove_class_access` | `fullObjectType`, `profileName` | Same as `permissions: []`. |
 | `replace_action_access` | `fullObjectType`, `actionName`, `profiles` | Profiles that can see and run the action besides `Admin`. |
@@ -185,7 +190,7 @@ broke; apply the class's access files again after it.
 | Tool | Args | Notes |
 |---|---|---|
 | `get_users` | `appName`, `profileName?`, `search?` | Users holding a profile of the app: name, email, profile, organization, `active` / `invited` / `inactive`. |
-| `invite_user` | `appName`, `email`, `profileName`, `name?`, `organizationName?` | Creates an invitation (an inactive user with no sign-ins) that becomes the user on their first sign in with a provider that verifies the email; if the account already has that email, sets their profile instead. Sends nothing. |
+| `invite_user` | `appName`, `email`, `profileName`, `name?`, `organizationName?` | Creates an invitation (an inactive user with no sign-ins) that becomes the user on their first sign in with a provider that verifies the email, keeping the same id; if the account already has that email, sets their profile instead. Sends nothing and returns no id (`get_users` lists them; scripts get the id from `system.user.invite`). |
 | `assign_user_profile` | `appName`, `email`, `profileName` | Applies from the next sign in. |
 | `remove_user_access` | `appName`, `email` | Removes the app from the user; the user stays in the account. Refuses the caller. |
 | `set_user_organization` | `appName`, `email`, `organizationName` | |

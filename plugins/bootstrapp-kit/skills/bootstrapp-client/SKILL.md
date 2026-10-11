@@ -54,6 +54,17 @@ were never applied won't be in it.
 - Sort/limit parameters: use them only if the generated signature has them;
   otherwise sort and slice client-side.
 
+## Named views
+
+A query the app runs again and again (open orders, my tasks) is a **named
+view**: a typed helper in the wrapper, such as `openOrders()`, that bundles
+the filter conditions, the `fields` it returns, an optional label field, and
+sort and limit. List screens call views, not raw filters, so each query lives
+in one place. Every condition field must be in the class's `indexedFields`;
+if a view needs another one, add it to the class manifest and sync before
+writing the view. One-off queries can call the filter operation directly
+under the same rules.
+
 ## Auth
 
 Read the server's auth-config resource first; it is authoritative. In short:
@@ -64,6 +75,24 @@ secure storage, and always a user-initiated login entry point. Register every
 redirect URL (dev and deployed) with `add_oidc_client_redirect`, or login
 fails there. Surface authorization errors from the backend; don't re-implement
 access rules on the client.
+
+## New frontends
+
+For an app with no UI yet, use the platform's own scaffolder in the
+repository (web: `npm create vite@latest` with React + TypeScript unless the
+user picks another stack; Flutter: `flutter create`; desktop: the framework
+the user chose), then:
+
+1. Generate the client into it and write the wrapper (steps above). Web: a
+   `src/lib/bootstrapp.ts` module, with React Query or SWR for caching.
+   Flutter: a `lib/bootstrapp/` package exposing repositories, `dio` or
+   `http`, and `flutter_secure_storage` for tokens. CLI: one module reading
+   credentials from env or the OS config folder.
+2. Wire sign-in first (see Auth above) and confirm login, logout and an
+   authenticated call work.
+3. Add one real read screen (a named view) and one real write against live
+   data. No stubs.
+4. Document how to run it and the env variables in the README.
 
 ## Existing frontends
 

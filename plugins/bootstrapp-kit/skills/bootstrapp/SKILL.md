@@ -80,7 +80,8 @@ available, read the folder and `applied.json` by hand; the rules are the same.
 Typical states and sensible next steps (suggest, don't force):
 
 - **No `bootstrapp/` folder, empty repo** → new app: settle name and scope,
-  then model the first classes.
+  then model the first classes. For a guided path all the way to a running
+  UI, use `/bootstrapp-kit:new-app` (in Claude Code) or follow its steps.
 - **No `bootstrapp/` folder, existing codebase** → migration: analyze the
   current backend first (`bootstrapp-migration`).
 - **Manifests exist, nothing applied** → review, then sync.

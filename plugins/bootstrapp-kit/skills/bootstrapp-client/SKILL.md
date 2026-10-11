@@ -73,6 +73,24 @@ were never applied won't be in it.
   queries it affects (React Query/SWR invalidation), and refetch on focus
   for lists other users change.
 
+## Uploading files
+
+File bytes never go through an action. When the app uploads files:
+
+1. Call the app's upload action (a script using `system.files`, written
+   with the `bootstrapp-apiscript` skill). It returns the file id and a
+   presigned `uploadUrl`.
+2. `PUT` the raw bytes to `uploadUrl` with `fetch`, no `Authorization`
+   header, and the file's real `Content-Type` (the confirm stores it). The url
+   expires 10 minutes after it is created, so request it right before
+   uploading.
+3. Confirm with `PUT /files/api/File({id})/Upload` using the user's token,
+   or call the confirm action if the app has one.
+
+Show the file later through `GET /files/api/File({id})/Download` with the
+user's token; it redirects to a short-lived url. Only the user who
+uploaded the file may read it.
+
 ## Named views
 
 A query the app runs again and again (open orders, my tasks) is a **named

@@ -85,7 +85,9 @@ Other system modules, when `platform.d.ts` declares them:
 `system.session` (the caller: `getUserId()`, `getOrganizationId()`, …,
 also in elevated scripts) and `system.user` (`invite(email, profile,
 name?, organizationId?)` → user id; check who the caller is before
-inviting from an elevated script, and pick the profile in the script).
+inviting from an elevated script, and pick the profile in the script)
+and `system.files` (`create(folderId, name, contentType?)` and
+`confirmUpload(id)`, see Uploading files).
 
 Strings have no methods (`trim`, `toLowerCase`, `split`, …): have the
 caller send normalized values. Property names that are keywords (`from`,
@@ -220,6 +222,51 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
   stale `session` module with `currUser()` at the top of the file). If it
   is missing, the server is older: say so instead of elevating without the
   checks.
+
+## Uploading files
+
+Scripts never carry file contents. An action creates the file record and
+hands the client a presigned url; the client sends the bytes straight to
+storage:
+
+```typescript
+import * as files from "system.files";
+import * as actions from "app.<app>.actions";
+
+function execute(req: StartUploadInput): StartUploadOutput {
+  if (req.fileName == null || req.fileName == "") {
+    throw { code: "NAME_REQUIRED", message: "fileName is required" };
+  }
+  // the folder is app configuration, never taken from input
+  const file = files.create("<folder-id>", req.fileName, req.contentType);
+  return { fileId: file.id, uploadUrl: file.uploadUrl };
+}
+
+return execute(input);
+```
+
+- `create(folderId, name, contentType?)` returns `{ id, name, uploadUrl }`.
+  The client `PUT`s the raw bytes to `uploadUrl` (no auth header), which
+  expires 10 minutes after it is created. The `Content-Type` header of that
+  `PUT` is what the confirm stores, so the client sends the real one.
+- Then the file's size and content type are confirmed, either by the
+  client calling `PUT /files/api/File({id})/Upload` with its token, or by a
+  second action calling `files.confirmUpload(id)`, which returns
+  `{ id, name, contentType, size }`. An unconfirmed file has no size.
+- Keep the file id on the domain object it belongs to (a string field such
+  as `attachmentFileId`), in the same action or after the confirm.
+- The folder id comes from the account's file setup (a folder on a bucket
+  that supports presigned urls, such as S3). No MCP tool lists or creates
+  folders: ask the user for the id, and keep it in the script, not in
+  `input`.
+- The caller needs upload access to the folder. In an elevated script the
+  account's access is checked instead, and the file then belongs to the
+  account: the caller can't confirm or download it through REST, so
+  confirm with `confirmUpload` from an elevated action too.
+- Only the user who created the file (or an account admin) can read it back
+  (`GET /files/api/File({id})/Download`, which redirects to a short-lived
+  url). No script function returns a download url, so files other users
+  must open are a gap to raise with the platform owner.
 
 ## Workflow
 

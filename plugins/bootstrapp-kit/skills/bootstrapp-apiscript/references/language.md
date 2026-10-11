@@ -44,10 +44,21 @@ names declared in an imported module. Annotate `execute`'s parameter and
 return type; annotate locals when the right side doesn't make the type
 obvious. An unknown type name is an error.
 
-## Arrays
+## Arrays and strings
 
-`length`, `push`, `pop`, `indexOf`, `lastIndexOf`, `includes`, `slice`,
-`join`, `concat`, `at`, index read and write, spread.
+Arrays: `length`, `push`, `pop`, `indexOf`, `lastIndexOf`, `includes`,
+`slice`, `join`, `concat`, `at`, index read and write, spread.
+
+Strings have no methods (`trim`, `toLowerCase`, `split`, `replace`,
+`startsWith`, …). Join them with `+` and compare with `==`.
+
+## Reserved names
+
+`from`, `as`, `of`, `number`, `string`, `boolean`, `any`, `Record` and the
+keywords (`if`, `for`, `return`, `null`, `true`, …) can't be property names:
+`input.from` and `{ from: x }` are syntax errors. `switch`, `case`,
+`default`, `break` and `continue` are allowed after a `.`. Name fields
+`startDate`/`endDate`, not `from`/`to`.
 
 ## Not available
 

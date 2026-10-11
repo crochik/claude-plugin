@@ -75,8 +75,8 @@ function execute(input: MonthlySalesInput): MonthlySalesOutput {
   const orders = app.filterOrder(
     [
       { field: "status", operator: "Eq", value: "paid" },
-      { field: "paidOn", operator: "Gte", value: input.from },
-      { field: "paidOn", operator: "Lt", value: input.to },
+      { field: "paidOn", operator: "Gte", value: input.startDate },
+      { field: "paidOn", operator: "Lt", value: input.endDate },
     ],
     ["_id", "totalCents", "customerId"]
   );

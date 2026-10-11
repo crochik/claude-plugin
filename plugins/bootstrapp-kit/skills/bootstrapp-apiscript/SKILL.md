@@ -70,13 +70,27 @@ For each top-level class `X` in namespace `ns` the profile can access:
 
 | Function | Returns | Notes |
 |---|---|---|
-| `filterX(conditions, fields, orderBy?, reverseOrder?, top?, skip?)` | `X[]` | AND of `{ field, operator, value }`; `field` and `orderBy` must be indexed; `fields` is the projection (always name what you read). |
+| `filterX(conditions, fields, orderBy?, reverseOrder?, top?, skip?)` | `X[]` | AND of `{ field, operator, value }`; `field` and `orderBy` must be indexed; `fields` is the projection (always name what you read). `#text` with `Eq` searches the class's text fields. |
 | `createX(fields, t?)` | new id (string) | Server-assigned fields (`_id`) are omitted. |
-| `updateXById(id, fields, t?)` | boolean | Partial update: only the fields you pass change. |
+| `updateXById(id, fields, t?)` | boolean | A patch: fields you leave out or set to `null` don't change; `0`, `""` and `false` are written; an embedded object or array is replaced whole. |
 | `deleteXById(id, t?)` | boolean | Hard delete. |
 | `<actionName>(input)` | the action's output | Other registered actions, in their input class's namespace. |
 
-Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`.
+Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. On an array
+field, `Eq` with `[x, y]` means it holds both and `In` that it holds any.
+A range on one field is two conditions. Filtering and paging rules (no
+total, `top`/`skip`): the platform notes, "Filtering and reading data".
+
+Other system modules, when `platform.d.ts` declares them:
+`system.session` (the caller: `getUserId()`, `getOrganizationId()`, …,
+also in elevated scripts) and `system.user` (`invite(email, profile,
+name?, organizationId?)` → user id; check who the caller is before
+inviting from an elevated script, and pick the profile in the script).
+
+Strings have no methods (`trim`, `toLowerCase`, `split`, …): have the
+caller send normalized values. Property names that are keywords (`from`,
+`as`, `of`, `string`, …) can't be used after a `.`; rename the field in
+the class instead. The checker flags both.
 
 `t` is an optional transaction from the `system.mongodb` module, always the last
 argument. `filterX` takes none.
@@ -202,8 +216,10 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
 - Who may run the action is still its action access (`access/actions/`),
   elevated or not. Elevated actions are usually limited to the profiles
   that need them.
-- Confirm `system.session` is in `platform.d.ts` before relying on it; if it
-  isn't, say so instead of elevating without the checks.
+- `system.session` is in `platform.d.ts` on current servers (ignore the
+  stale `session` module with `currUser()` at the top of the file). If it
+  is missing, the server is older: say so instead of elevating without the
+  checks.
 
 ## Workflow
 
@@ -224,7 +240,10 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
    the script against the real classes and modules and returns errors with
    line and column instead of saving a broken script; fix and push again.
    Record it with `bootstrapp-state.mjs record script <actionName>`, then call
-   the action once through the client, or ask the user to, to see it run.
+   the action once through the client, or ask the user to, to see it run
+   (no MCP tool runs an action). A runtime error names the line and the
+   call stack; on an older server it names the last line, so throw
+   `{ code, message }` with distinct messages to find the spot.
 
 ## Porting existing server code
 

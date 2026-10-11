@@ -38,6 +38,9 @@ const CONTEXT_KEYS = ["AccountId", "OrganizationId", "UserId", "EntityId", "Prof
 const CONTEXT_VALUE = /^\{\{\s*context\s+"(?<key>[^"]+)"\s*\}\}$/;
 const PROVIDERS = ["Microsoft", "Google", "Salesforce", "GitHub"];
 const SIGNUP = ["open", "invite_only"];
+// words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
+const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
+const INT32_MAX = 2147483647;
 const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", script: "scripts", auth: null };
 
 function fail(message) {
@@ -189,6 +192,12 @@ function check(state) {
       if (cls.indexedFields?.length) error(where, "embedded classes must use indexedFields: []");
     }
 
+    for (const [field, prop] of Object.entries(schema.properties ?? {})) {
+      if (SCRIPT_RESERVED.has(field)) warn(where, `property "${field}" is a reserved word in ApiScript, so scripts can't read or write it (input.${field} fails to save); rename it`);
+      if (prop?.type === "integer" && [prop.maximum, prop.minimum, prop.exclusiveMaximum].some((v) => typeof v === "number" && (v > INT32_MAX || v < -INT32_MAX - 1))) {
+        error(where, `property "${field}": integer fields are 32-bit signed (max ${INT32_MAX}) whatever maximum says; store larger values as a string (e.g. hex for colors)`);
+      }
+    }
     for (const field of cls.indexedFields ?? []) {
       if (!props[field]) error(where, `indexed field "${field}" is not a property`);
     }
@@ -499,9 +508,9 @@ function plan(state) {
   for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
     if (item.state === "new" || item.state === "changed") {
-      const { fullObjectType, type, baseObjectType, indexedFields, foreignKeys, schema } = strip(data);
+      const { fullObjectType, type, baseObjectType, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
       const tool = item.state === "new" ? "add_object_class" : "replace_object_class";
-      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema } });
+      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) } });
     }
   }
   for (const item of pending("access")) {

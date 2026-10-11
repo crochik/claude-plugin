@@ -43,8 +43,9 @@ resources. The output of this skill is one manifest per class in
    `bootstrapp-state.mjs check` (in the `bootstrapp` skill's `scripts/`
    folder). Fix every error.
 5. **Apply when asked** (see "Applying" in the `bootstrapp` skill).
-   Registration cannot be undone through MCP, so a quick look from the user
-   before the first push of a new class is worth it.
+   A registered class can be replaced but never deleted through MCP, so a
+   quick look from the user before the first push of a new class is worth
+   it.
 
 ## Modeling rules for MongoDB
 
@@ -66,15 +67,18 @@ The full checklist with examples is in
 - **Denormalize deliberately.** Copying a display field (`customerName` next
   to `customerId`) saves a lookup on every list screen, but someone must keep
   it in sync; note who (an action, or the client on update) in `$notes`.
-- **Index only what you filter or sort on.** Filters and `orderBy` accept
-  indexed fields only; anything else is rejected. Always `_id` and every
+- **Index only what you filter or sort on.** Filters accept indexed fields
+  only, and script `orderBy` too. Enums sort alphabetically, so a rank
+  order (priority) needs a numeric rank field. Always `_id` and every
   reference field; then the fields real queries use. Embedded classes use
   `[]`.
 - **Inheritance** is single-parent with a discriminator string on the base
   (`kind: "card" | "bank"`); children set `baseObjectType`. Prefer a flat
   class with a discriminator and optional blocks when the variants are small.
 - **Types that survive the trip.** Money as integer minor units
-  (`amountCents`) or a decimal string, never a float. Dates as strings with
+  (`amountCents`) or a decimal string, never a float. `integer` is 32-bit
+  signed whatever `maximum` says; larger values (ARGB colors, byte counts)
+  go in a string. Dates as strings with
   `format: date` or `date-time`. Enums as `enum` on a string. No
   `byte`/`binary`; store files elsewhere and keep a URL.
 - **Users** are platform objects. Store `ownerId`, `assigneeId`, … as uuid
@@ -107,6 +111,12 @@ The full checklist with examples is in
   `<Parent>.<property>`; use them for one-off shapes only.
 - No multi-branch `anyOf`/`oneOf` inside a class schema.
 - `default` on scalar properties becomes the field default.
+- Don't name properties after ApiScript keywords (`from`, `as`, `of`,
+  `string`, `number`, …): scripts can't read them. `startDate`/`endDate`
+  rather than `from`/`to`.
+- Full text search over a top-level class's text fields is on by default
+  (`#text`); set `"isFullTextSearchable": false` in the manifest for
+  classes nobody searches.
 
 ## Changing a class that is already applied
 

@@ -145,6 +145,17 @@ what you are relying on from this page.
   gives a person the app's profile like `invite_user` and returns their
   user id, which they keep after their first sign-in. It needs the
   caller's right to create users unless the script is elevated.
+- `system.files` (PR #65, 2026-10-11): `create(folderId, name,
+  contentType?)` inserts a RemoteFile in the folder and returns
+  `{ id, name, uploadUrl }`, a presigned `PUT` url valid for 10 minutes;
+  `confirmUpload(id)` reads size and content type back from the bucket and
+  returns `{ id, name, contentType, size }` (the same check as the REST
+  `PUT /files/api/File({id})/Upload`). Creating needs the folder's upload
+  permission for the caller, or the account's when elevated. The creator
+  gets Read and Upload on the file; when elevated there is no user, so the
+  account's Admin role gets them instead. The bucket must support presigned
+  urls (S3). How to use it: the `bootstrapp-apiscript` skill, "Uploading
+  files".
 - A failing script reports the line, column and source line where it
   failed, plus the call stack when it failed inside a function (PRs #53,
   #54). A server without them reports the script's last line
@@ -235,6 +246,11 @@ don't guess a cause.
 ## Gaps (October 2026)
 
 No MCP tool deletes a class or action or edits role access entries.
+No MCP tool lists or creates file buckets and folders, so a script's
+folder id comes from the user. Only a file's creator can download it
+(no script function returns a download url), and servers without
+BootstrApp PR #68 fail `invoke_action` on scripts that import
+`system.files` (the action itself runs them).
 Servers without BootstrApp PRs #66 and #67 also lack `invoke_action`, the
 flag-only changes and `get_object_class(compact)`. Scripts are sent in full
 on every save. MCP sessions can drop when the server restarts, and a client may not

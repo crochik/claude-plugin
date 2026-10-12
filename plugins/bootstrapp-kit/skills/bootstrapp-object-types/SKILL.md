@@ -74,14 +74,17 @@ The full checklist with examples is in
   reference field; then the fields real queries use. Embedded classes use
   `[]`.
 - **Variants** (payments that are a card or a bank transfer) are a
-  discriminated base class: the base has a required, indexed string enum
-  (`kind: "card" | "bank"`) named as its `discriminatorField`, and each
-  variant sets `baseObjectType` and its `discriminatorValue` and adds only
-  its own fields. Top-level variants share the base's collection, so one
-  list or filter on the base covers them all, and each variant's endpoint
-  covers just its records. The same works for embedded classes. Prefer a
-  flat class with the enum and optional fields when the variants differ by
-  a field or two. See platform-notes for the exact behavior.
+  discriminated base class: the base has a required, indexed string
+  (`kind`) named as its `discriminatorField`, and each variant sets
+  `baseObjectType` and its `discriminatorValue` and adds only its own
+  fields. The server turns `kind` into an enum of the variants' values
+  (`card`, `bank`), so don't list them yourself; an `enum` on the base only
+  adds values for plain base records. Top-level variants share the base's
+  collection, so one list or filter on the base covers them all, and each
+  variant's endpoint covers just its records. The same works for embedded
+  classes. Prefer a flat class with an enum and optional fields when the
+  variants differ by a field or two. See platform-notes for the exact
+  behavior.
 - **Plain inheritance** (`baseObjectType` without a discriminator) only
   reuses fields: each child has its own collection and the base's list
   never includes them. Use it for classes that share a shape but are never

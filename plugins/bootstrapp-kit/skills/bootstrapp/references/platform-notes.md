@@ -47,9 +47,15 @@ what you are relying on from this page.
   fields (their access is set on the base) but keeps its records in its
   own collection: listing the base never returns them.
 - **Discriminated classes share the base's records** (crochik/BootstrApp
-  PR #75). The base passes `discriminatorField` (an own, required string
-  property, best an `enum`, indexed); each class extending it passes its
+  PR #75). The base passes `discriminatorField` (an own, required,
+  indexed string property); each class extending it passes its
   `discriminatorValue`. Then:
+  - The server keeps the base's discriminator property an enum (a select)
+    of the variants' values, each described by its variant's class name
+    (`x-enum-descriptions` in the spec). Values the base's own schema
+    lists in an `enum` that no variant uses stay in it as plain base
+    records; any other value is rejected. `get_object_class` returns the
+    same map as `discriminatedClasses`.
   - A top-level variant shares the base's collection. Its value is part of
     its account constraint: create always stores it, whatever the body
     says, and reading, filtering, updating or deleting through the
@@ -59,7 +65,7 @@ what you are relying on from this page.
     fields too, and `PATCH` through the base updates the record as its
     variant. `POST` to the base creates the variant whose value matches
     the body's discriminator; a value no variant has creates a plain base
-    record.
+    record (only values the base's enum lists).
   - Embedded bases work the same way: a `$ref`, array or dictionary of a
     discriminated embedded class stores and reads each object as the
     variant its value names.

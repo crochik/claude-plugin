@@ -128,7 +128,7 @@ value and leaves the field out of its schema (properties abbreviated):
   "indexedFields": ["_id", "kind", "orderId"],
   "discriminatorField": "kind",
   "schema": { "type": "object", "required": ["_id", "kind", "orderId", "amountCents"],
-    "properties": { "_id": {}, "kind": { "type": "string", "enum": ["card", "bank"] }, "orderId": {}, "amountCents": {} } }
+    "properties": { "_id": {}, "kind": { "type": "string" }, "orderId": {}, "amountCents": {} } }
 }
 ```
 

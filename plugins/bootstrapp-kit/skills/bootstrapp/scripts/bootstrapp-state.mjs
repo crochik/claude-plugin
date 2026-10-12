@@ -415,7 +415,8 @@ function inlineClassNames(node, parent, out = []) {
   return out;
 }
 
-// A discriminated base class names one of its required string properties; each class extending it gives its own value.
+// A discriminated base class names one of its required string properties; each class extending it gives its own value
+// (the server adds the values to the field's enum).
 function checkDiscriminator(cls, where, byName, error, warn) {
   const own = cls.schema?.properties ?? {};
   const field = cls.discriminatorField;
@@ -426,7 +427,6 @@ function checkDiscriminator(cls, where, byName, error, warn) {
     else {
       if (field === "_id" || prop.type !== "string") error(where, `discriminatorField "${field}" must be a string property`);
       if (!(cls.schema.required ?? []).includes(field)) error(where, `discriminatorField "${field}" must be listed in required`);
-      if (!Array.isArray(prop.enum)) warn(where, `discriminatorField "${field}" is best an enum of the classes' values`);
       if (cls.type === "TopLevel" && !(cls.indexedFields ?? []).includes(field)) warn(where, `discriminatorField "${field}" is usually worth indexing`);
     }
   }
@@ -444,8 +444,6 @@ function checkDiscriminator(cls, where, byName, error, warn) {
   if (!baseField) { error(where, `base class ${base.fullObjectType} has no discriminatorField`); return; }
   if (base.type !== cls.type) error(where, `${base.fullObjectType} is ${base.type}: a discriminated class must have its base's type`);
   if (own[baseField]) error(where, `"${baseField}" comes from ${base.fullObjectType}; leave it out of this schema`);
-  const allowed = base.schema?.properties?.[baseField]?.enum;
-  if (Array.isArray(allowed) && !allowed.includes(value)) error(where, `discriminatorValue "${value}" is not one of ${baseField}'s values: ${allowed.join(", ")}`);
   for (const other of byName.values()) {
     if (other !== cls && other.baseObjectType === cls.baseObjectType && other.discriminatorValue === value) error(where, `${other.fullObjectType} already uses ${baseField} = "${value}"`);
   }

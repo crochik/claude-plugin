@@ -73,9 +73,19 @@ The full checklist with examples is in
   order (priority) needs a numeric rank field. Always `_id` and every
   reference field; then the fields real queries use. Embedded classes use
   `[]`.
-- **Inheritance** is single-parent with a discriminator string on the base
-  (`kind: "card" | "bank"`); children set `baseObjectType`. Prefer a flat
-  class with a discriminator and optional blocks when the variants are small.
+- **Variants** (payments that are a card or a bank transfer) are a
+  discriminated base class: the base has a required, indexed string enum
+  (`kind: "card" | "bank"`) named as its `discriminatorField`, and each
+  variant sets `baseObjectType` and its `discriminatorValue` and adds only
+  its own fields. Top-level variants share the base's collection, so one
+  list or filter on the base covers them all, and each variant's endpoint
+  covers just its records. The same works for embedded classes. Prefer a
+  flat class with the enum and optional fields when the variants differ by
+  a field or two. See platform-notes for the exact behavior.
+- **Plain inheritance** (`baseObjectType` without a discriminator) only
+  reuses fields: each child has its own collection and the base's list
+  never includes them. Use it for classes that share a shape but are never
+  read together.
 - **Types that survive the trip.** Money as integer minor units
   (`amountCents`) or a decimal string, never a float. `integer` is 32-bit
   signed whatever `maximum` says; larger values (ARGB colors, byte counts)

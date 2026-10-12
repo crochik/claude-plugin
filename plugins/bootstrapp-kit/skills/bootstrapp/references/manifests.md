@@ -118,10 +118,36 @@ An embedded class used by others is its own manifest
 A string-keyed dictionary uses `"type": "object", "additionalProperties":
 { "$ref": ... }`. `plan` registers referenced classes first.
 
+A discriminated base names its discriminator, and each variant gives its
+value and leaves the field out of its schema (properties abbreviated):
+
+```json
+{
+  "fullObjectType": "app.shop.Payment",
+  "type": "TopLevel",
+  "indexedFields": ["_id", "kind", "orderId"],
+  "discriminatorField": "kind",
+  "schema": { "type": "object", "required": ["_id", "kind", "orderId", "amountCents"],
+    "properties": { "_id": {}, "kind": { "type": "string", "enum": ["card", "bank"] }, "orderId": {}, "amountCents": {} } }
+}
+```
+
+```json
+{
+  "fullObjectType": "app.shop.CardPayment",
+  "type": "TopLevel",
+  "baseObjectType": "app.shop.Payment",
+  "discriminatorValue": "card",
+  "indexedFields": ["_id"],
+  "schema": { "type": "object", "required": ["last4"], "properties": { "last4": {} } }
+}
+```
+
 Maps to `add_object_class` as: `appName` (from `app.json`),
 `fullObjectType`, `type` (`TopLevel` | `Embedded`), `baseObjectType`
-(optional), `indexedFields` (required; `[]` for embedded), `foreignKeys`
-(optional), `schema`, `isFullTextSearchable` (optional, default `true`).
+(optional), `discriminatorField` / `discriminatorValue` (optional),
+`indexedFields` (required; `[]` for embedded), `foreignKeys` (optional),
+`schema`, `isFullTextSearchable` (optional, default `true`).
 
 ## `actions/<actionName>.json`
 

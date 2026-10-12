@@ -164,6 +164,7 @@ function check(state) {
     if (!Array.isArray(cls.indexedFields)) error(where, "indexedFields is required (use [] for embedded classes)");
     if (cls.baseObjectType && root && !cls.baseObjectType.startsWith(`${root}.`)) error(where, `baseObjectType must live under ${root}`);
     if (cls.baseObjectType && !byName.has(cls.baseObjectType)) warn(where, `base class ${cls.baseObjectType} has no local manifest`);
+    checkDiscriminator(cls, where, byName, error, warn);
 
     const schema = cls.schema;
     if (!schema || typeof schema !== "object") { error(where, "schema is required"); continue; }
@@ -414,6 +415,42 @@ function inlineClassNames(node, parent, out = []) {
   return out;
 }
 
+// A discriminated base class names one of its required string properties; each class extending it gives its own value.
+function checkDiscriminator(cls, where, byName, error, warn) {
+  const own = cls.schema?.properties ?? {};
+  const field = cls.discriminatorField;
+  if (field !== undefined) {
+    const prop = own[field];
+    if (typeof field !== "string" || !field) error(where, "discriminatorField must be a property name");
+    else if (!prop) error(where, `discriminatorField "${field}" must be one of this class' own properties`);
+    else {
+      if (field === "_id" || prop.type !== "string") error(where, `discriminatorField "${field}" must be a string property`);
+      if (!(cls.schema.required ?? []).includes(field)) error(where, `discriminatorField "${field}" must be listed in required`);
+      if (!Array.isArray(prop.enum)) warn(where, `discriminatorField "${field}" is best an enum of the classes' values`);
+      if (cls.type === "TopLevel" && !(cls.indexedFields ?? []).includes(field)) warn(where, `discriminatorField "${field}" is usually worth indexing`);
+    }
+  }
+
+  const base = cls.baseObjectType ? byName.get(cls.baseObjectType) : null;
+  const value = cls.discriminatorValue;
+  if (value === undefined) {
+    if (base?.discriminatorField) error(where, `${base.fullObjectType} is discriminated by ${base.discriminatorField}: set discriminatorValue`);
+    return;
+  }
+  if (typeof value !== "string" || !value) { error(where, "discriminatorValue must be a non-empty string"); return; }
+  if (!cls.baseObjectType) { error(where, "discriminatorValue needs a baseObjectType"); return; }
+  if (!base) return; // the base exists only on the server, which checks the rest
+  const baseField = base.discriminatorField;
+  if (!baseField) { error(where, `base class ${base.fullObjectType} has no discriminatorField`); return; }
+  if (base.type !== cls.type) error(where, `${base.fullObjectType} is ${base.type}: a discriminated class must have its base's type`);
+  if (own[baseField]) error(where, `"${baseField}" comes from ${base.fullObjectType}; leave it out of this schema`);
+  const allowed = base.schema?.properties?.[baseField]?.enum;
+  if (Array.isArray(allowed) && !allowed.includes(value)) error(where, `discriminatorValue "${value}" is not one of ${baseField}'s values: ${allowed.join(", ")}`);
+  for (const other of byName.values()) {
+    if (other !== cls && other.baseObjectType === cls.baseObjectType && other.discriminatorValue === value) error(where, `${other.fullObjectType} already uses ${baseField} = "${value}"`);
+  }
+}
+
 // Classes a class needs registered before it: its base class and the classes it embeds by $ref.
 function classDependencies(cls) {
   const deps = schemaRefs(cls.schema)
@@ -511,9 +548,9 @@ function plan(state) {
   for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
     if (item.state === "new" || item.state === "changed") {
-      const { fullObjectType, type, baseObjectType, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
+      const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
       const tool = item.state === "new" ? "add_object_class" : "replace_object_class";
-      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) } });
+      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) } });
     }
   }
   for (const item of pending("access")) {

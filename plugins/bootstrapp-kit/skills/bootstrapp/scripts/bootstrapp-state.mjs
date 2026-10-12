@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 Crochik Software Solutions, LLC. All rights reserved.
+// Proprietary; use requires agreement to CSS license terms and prior written
+// authorization from CSS. See LICENSE.
 // Inspect a bootstrapp/ folder: validate manifests, compare them with the
 // applied.json ledger, print the MCP calls a sync needs, and record applied items.
 //

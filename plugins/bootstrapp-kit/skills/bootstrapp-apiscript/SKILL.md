@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-apiscript
 description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Writing ApiScripts

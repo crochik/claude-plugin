@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-client
 description: Generate and wire a strongly typed API client for a BootstrApp app from the OpenAPI spec the MCP server produces, including the thin wrapper module, OIDC login, and regeneration after model changes. Use when the user wants the client generated or refreshed, or when an existing frontend needs to start calling BootstrApp.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Generating the typed client

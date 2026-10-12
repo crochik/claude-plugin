@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-access
 description: Decide who can do what in a BootstrApp app - profiles (roles), per-class, per-field and per-relation permissions, row constraints such as "only their own records", which profiles run each action, sign-in providers and sign-up, and the app's users and organizations. Use when the user talks about roles, permissions, access, visibility, multi-tenant or per-company data, login/sign-up, or inviting users.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Access control in a BootstrApp app

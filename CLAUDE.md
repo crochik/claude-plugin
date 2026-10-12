@@ -27,6 +27,14 @@ available when working in this repo; each plugin bundles its own `.mcp.json`.
   user/app perspective. The name is reserved for it; don't reuse it for
   developer tooling.
 
+## License
+
+The repo is proprietary to Crochik Software Solutions, LLC (see
+[LICENSE](./LICENSE) and the copy in the plugin). Never add MIT or any other
+open-source license text, badge or `"license"` value. New skills carry the
+`license:` frontmatter line and new scripts the copyright header, like the
+existing ones.
+
 ## Local development
 
 ```

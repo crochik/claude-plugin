@@ -60,3 +60,9 @@ has, since the MCP server cannot return full class definitions.
 ## Other harnesses
 
 See [AGENTS.md](AGENTS.md).
+
+## License
+
+Copyright (c) 2026 Crochik Software Solutions, LLC. All rights reserved.
+Proprietary, not open source: any use requires agreeing to CSS's license terms
+and prior written authorization from CSS. See [LICENSE](LICENSE).

@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-migration
 description: Move an existing application's backend onto BootstrApp - inventory its data models, endpoints, business logic and auth, map them to ObjectTypes, generated CRUD/filter endpoints, actions and ApiScripts, and plan an incremental cutover. Use when the user has an existing codebase (any stack) and wants to adopt BootstrApp for part or all of its backend.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Migrating an existing app to BootstrApp

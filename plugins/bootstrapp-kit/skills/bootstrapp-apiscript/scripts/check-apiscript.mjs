@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 Crochik Software Solutions, LLC. All rights reserved.
+// Proprietary; use requires agreement to CSS license terms and prior written
+// authorization from CSS. See LICENSE.
 // Lint ApiScript files against the published grammar subset and the app's
 // generated platform.d.ts. Not a type checker: it catches the common mistakes
 // (TypeScript features the dialect lacks, imports or functions the platform

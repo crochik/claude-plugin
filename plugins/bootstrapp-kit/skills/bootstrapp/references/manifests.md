@@ -118,15 +118,15 @@ An embedded class used by others is its own manifest
 A string-keyed dictionary uses `"type": "object", "additionalProperties":
 { "$ref": ... }`. `plan` registers referenced classes first.
 
-A discriminated base names its discriminator, and each variant gives its
-value and leaves the field out of its schema (properties abbreviated):
+A discriminated base has a required string property (`kind`). Each variant
+names that property and gives its value, and leaves the property out of
+its own schema (properties abbreviated):
 
 ```json
 {
   "fullObjectType": "app.shop.Payment",
   "type": "TopLevel",
   "indexedFields": ["_id", "kind", "orderId"],
-  "discriminatorField": "kind",
   "schema": { "type": "object", "required": ["_id", "kind", "orderId", "amountCents"],
     "properties": { "_id": {}, "kind": { "type": "string" }, "orderId": {}, "amountCents": {} } }
 }
@@ -137,6 +137,7 @@ value and leaves the field out of its schema (properties abbreviated):
   "fullObjectType": "app.shop.CardPayment",
   "type": "TopLevel",
   "baseObjectType": "app.shop.Payment",
+  "discriminatorField": "kind",
   "discriminatorValue": "card",
   "indexedFields": ["_id"],
   "schema": { "type": "object", "required": ["last4"], "properties": { "last4": {} } }
@@ -145,7 +146,8 @@ value and leaves the field out of its schema (properties abbreviated):
 
 Maps to `add_object_class` as: `appName` (from `app.json`),
 `fullObjectType`, `type` (`TopLevel` | `Embedded`), `baseObjectType`
-(optional), `discriminatorField` / `discriminatorValue` (optional),
+(optional), `discriminatorField` / `discriminatorValue` (optional, on
+variants),
 `indexedFields` (required; `[]` for embedded), `foreignKeys` (optional),
 `schema`, `isFullTextSearchable` (optional, default `true`).
 

@@ -28,8 +28,8 @@ calling user a profile on the app so they can log in.
 | `indexedFields` | Required. Only these fields can be used in filter conditions and `orderBy`. `[]` for embedded. |
 | `foreignKeys` | Optional `[{ localFieldName, referenceObjectType, referenceFieldName }]`. Each `localFieldName` must be a property in the schema (else the call fails). Turns the field into a reference and adds a one-to-one relation. |
 | `baseObjectType` | Optional parent class (must also be under `app.<appName>`). |
-| `discriminatorField` | Optional. Makes the class a discriminated base: the name of one of its own required string properties whose value says which class a record is. The server keeps it an enum of the variants' values, each described by its class. Can't change while classes use it. |
-| `discriminatorValue` | Required when the base has a `discriminatorField`, else not allowed: this class' value of that field, different for each class of the base. It is added to the base's enum. Leave the field itself out of this schema. |
+| `discriminatorField` | With `discriminatorValue`: the base's own required string property that holds the value. Needed for the first variant of a base; later ones may omit it (it must match), since the server infers it from the base's variants. The base's property becomes an enum of the variants' values, each described by its class. |
+| `discriminatorValue` | Makes the class a variant of its base: its value of the base's discriminator property, different for each variant. Required once the base has a variant. Leave the property itself out of this schema. |
 | `schema` | JSON Schema of the object (parsed as an OpenAPI 3.1 schema object). |
 | `isFullTextSearchable` | Optional, default `true`. Top-level classes with text fields get a `#text` index for full text search; `false` turns it off. |
 
@@ -110,7 +110,9 @@ Use it to pull scripts written elsewhere into `scripts/<actionName>.ts`.
 discriminatorField?, discriminatorValue?, discriminatedClasses?, label,
 description, indexedFields, foreignKeys: [{ localFieldName,
 referenceObjectType, referenceFieldName }], schemas }`.
-`discriminatedClasses` (on a discriminated base) maps each value to its
+`discriminatorField` is the base's discriminator property, on a
+discriminated base and on its variants; `discriminatorValue` is a
+variant's value; `discriminatedClasses` (on a base) maps each value to its
 class.
 
 `schemas` is the OpenAPI 3.1 `components.schemas` the app's API exposes for

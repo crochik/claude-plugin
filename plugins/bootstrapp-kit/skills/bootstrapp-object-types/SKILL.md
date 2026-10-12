@@ -75,9 +75,8 @@ The full checklist with examples is in
   `[]`.
 - **Variants** (payments that are a card or a bank transfer) are a
   discriminated base class: the base has a required, indexed string
-  (`kind`) named as its `discriminatorField`, and each variant sets
-  `baseObjectType` and its `discriminatorValue` and adds only its own
-  fields. The server turns `kind` into an enum of the variants' values
+  (`kind`), and each variant sets `baseObjectType`, `discriminatorField`
+  (`kind`) and its `discriminatorValue` and adds only its own fields. The server turns `kind` into an enum of the variants' values
   (`card`, `bank`), so don't list them yourself; an `enum` on the base only
   adds values for plain base records. Top-level variants share the base's
   collection, so one list or filter on the base covers them all, and each

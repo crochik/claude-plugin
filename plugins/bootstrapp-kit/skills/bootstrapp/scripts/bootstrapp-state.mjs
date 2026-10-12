@@ -415,37 +415,34 @@ function inlineClassNames(node, parent, out = []) {
   return out;
 }
 
-// A discriminated base class names one of its required string properties; each class extending it gives its own value
-// (the server adds the values to the field's enum).
+// A discriminated class extends a base with a value of one of the base's own required string properties (discriminatorField,
+// the same for every class of the base; the server infers it after the first one and adds the values to the field's enum).
 function checkDiscriminator(cls, where, byName, error, warn) {
-  const own = cls.schema?.properties ?? {};
+  const siblings = [...byName.values()].filter((other) => other !== cls && other.baseObjectType && other.baseObjectType === cls.baseObjectType);
   const field = cls.discriminatorField;
-  if (field !== undefined) {
-    const prop = own[field];
-    if (typeof field !== "string" || !field) error(where, "discriminatorField must be a property name");
-    else if (!prop) error(where, `discriminatorField "${field}" must be one of this class' own properties`);
-    else {
-      if (field === "_id" || prop.type !== "string") error(where, `discriminatorField "${field}" must be a string property`);
-      if (!(cls.schema.required ?? []).includes(field)) error(where, `discriminatorField "${field}" must be listed in required`);
-      if (cls.type === "TopLevel" && !(cls.indexedFields ?? []).includes(field)) warn(where, `discriminatorField "${field}" is usually worth indexing`);
-    }
-  }
-
-  const base = cls.baseObjectType ? byName.get(cls.baseObjectType) : null;
   const value = cls.discriminatorValue;
-  if (value === undefined) {
-    if (base?.discriminatorField) error(where, `${base.fullObjectType} is discriminated by ${base.discriminatorField}: set discriminatorValue`);
+  if (field === undefined && value === undefined) {
+    const used = siblings.find((other) => other.discriminatorValue !== undefined);
+    if (used) error(where, `${used.fullObjectType} extends ${cls.baseObjectType} with a discriminator: set discriminatorField and discriminatorValue here too`);
     return;
   }
   if (typeof value !== "string" || !value) { error(where, "discriminatorValue must be a non-empty string"); return; }
-  if (!cls.baseObjectType) { error(where, "discriminatorValue needs a baseObjectType"); return; }
+  if (typeof field !== "string" || !field) { error(where, "discriminatorField must name the base's property that holds discriminatorValue"); return; }
+  if (!cls.baseObjectType) { error(where, "discriminatorField and discriminatorValue need a baseObjectType"); return; }
+  if (cls.schema?.properties?.[field]) error(where, `"${field}" comes from ${cls.baseObjectType}; leave it out of this schema`);
+  for (const other of siblings) {
+    if (other.discriminatorField !== undefined && other.discriminatorField !== field) error(where, `${other.fullObjectType} uses discriminatorField "${other.discriminatorField}"; every class of ${cls.baseObjectType} must use the same one`);
+    if (other.discriminatorValue === value) error(where, `${other.fullObjectType} already uses ${field} = "${value}"`);
+  }
+  const base = byName.get(cls.baseObjectType);
   if (!base) return; // the base exists only on the server, which checks the rest
-  const baseField = base.discriminatorField;
-  if (!baseField) { error(where, `base class ${base.fullObjectType} has no discriminatorField`); return; }
   if (base.type !== cls.type) error(where, `${base.fullObjectType} is ${base.type}: a discriminated class must have its base's type`);
-  if (own[baseField]) error(where, `"${baseField}" comes from ${base.fullObjectType}; leave it out of this schema`);
-  for (const other of byName.values()) {
-    if (other !== cls && other.baseObjectType === cls.baseObjectType && other.discriminatorValue === value) error(where, `${other.fullObjectType} already uses ${baseField} = "${value}"`);
+  const prop = base.schema?.properties?.[field];
+  if (!prop) error(where, `discriminatorField "${field}" must be one of ${base.fullObjectType}'s own properties`);
+  else {
+    if (field === "_id" || prop.type !== "string") error(where, `discriminatorField "${field}" must be a string property of ${base.fullObjectType}`);
+    if (!(base.schema.required ?? []).includes(field)) error(where, `discriminatorField "${field}" must be listed in ${base.fullObjectType}'s required`);
+    if (base.type === "TopLevel" && !(base.indexedFields ?? []).includes(field)) warn(where, `${base.fullObjectType}'s "${field}" is usually worth indexing`);
   }
 }
 

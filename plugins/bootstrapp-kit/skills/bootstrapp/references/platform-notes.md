@@ -47,12 +47,16 @@ what you are relying on from this page.
   fields (their access is set on the base) but keeps its records in its
   own collection: listing the base never returns them.
 - **Discriminated classes share the base's records** (crochik/BootstrApp
-  PR #75). The base passes `discriminatorField` (an own, required,
-  indexed string property); each class extending it passes its
-  `discriminatorValue`. Then:
+  PR #75). The base has an own, required, indexed string property
+  (`kind`). Each class extending it passes its `discriminatorValue` and
+  `discriminatorField` (the base's property). The server stores no field
+  name on the base: it infers it from the first variant's mapping, so
+  only the first variant must pass it, but manifests always carry both.
+  Then:
   - The server keeps the base's discriminator property an enum (a select)
     of the variants' values, each described by its variant's class name
-    (`x-enum-descriptions` in the spec). Values the base's own schema
+    (`x-enum-descriptions` in the spec), and the base's schema carries an
+    OpenAPI `discriminator` mapping each value to its variant. Values the base's own schema
     lists in an `enum` that no variant uses stay in it as plain base
     records; any other value is rejected. `get_object_class` returns the
     same map as `discriminatedClasses`.
@@ -69,8 +73,9 @@ what you are relying on from this page.
   - Embedded bases work the same way: a `$ref`, array or dictionary of a
     discriminated embedded class stores and reads each object as the
     variant its value names.
-  - The base's `discriminatorField` can't change while variants use it,
-    and each variant of a base needs a different value. A top-level class
+  - While variants use it, the base's property must stay a required
+    string, every class extending the base must be a variant on the same
+    property, and each variant needs a different value. A top-level class
     that already has its own collection can't become a variant (add a new
     class), and a variant can't stop being one.
   - Full text search uses one text index per collection, built for the

@@ -61,8 +61,8 @@ were never applied won't be in it.
   `{ field: "#text", operator: "Eq", value: "words" }` (any word matches).
   The rest: platform notes, "Filtering and reading data".
 - Sort parameters: use them only if the generated signature has them.
-- Discriminated classes (a base with `discriminatorField`, variants with
-  `discriminatorValue`, see `bootstrapp-object-types`): list and filter
+- Discriminated classes (variants with `discriminatorValue`, see
+  `bootstrapp-object-types`): list and filter
   through the base to show all variants together, and switch on the
   discriminator field to render each row. Read one record by id through
   the base or its variant. Create and update through the variant's

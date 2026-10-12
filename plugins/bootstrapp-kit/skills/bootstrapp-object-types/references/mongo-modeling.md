@@ -24,7 +24,8 @@ Ask, for each candidate class:
 | many:many without data (posts ↔ tags) | array of ids or strings on the side read most |
 | many:many with data (students ↔ courses with grade) | top-level link class (`Enrollment` with `studentId`, `courseId`, `grade`) |
 | lookup table (status, category used for filtering) | string `enum` if fixed; top-level class if users edit it |
-| polymorphic rows | one class + discriminator, or base class + children via `baseObjectType` |
+| polymorphic rows (card or bank payment) | base with a `kind` string + variants (`discriminatorField`, `discriminatorValue`), or one flat class with a `kind` enum when variants are small |
+| shared shape, never read together | base class + children via `baseObjectType` (separate collections) |
 | audit/history | top-level append-only class with `<subject>Id` and timestamp |
 
 ## Read-path checklist

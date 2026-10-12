@@ -43,6 +43,46 @@ what you are relying on from this page.
   `baseObjectType` argument of `add_object_class` (the manifest's
   `baseObjectType`), not through `allOf` in the schema. Embedding is a
   different relationship and is not expressed by `baseObjectType`.
+- **`baseObjectType` alone only reuses fields.** The child gets the base's
+  fields (their access is set on the base) but keeps its records in its
+  own collection: listing the base never returns them.
+- **Discriminated classes share the base's records** (crochik/BootstrApp
+  PR #75). The base has an own, required, indexed string property
+  (`kind`). Each class extending it passes its `discriminatorValue` and
+  `discriminatorField` (the base's property). The server stores no field
+  name on the base: it infers it from the first variant's mapping, so
+  only the first variant must pass it, but manifests always carry both.
+  Then:
+  - The server keeps the base's discriminator property an enum (a select)
+    of the variants' values, each described by its variant's class name
+    (`x-enum-descriptions` in the spec), and the base's schema carries an
+    OpenAPI `discriminator` mapping each value to its variant. Values the base's own schema
+    lists in an `enum` that no variant uses stay in it as plain base
+    records; any other value is rejected. `get_object_class` returns the
+    same map as `discriminatedClasses`.
+  - A top-level variant shares the base's collection. Its value is part of
+    its account constraint: create always stores it, whatever the body
+    says, and reading, filtering, updating or deleting through the
+    variant only touches records with that value.
+  - Listing or filtering the base returns every variant's records with the
+    base's fields. `GET` by id through the base returns the variant's
+    fields too, and `PATCH` through the base updates the record as its
+    variant. `POST` to the base creates the variant whose value matches
+    the body's discriminator; a value no variant has creates a plain base
+    record (only values the base's enum lists).
+  - Embedded bases work the same way: a `$ref`, array or dictionary of a
+    discriminated embedded class stores and reads each object as the
+    variant its value names.
+  - While variants use it, the base's property must stay a required
+    string, every class extending the base must be a variant on the same
+    property, and each variant needs a different value. A top-level class
+    that already has its own collection can't become a variant (add a new
+    class), and a variant can't stop being one.
+  - Full text search uses one text index per collection, built for the
+    first class that needed it (normally the base), so put searchable
+    text on the base.
+  - A server without PR #75 rejects or ignores the two arguments; then
+    use one flat class with a `kind` enum instead.
 - **Supported property shapes.** `string` (formats `date`, `date-time`,
   `email`, `uri`, `password`, `uuid`; `enum` becomes a select), `integer`,
   `number`, `boolean`, arrays of strings/numbers/objects, string arrays with

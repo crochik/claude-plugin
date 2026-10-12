@@ -8,7 +8,7 @@ from this page, the live schema wins.
 
 | Arg | Notes |
 |---|---|
-| `appName` | snake_case. Becomes the OIDC `client_id` and the `app.<appName>` namespace. |
+| `appName` | snake_case. Becomes the OIDC `client_id` and the `app.<appName>` namespace. On servers with BootstrApp PR #73: a letter, then letters, digits or `_` (up to 40), and unique across the platform (it is refused if any account already uses that client id). |
 | `appTitle` | Human-readable. |
 | `appDescription` | Paragraph. |
 
@@ -78,8 +78,9 @@ profiles }] }`.
 | `elevated` | Required boolean. `false`: the script's reads and writes run with the caller's access. `true`: they ignore the caller's profile (permissions and constraints); writes are still attributed to the caller. Optional on `update_action_script`, where omitting it keeps the current setting. |
 
 Validates the script against the app's classes and the system modules
-(`input` is a global), and rejects it with `Syntax`/`Type`/`Reference` errors
-and line/column when invalid, leaving the stored script unchanged.
+(`input` is a global). On servers with BootstrApp PR #73, imports other than
+`system.*` and the app's own `app.<app_name>` modules are refused. Invalid scripts are rejected with `Syntax`/`Type`/`Reference` errors
+and line/column, leaving the stored script unchanged.
 Otherwise stores it and adds or updates the step that runs it when the action
 is invoked (top-level classes in `app.<app_name>` only). Safe to repeat.
 `update_action_script` is the older name; on servers before PR #28 it only

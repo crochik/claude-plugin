@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-object-types
 description: Design BootstrApp ObjectTypes (classes) - the JSON Schemas that are both the MongoDB document and the API model - including top-level vs embedded, references, inheritance, indexed fields and naming. Use when creating, reviewing or changing the data model of a BootstrApp app, or when translating an existing app's models (SQL tables, ORM models, Mongoose schemas, TS types) into ObjectTypes.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Designing ObjectTypes

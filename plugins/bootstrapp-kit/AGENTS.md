@@ -1,6 +1,7 @@
 # Using bootstrapp-kit outside Claude Code
 
-The useful parts of this kit are harness-neutral:
+The useful parts of this kit are harness-neutral. Using them in any harness
+is subject to the same license as the plugin (see [LICENSE](LICENSE)):
 
 - **Skills** (`skills/*/SKILL.md`) follow the Agent Skills format: a folder
   with a `SKILL.md` whose frontmatter has `name` and `description`, plus

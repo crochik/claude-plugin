@@ -1,6 +1,7 @@
 ---
 name: bootstrapp
 description: Core guide for any work on an app whose backend is (or is moving to) the BootstrApp PaaS (bootstrapp.cloud) - the mental model, the bootstrapp/ project folder, the MCP tools, and how to pick the next step from the app's current state. Load it first whenever BootstrApp, the bootstrapp MCP server, ObjectTypes, ApiScripts, or a bootstrapp/ folder comes up.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Working with BootstrApp

@@ -1,6 +1,7 @@
 ---
 name: bootstrapp-actions
 description: Decide whether a BootstrApp operation needs a server-side action, and define it - target class, scope (Instance/Bulk/Class), typed input and output classes, whether its script runs elevated, and registration. Use when the user needs an API operation beyond the auto-generated CRUD and filter endpoints, or when mapping an existing app's custom endpoints onto BootstrApp.
+license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Defining actions

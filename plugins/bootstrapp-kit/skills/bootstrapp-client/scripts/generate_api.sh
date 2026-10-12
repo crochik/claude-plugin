@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Crochik Software Solutions, LLC. All rights reserved.
+# Proprietary; use requires agreement to CSS license terms and prior written
+# authorization from CSS. See LICENSE.
 # Generate a typed API client from a saved OpenAPI spec by invoking the
 # language-specific `bootstrapp-gen-<language>` executable on PATH.
 #

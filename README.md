@@ -1,7 +1,8 @@
 # BootstrApp plugins for Claude Code
 
 Claude Code plugins for building apps on the
-[BootstrApp](https://bootstrapp.cloud) PaaS.
+[BootstrApp](https://bootstrapp.cloud) PaaS, by Crochik Software Solutions, LLC.
+Proprietary: use requires a license and written authorization; see [License](#license).
 
 | Plugin | What it does |
 |---|---|
@@ -35,4 +36,10 @@ See the [kit's README](./plugins/bootstrapp-kit/README.md) for usage.
 
 ## License
 
-MIT
+Copyright (c) 2026 Crochik Software Solutions, LLC. All rights reserved.
+
+This repository is proprietary and is **not** open source. It is not licensed
+under MIT or any other open-source license, and its public visibility grants no
+rights. Any use, including installing the plugins, is subject to agreeing to
+the license terms of Crochik Software Solutions, LLC (CSS) and to prior written
+authorization from CSS. See [LICENSE](./LICENSE).

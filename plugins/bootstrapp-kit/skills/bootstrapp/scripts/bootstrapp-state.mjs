@@ -205,12 +205,7 @@ function check(state) {
     for (const field of cls.indexedFields ?? []) {
       if (!props[field]) error(where, `indexed field "${field}" is not a property`);
     }
-    for (const fk of cls.foreignKeys ?? []) {
-      if (!props[fk.localFieldName]) error(where, `foreign key field "${fk.localFieldName}" is not a property`);
-      if (!fk.referenceObjectType || !fk.referenceFieldName) error(where, "foreign keys need referenceObjectType and referenceFieldName");
-      else if (fk.referenceObjectType.startsWith("app.") && !byName.has(fk.referenceObjectType)) warn(where, `foreign key target ${fk.referenceObjectType} has no local manifest`);
-      if (cls.type === "TopLevel" && !(cls.indexedFields ?? []).includes(fk.localFieldName)) warn(where, `reference field "${fk.localFieldName}" is usually worth indexing`);
-    }
+    checkForeignKeys(cls, propsOf, where, byName, error, warn);
     for (const key of Object.keys(schema.properties ?? {})) {
       if (key !== "_id" && !CAMEL.test(key)) warn(where, `property "${key}" should be camelCase`);
     }
@@ -446,12 +441,67 @@ function checkDiscriminator(cls, where, byName, error, warn) {
   }
 }
 
-// Classes a class needs registered before it: its base class and the classes it embeds by $ref.
+// The shape a foreign key's property must have: a string (reference), an array of strings (multi reference),
+// or a dictionary of strings (its keys or values are references, per dictionaryPart). null when it can't hold ids.
+function foreignKeyShape(prop) {
+  if (prop?.type === "string" && !prop.enum) return "reference";
+  if (prop?.type === "array" && prop.items?.type === "string" && !prop.items.enum) return "multi";
+  if (prop?.type === "object" && !prop.properties && prop.additionalProperties?.type === "string") return "dictionary";
+  return null;
+}
+
+// Mirrors add_object_class: every property that holds ids of other records is a foreign key of the right shape,
+// pointing at a top-level class and at _id or one of its fields.
+function checkForeignKeys(cls, propsOf, where, byName, error, warn) {
+  // the server looks the field up among the class' own properties, and the target's field among all of its
+  const props = cls.schema?.properties ?? {};
+  const seen = new Set();
+  const declared = new Set();
+  for (const fk of cls.foreignKeys ?? []) {
+    const field = fk.localFieldName;
+    const part = fk.dictionaryPart;
+    declared.add(field);
+    if (seen.has(`${field}|${part ?? ""}`)) error(where, `foreign key field "${field}" is listed more than once`);
+    seen.add(`${field}|${part ?? ""}`);
+    if (part !== undefined && part !== null && !["key", "value"].includes(part)) error(where, `foreign key "${field}": dictionaryPart must be "key" or "value"`);
+    if (!fk.referenceObjectType || !fk.referenceFieldName) error(where, "foreign keys need referenceObjectType and referenceFieldName");
+
+    const prop = props[field];
+    if (!prop) { error(where, `foreign key field "${field}" is not one of the class' own properties`); continue; }
+    if (field === "_id") { error(where, "_id is the record's own id and can't be a foreign key"); continue; }
+    const shape = foreignKeyShape(prop);
+    if (!shape) error(where, `foreign key field "${field}" can't hold ids: use a string, an array of strings, or a dictionary of strings`);
+    else if (shape === "dictionary" && !part) error(where, `foreign key field "${field}" is a dictionary: set dictionaryPart to "key" (its keys are the ids) or "value"`);
+    else if (shape !== "dictionary" && part) error(where, `foreign key field "${field}" is not a dictionary of strings: leave dictionaryPart out`);
+
+    const target = fk.referenceObjectType === cls.fullObjectType ? cls : byName.get(fk.referenceObjectType);
+    if (!fk.referenceObjectType) continue;
+    if (!target) {
+      if (fk.referenceObjectType.startsWith("app.")) warn(where, `foreign key target ${fk.referenceObjectType} has no local manifest; it must already exist on the server`);
+    } else if (target.type === "Embedded") {
+      error(where, `foreign key "${field}" points at ${fk.referenceObjectType}, an embedded class; only top-level classes can be referenced`);
+    } else if (fk.referenceFieldName && fk.referenceFieldName !== "_id" && !propsOf(target)[fk.referenceFieldName]) {
+      error(where, `foreign key "${field}" points at ${fk.referenceObjectType}.${fk.referenceFieldName}, which is not one of its properties`);
+    }
+    if (cls.type === "TopLevel" && shape !== "dictionary" && !(cls.indexedFields ?? []).includes(field)) warn(where, `reference field "${field}" is usually worth indexing`);
+  }
+
+  // ids left as plain strings: the server stores them as text with no link to the class they point at
+  for (const [field, prop] of Object.entries(cls.schema?.properties ?? {})) {
+    if (field === "_id" || declared.has(field)) continue;
+    const isId = (prop?.type === "string" && prop.format === "uuid" && field.endsWith("Id")) ||
+      (prop?.type === "array" && prop.items?.type === "string" && prop.items.format === "uuid" && field.endsWith("Ids"));
+    if (isId) warn(where, `"${field}" looks like it holds ids of another class; if it does, add it to foreignKeys so it becomes a reference field (user ids stay plain)`);
+  }
+}
+
+// Classes a class needs registered before it: its base class, the classes it embeds by $ref, and the classes its foreign keys point at.
 function classDependencies(cls) {
   const deps = schemaRefs(cls.schema)
     .filter(({ ref }) => ref.startsWith(REF_PREFIX))
     .map(({ ref }) => ref.slice(REF_PREFIX.length));
   if (cls.baseObjectType) deps.push(cls.baseObjectType);
+  for (const fk of cls.foreignKeys ?? []) if (fk.referenceObjectType && fk.referenceObjectType !== cls.fullObjectType) deps.push(fk.referenceObjectType);
   return deps;
 }
 
@@ -540,14 +590,32 @@ function plan(state) {
     const { profileName, description, inheritsFrom } = strip(state.profiles.find((p) => p.data.profileName === item.name).data);
     calls.push({ tool: item.state === "new" ? "add_profile" : "replace_profile", record: ["profile", item.name], args: { appName, profileName, description, ...(inheritsFrom?.length ? { inheritsFrom } : {}) } });
   }
-  for (const item of dependencyOrder(items.filter((i) => i.kind === "class"), state)) {
+  // a foreign key's target must exist on the server first; classes that point at each other are added
+  // without the foreign keys to the ones not added yet, and replaced with them once every class exists
+  const classItems = items.filter((i) => i.kind === "class");
+  const newClasses = new Set(classItems.filter((i) => i.state === "new").map((i) => i.name));
+  const onServer = new Set();
+  const deferred = [];
+  for (const item of dependencyOrder(classItems, state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
     if (item.state === "new" || item.state === "changed") {
       const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
-      const tool = item.state === "new" ? "add_object_class" : "replace_object_class";
-      calls.push({ tool, record: ["class", item.name], args: { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) } });
+      const args = (fks) => ({ appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(fks?.length ? { foreignKeys: fks } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) });
+      const pendingTarget = (fk) => fk.referenceObjectType !== fullObjectType && newClasses.has(fk.referenceObjectType) && !onServer.has(fk.referenceObjectType);
+      const waiting = (foreignKeys ?? []).filter(pendingTarget);
+      if (!waiting.length) {
+        calls.push({ tool: item.state === "new" ? "add_object_class" : "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
+      } else if (item.state === "new") {
+        const targets = [...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ");
+        calls.push({ tool: "add_object_class", record: null, note: `without its foreign keys to ${targets} (not added yet); don't record it, the replace_object_class further down adds them and is recorded`, args: args((foreignKeys ?? []).filter((fk) => !pendingTarget(fk))) });
+        deferred.push({ tool: "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
+      } else {
+        deferred.push({ tool: "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
+      }
     }
+    onServer.add(item.name);
   }
+  calls.push(...deferred);
   for (const item of pending("access")) {
     const { data } = state.access.find((a) => accessName(a.data) === item.name);
     calls.push({ tool: "replace_class_access", record: ["access", item.name], args: strip(data) });
@@ -684,7 +752,7 @@ switch (command) {
   case "plan": {
     const result = plan(state);
     if (!summary) { console.log(JSON.stringify(result, null, 2)); break; }
-    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.record[1]}`);
+    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.record?.[1] ?? c.args.fullObjectType}${c.note ? ` (${c.note})` : ""}`);
     for (const b of result.blocked) console.log(`BLOCKED ${b.kind} ${b.name}: ${b.reason}`);
     if (!result.calls.length && !result.blocked.length) console.log("Nothing to apply.");
     break;

@@ -21,7 +21,7 @@ Ask, for each candidate class:
 | 1:few owned (order ↔ lines, ≤ ~100) | array of embedded objects (`items: {"$ref": ...}`) |
 | keyed set owned (settings per locale) | dictionary of embedded objects (`additionalProperties: {"$ref": ...}`) |
 | 1:many (project ↔ tasks) | top-level child with `projectId` (indexed, foreign key) |
-| many:many without data (posts ↔ tags) | array of ids or strings on the side read most |
+| many:many without data (posts ↔ tags) | array of ids on the side read most (`tagIds`, foreign key → multi reference), or strings when tags aren't records |
 | many:many with data (students ↔ courses with grade) | top-level link class (`Enrollment` with `studentId`, `courseId`, `grade`) |
 | lookup table (status, category used for filtering) | string `enum` if fixed; top-level class if users edit it |
 | polymorphic rows (card or bank payment) | base with a `kind` string + variants (`discriminatorField`, `discriminatorValue`), or one flat class with a `kind` enum when variants are small |
@@ -48,7 +48,9 @@ Ask, for each candidate class:
 
 | Kind | Schema |
 |---|---|
-| id / reference | `{ "type": "string", "format": "uuid" }` |
+| id / reference | `{ "type": "string", "format": "uuid" }` + `foreignKeys` entry |
+| list of references | `{ "type": "array", "items": { "type": "string", "format": "uuid" } }` named `…Ids` + `foreignKeys` entry |
+| map keyed (or valued) by references | `{ "type": "object", "additionalProperties": { "type": "string" } }` + `foreignKeys` entry with `dictionaryPart` |
 | money | `{ "type": "integer", "minimum": 0 }` named `…Cents`, or string decimal |
 | timestamp | `{ "type": "string", "format": "date-time" }` |
 | date | `{ "type": "string", "format": "date" }` |

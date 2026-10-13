@@ -26,7 +26,7 @@ calling user a profile on the app so they can log in.
 | `fullObjectType` | Must start with `app.<appName>`. |
 | `type` | `TopLevel` or `Embedded`. |
 | `indexedFields` | Required. Only these fields can be used in filter conditions and `orderBy`. `[]` for embedded. |
-| `foreignKeys` | Optional `[{ localFieldName, referenceObjectType, referenceFieldName }]`. Each `localFieldName` must be a property in the schema (else the call fails). Turns the field into a reference and adds a one-to-one relation. |
+| `foreignKeys` | Optional `[{ localFieldName, referenceObjectType, referenceFieldName, dictionaryPart? }]`. Every property holding ids of other records belongs here. `localFieldName` is one of the class' own properties; its shape picks the stored field: a string becomes a reference field plus a one-to-one relation, an array of strings a multi reference field (no relation), a dictionary of strings (`additionalProperties: {type: string}`) gets a reference key or value field (`dictionaryPart: "key"` or `"value"`, one entry each). The target must already exist (or be the class itself) and be top level; `referenceFieldName` is `_id` or one of its fields. Anything else fails (BootstrApp PR #79). The result lists uuid `*Id`/`*Ids` properties left out. |
 | `baseObjectType` | Optional parent class (must also be under `app.<appName>`). |
 | `discriminatorField` | With `discriminatorValue`: the base's own required string property that holds the value. Needed for the first variant of a base; later ones may omit it (it must match), since the server infers it from the base's variants. The base's property becomes an enum of the variants' values, each described by its class. |
 | `discriminatorValue` | Makes the class a variant of its base: its value of the base's discriminator property, different for each variant. Required once the base has a variant. Leave the property itself out of this schema. |
@@ -109,7 +109,8 @@ Use it to pull scripts written elsewhere into `scripts/<actionName>.ts`.
 `get_object_class(fullObjectType, compact?)` → `{ fullObjectType, type, baseObjectType,
 discriminatorField?, discriminatorValue?, discriminatedClasses?, label,
 description, indexedFields, foreignKeys: [{ localFieldName,
-referenceObjectType, referenceFieldName }], schemas }`.
+referenceObjectType, referenceFieldName, dictionaryPart? }], schemas }`.
+`foreignKeys` covers single, multi and dictionary references.
 `discriminatorField` is the base's discriminator property, on a
 discriminated base and on its variants; `discriminatorValue` is a
 variant's value; `discriminatedClasses` (on a base) maps each value to its

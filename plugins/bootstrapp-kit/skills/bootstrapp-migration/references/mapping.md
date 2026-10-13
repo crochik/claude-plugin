@@ -21,6 +21,7 @@
 | `id` int/serial | `_id` uuid (new) + `legacyId` integer, indexed, during migration |
 | `uuid` primary key | `_id` uuid; keep the same values on import if the platform accepts them, otherwise `legacyId` |
 | foreign key column | `<name>Id` uuid + `foreignKeys` entry + indexed |
+| join table without extra columns | `<name>Ids` array of uuids on the side read most + `foreignKeys` entry |
 | `varchar(n)` / `text` | `string` with `maxLength` when meaningful |
 | `decimal(p,s)` money | integer minor units, or string decimal |
 | `float`/`double` | `number` |

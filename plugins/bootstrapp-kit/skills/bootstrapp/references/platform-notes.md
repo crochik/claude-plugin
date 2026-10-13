@@ -39,6 +39,18 @@ what you are relying on from this page.
   it silently drops `$ref` properties and inline nested classes. After
   registering a class that embeds, check the generated spec or `.d.ts` shows
   the nested shape; if it does not, the server is older, so tell the user.
+- **Foreign keys pick the field type from the property's shape**
+  (crochik/BootstrApp PR #79). A string becomes a reference field with a
+  one-to-one relation (its read model adds `{field}|Name` and the related
+  object), an array of strings a multi reference field (no relation, so
+  reads return only the ids), and a dictionary of strings a dictionary
+  whose key or value field (`dictionaryPart`) is a reference. The target
+  must exist first and be top level, so classes that reference each
+  other are added without that foreign key and replaced with it (`plan`
+  does this). Two references to the same class name their relations
+  after the fields. A server without PR #79 turns any foreign key into a
+  single reference and stores a dictionary of strings as an empty
+  embedded class; check `get_object_class` after applying.
 - **Inheritance is `baseObjectType`.** A class extends another through the
   `baseObjectType` argument of `add_object_class` (the manifest's
   `baseObjectType`), not through `allOf` in the schema. Embedding is a

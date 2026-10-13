@@ -73,7 +73,7 @@ For each top-level class `X` in namespace `ns` the profile can access:
 |---|---|---|
 | `filterX(conditions, fields, orderBy?, reverseOrder?, top?, skip?)` | `X[]` | AND of `{ field, operator, value }`; `field` and `orderBy` must be indexed; `fields` is the projection (always name what you read). `#text` with `Eq` searches the class's text fields. |
 | `createX(fields, t?)` | new id (string) | Server-assigned fields (`_id`) are omitted. |
-| `updateXById(id, fields, t?)` | boolean | A patch: fields you leave out or set to `null` don't change; `0`, `""` and `false` are written; an embedded object or array is replaced whole. |
+| `updateXById(id, fields, t?)` | boolean | A patch: pass only the fields you are changing, never the whole record read back. Fields you leave out or set to `null` don't change; `0`, `""` and `false` are written; an embedded object or array is replaced whole. |
 | `deleteXById(id, t?)` | boolean | Hard delete. |
 | `<actionName>(input)` | the action's output | Other registered actions, in their input class's namespace. |
 

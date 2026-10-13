@@ -148,7 +148,9 @@ Maps to `add_object_class` as: `appName` (from `app.json`),
 `fullObjectType`, `type` (`TopLevel` | `Embedded`), `baseObjectType`
 (optional), `discriminatorField` / `discriminatorValue` (optional, on
 variants),
-`indexedFields` (required; `[]` for embedded), `foreignKeys` (optional),
+`indexedFields` (required; `[]` for embedded), `foreignKeys` (optional;
+every property holding ids, with `dictionaryPart` for a dictionary, see
+`bootstrapp-object-types`),
 `schema`, `isFullTextSearchable` (optional, default `true`).
 
 ## `actions/<actionName>.json`

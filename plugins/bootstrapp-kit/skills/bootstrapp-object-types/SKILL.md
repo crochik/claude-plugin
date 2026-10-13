@@ -62,9 +62,16 @@ The full checklist with examples is in
   `<parent>Id` reference. MongoDB documents cap at 16 MB and large arrays make
   every read and write expensive.
 - **References** are `<name>Id` fields, `{ "type": "string", "format": "uuid" }`,
-  declared in `foreignKeys` and listed in `indexedFields`. Many-to-many: an
-  array of ids on the side that is read more, or a top-level link class when
-  the link carries data.
+  declared in `foreignKeys` and listed in `indexedFields`. Every property
+  that holds ids of other records goes in `foreignKeys`; a plain uuid
+  string has no link to the class it points at. The shape picks the field:
+  a single id is a reference, an array of ids of one class (`<name>Ids`) a
+  multi reference, and a dictionary keyed or valued by ids
+  (`additionalProperties: {type: string}`) takes `dictionaryPart: "key"` or
+  `"value"`. Many-to-many: an array of ids on the side that is read more,
+  or a top-level link class when the link carries data. User ids
+  (`ownerId`, `assigneeId`) point at platform users, not app classes, and
+  stay plain uuid strings.
 - **Denormalize deliberately.** Copying a display field (`customerName` next
   to `customerId`) saves a lookup on every list screen, but someone must keep
   it in sync; note who (an action, or the client on update) in `$notes`.

@@ -195,7 +195,10 @@ When the user wants local definitions pushed:
    and embedded classes first), class access, actions, action access,
    scripts, `auth.json`. Actions don't depend on each other and can go in
    parallel; so can access calls. Access shown as `recheck` is applied again
-   because its class changed.
+   because its class changed. Classes that reference each other show up
+   twice: an `add_object_class` with `record: null` and a `note` (don't
+   record it), then a `replace_object_class` with the foreign keys, which
+   is recorded.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
    `script`, `auth`; an access item's name is `<Profile>/<fullObjectType>`).

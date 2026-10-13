@@ -50,6 +50,13 @@ were never applied won't be in it.
   only, on indexed fields; the response contains only the listed fields plus
   `_id`, so always pass every field the screen shows. Operators and value
   rules: the server's filter-operators resource.
+- Update is a `PATCH`: send only the fields the user changed, not the
+  whole record (a form diffs against what it loaded). Fields left out or
+  `null` keep their value, so a field can't be cleared back to null;
+  `0`, `""` and `false` are written; an embedded object or array is
+  replaced whole, so send all of it when it changes. Posting the full
+  record back would overwrite whatever another user or action changed
+  since it was read.
 - Per action: two operations taking the input class. The plain one streams
   the run as server-sent events; the `/Result` one answers once with the
   output class as JSON. Use `/Result` unless the screen shows the progress

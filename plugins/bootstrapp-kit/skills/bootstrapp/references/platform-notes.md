@@ -172,7 +172,9 @@ what you are relying on from this page.
   `update<Class>ById(id, fields, t?)` → boolean (a patch: fields set to
   `null` or left out are untouched, `0`, `""` and `false` are written, and
   an embedded object or array is replaced whole, never merged; so a field
-  can't be cleared back to null through an update),
+  can't be cleared back to null through an update; the REST `PATCH`
+  behaves the same, both run `UpdateObjectAsync` with `PartialUpdate`; send
+  only the changed fields, since anything sent overwrites the stored value),
   `delete<Class>ById(id, t?)` → boolean. Registered actions are also
   callable, as `<actionName>(input)` in the input class's namespace.
 - `delete<Class>ById` works since BootstrApp PR #36 (2026-10-09); before

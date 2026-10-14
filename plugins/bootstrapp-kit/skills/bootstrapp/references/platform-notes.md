@@ -177,7 +177,7 @@ what you are relying on from this page.
   only the changed fields, since anything sent overwrites the stored value),
   `delete<Class>ById(id, t?)` → boolean. Registered actions are also
   callable, as `<actionName>(input)` in the input class's namespace.
-- Bulk writes (BootstrApp, 2026-10-14): `bulkAdd<Class>(items, t?)` and
+- Bulk writes (BootstrApp, 2026-10-14): `bulkCreate<Class>(items, t?)` and
   `bulkUpdate<Class>(items, t?)` exist when the profile may create / update
   the class. Each `bulkUpdate` item is the patch plus the object's `_id`.
   They return one `{ success, id?, error? }` per item, in input order. Items

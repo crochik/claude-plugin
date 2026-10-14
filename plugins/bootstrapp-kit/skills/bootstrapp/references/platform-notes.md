@@ -177,6 +177,14 @@ what you are relying on from this page.
   only the changed fields, since anything sent overwrites the stored value),
   `delete<Class>ById(id, t?)` → boolean. Registered actions are also
   callable, as `<actionName>(input)` in the input class's namespace.
+- Bulk writes (BootstrApp, 2026-10-14): `bulkCreate<Class>(items, t?)` and
+  `bulkUpdate<Class>(items, t?)` exist when the profile may create / update
+  the class. Each `bulkUpdate` item is the patch plus the object's `_id`.
+  They return one `{ success, id?, error? }` per item, in input order. Items
+  are written one at a time and independently: a failing item is reported,
+  not thrown, and the rest still run. With `t`, the script decides whether
+  to commit by checking the results. Not on servers older than that: check
+  `platform.d.ts`.
 - `delete<Class>ById` works since BootstrApp PR #36 (2026-10-09); before
   that the invoker had no delete branch and it did nothing.
 - Transactions (PR #36): the `system.mongodb` module has `createTransaction()`,

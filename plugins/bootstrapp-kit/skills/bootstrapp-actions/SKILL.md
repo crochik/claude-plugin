@@ -38,6 +38,12 @@ The two cases above that touch data the caller can't see or change need an
 elevated script too. Everything else runs with the caller's access; see
 "Elevated or the caller's access" in the `bootstrapp-apiscript` skill.
 
+Logic two actions share belongs in one of them (or in a helper action) that
+the others call from their scripts, not copied into each script. A helper is
+still an endpoint: grant it only to the profiles that may run it directly, or
+to none if only elevated scripts call it (see "Calling other actions" in the
+`bootstrapp-apiscript` skill).
+
 When migrating, each custom endpoint of the old backend gets this test. Plain
 reads and writes map to the generated endpoints; the rest become actions.
 

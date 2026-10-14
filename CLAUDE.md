@@ -81,7 +81,7 @@ The kit's own files are the source of truth; preserve these when extending:
 - **One working vertical slice** (sign-in, one real read, one real write)
   before anything elaborate. `.env.example` is committed, `.env` is gitignored.
 
-## Outstanding item
+## MCP server host
 
-Confirm the canonical production URL for the bootstrapp.cloud MCP endpoint
-before relying on the `.mcp.json` files in a published release.
+The `bootstrapp` MCP server is at `https://kit.bootstrapp.cloud/mcp`; both
+`.mcp.json` files point there.

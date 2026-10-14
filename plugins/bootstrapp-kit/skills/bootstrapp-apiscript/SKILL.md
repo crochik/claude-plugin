@@ -75,6 +75,8 @@ For each top-level class `X` in namespace `ns` the profile can access:
 | `createX(fields, t?)` | new id (string) | Server-assigned fields (`_id`) are omitted. |
 | `updateXById(id, fields, t?)` | boolean | A patch: pass only the fields you are changing, never the whole record read back. Fields you leave out or set to `null` don't change; `0`, `""` and `false` are written; an embedded object or array is replaced whole. |
 | `deleteXById(id, t?)` | boolean | Hard delete. |
+| `bulkAddX(items, t?)` | `{ success, id?, error? }[]` | `createX` for each item. One result per item, in the order of `items`; a failing item doesn't stop the rest or throw. |
+| `bulkUpdateX(items, t?)` | `{ success, id?, error? }[]` | `updateXById` for each item; an item is the patch plus the `_id` it applies to (`{ _id: p._id, stock: 3 }`). Same results as `bulkAddX`. |
 | `<actionName>(input)` | the action's output | Other registered actions, in their input class's namespace. |
 
 Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. On an array
@@ -157,6 +159,10 @@ return execute(input);
   their own. Call writing actions after the commit, or inline their logic.
 - A single write doesn't need one. Open the transaction after the reads and
   keep it short.
+- `bulkAddX` / `bulkUpdateX` don't throw for a bad item, so a transaction
+  around them is only all-or-nothing if the script checks every result's
+  `success` and throws when one is `false`. After a database error inside
+  the transaction, the rest of the items can fail too.
 - It needs the `system.mongodb` module in `platform.d.ts` (BootstrApp PRs #36
   and #43). A server between those two declares it as plain `mongodb`;
   import whichever name the file declares. If neither is there after

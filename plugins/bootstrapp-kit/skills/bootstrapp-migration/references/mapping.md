@@ -63,7 +63,9 @@
 - Small data: a script using the generated client (`create<Class>` per
   record), run locally with an admin login.
 - Larger data or derived fields: a `Class`-scoped import action that takes a
-  batch of records, validates, and creates them; call it in chunks.
+  batch of records, validates, and creates them with `bulkAdd<Class>` (when
+  `platform.d.ts` has it), returning the per-record results so failures
+  can be retried; call it in chunks.
 - Import parents before children so `<parent>Id` values can be mapped from
   `legacyId`.
 - Do a dry run against a copy or a test app first; imports are not

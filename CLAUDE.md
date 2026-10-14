@@ -63,8 +63,11 @@ The kit's own files are the source of truth; preserve these when extending:
   `access/actions/`, `auth.json`, taught by the `bootstrapp-access` skill.
   Users and organizations are data and have no manifests.
 - Platform facts it relies on (tool behavior, script runtime, known gaps) are
-  in `skills/bootstrapp/references/platform-notes.md`; update that file when
-  the platform changes.
+  served by the MCP server as `bootstrapp://reference/<file>` resources
+  (`platform-notes.md`, `tools.md`, `api-script.md`, …), from
+  `src/MCP.BootstrApp/Content/` in crochik/BootstrApp. Change them there,
+  with the platform change; the skills keep only workflow and kit
+  conventions and point at the resource.
 - **Discover, don't guess.** Client code and scripts only use endpoints,
   fields, functions and auth settings that the manifests, `generated/` files
   or the MCP server confirm.

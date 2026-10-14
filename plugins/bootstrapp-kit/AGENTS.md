@@ -15,7 +15,12 @@ is subject to the same license as the plugin (see [LICENSE](LICENSE)):
   - `skills/bootstrapp-client/scripts/generate_api.sh <spec> <outdir> <lang>`
 - **MCP server**: configure an HTTP (streamable) MCP server named
   `bootstrapp` pointing at the URL in [.mcp.json](.mcp.json). It uses OAuth;
-  the harness must support the MCP authorization flow.
+  the harness must support the MCP authorization flow. The platform
+  reference the skills rely on (platform notes, tool reference, schema
+  conventions, the ApiScript rule book, access control) is served by the
+  server as `bootstrapp://reference/<file>` resources, and its
+  `instructions` point any client at them, so the harness needs MCP
+  resource support (or the agent will only see the tools).
 
 Claude Code specifics you can ignore elsewhere: `commands/` (slash command
 shortcuts that load the skills), `agents/` (optional subagents for

@@ -13,7 +13,8 @@ Read these skill files from the bootstrapp-kit plugin (the caller usually
 passes the folder; otherwise Glob for `**/bootstrapp-kit/skills/*/SKILL.md`):
 
 - `skills/bootstrapp/SKILL.md` and `references/manifests.md` (file formats)
-- `skills/bootstrapp/references/platform-notes.md` (what the platform does today)
+- The `bootstrapp` MCP server's `bootstrapp://reference/platform-notes.md`
+  ("Classes", what the platform does today) and `schema-conventions.md`
 - `skills/bootstrapp-object-types/SKILL.md` and `references/mongo-modeling.md`
 - `skills/bootstrapp-actions/SKILL.md`
 

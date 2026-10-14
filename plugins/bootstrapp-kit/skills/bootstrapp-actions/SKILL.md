@@ -81,7 +81,7 @@ request/response, not a stored document.
 - Registered actions appear in the OpenAPI spec (regenerate the client) and as
   callable functions in other scripts (regenerate `platform.d.ts`).
 - Invoke the action once through the generated client to confirm the script
-  runs (see the platform notes in the `bootstrapp` skill about script wiring).
+  runs (see the server's `platform-notes.md`, "Actions", about script wiring).
 - Scope, payload classes, summary and description can change later with
   `replace_action`. The name can't: a renamed action is a new action, and the
   old one stays.

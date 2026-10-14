@@ -79,7 +79,7 @@ For each top-level class `X` in namespace `ns` the profile can access:
 | `deleteXById(id, t?)` | boolean | Hard delete. |
 | `bulkCreateX(items, t?)` | `{ success, id?, error? }[]` | `createX` for each item. One result per item, in the order of `items`; a failing item doesn't stop the rest or throw. |
 | `bulkUpdateX(items, t?)` | `{ success, id?, error? }[]` | `updateXById` for each item; an item is the patch plus the `_id` it applies to (`{ _id: p._id, stock: 3 }`). Same results as `bulkCreateX`. |
-| `<actionName>(input)` | the action's output | Other registered actions, in their input class's namespace. |
+| `<actionName>(input)` / `<actionName>(id, input)` | the action's output | Another registered action of the app, in its input class's namespace; instance actions take the object's id first. See Calling other actions. |
 
 Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. On an array
 field, `Eq` with `[x, y]` means it holds both and `In` that it holds any.
@@ -104,6 +104,34 @@ the class instead. The checker flags both.
 
 `t` is an optional transaction from the `system.mongodb` module, always the last
 argument. `filterX` takes none.
+
+## Calling other actions
+
+A script can run any other action of the app by calling it, so shared logic
+lives in one action instead of being copied into several scripts:
+
+```ts
+// instance action: the object's id, then its input
+const label = actions.createShippingLabel(input.id, { id: input.id, carrier: "ups" });
+// class action: just its input
+actions.recordAuditEntry({ kind: "shipped", orderId: input.id });
+```
+
+- Use the name `platform.d.ts` declares (regenerate it after registering
+  the action). Bulk actions can't be called, and neither can an action
+  whose flow is more than its script.
+- The call returns the called script's result. Its input is checked like a
+  request; an instance action's script gets the object as `input.Object`,
+  and gets `input.id` only if you also pass `id` in the input object.
+- The caller's profile must be allowed to run it (elevated scripts always
+  are, so an action granted to no profile is a helper only elevated
+  scripts can call). It runs with its own `elevated` setting, and its
+  `system.session` is still the original caller.
+- If it fails, the calling script fails too; there is no catch. Its writes
+  commit on their own, outside your transaction.
+- Recursion is allowed: at most 16 nested calls and 200 calls per run.
+  The full rules are in the server's `api-script.md`, "Calling other
+  actions".
 
 ## Atomic writes (transactions)
 

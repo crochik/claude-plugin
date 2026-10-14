@@ -40,6 +40,7 @@ Produce a mapping table per area:
 | table/model | top-level or embedded ObjectType | per the `bootstrapp-object-types` rules |
 | plain CRUD/list endpoint | generated create/update/delete/filter | check filters only need indexed fields, AND-only |
 | endpoint with logic, multi-write, or aggregate | action + ApiScript | per `bootstrapp-actions`; port the logic per `bootstrapp-apiscript` |
+| service function shared by several endpoints | an action the other scripts call | per "Calling other actions" in `bootstrapp-apiscript`; script-only, not bulk |
 | logic needing a capability scripts lack | stays outside (existing service, or a gap to raise) | check `platform.d.ts` |
 | roles/permissions | platform groups (enforced server-side) | don't port ACL fields into schemas |
 | login | BootstrApp OIDC | per `bootstrapp-client` auth section |

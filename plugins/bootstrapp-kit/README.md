@@ -15,7 +15,7 @@ to a running UI.
 
 ```
 skills/
-  bootstrapp/                core guide: folder layout, MCP tools, state, sync, platform notes
+  bootstrapp/                core guide: folder layout, MCP tools, state, sync
   bootstrapp-object-types/   ObjectType design for MongoDB (data model = API model)
   bootstrapp-actions/        when an action is needed; scope, input/output classes
   bootstrapp-access/         profiles, permissions, row constraints, sign-in, users

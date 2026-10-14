@@ -17,10 +17,12 @@ declared in the app's platform definitions, and returns the action's output.
    and actions. Regenerate it (`generate_platform_definitions`, save the URL's
    content to that path) whenever classes or actions changed since it was
    saved, or if it is missing. Grep it; don't read it whole.
-2. **The server's grammar and rule-book resources** (ApiScript grammar,
-   ApiScript rule book). Read them when the MCP server is reachable.
-3. **This skill's [references/language.md](references/language.md)**: a
-   snapshot of the rules plus the runtime behavior the grammar doesn't say.
+2. **The server's rule book and grammar**: `bootstrapp://reference/api-script.md`
+   (the language, what isn't allowed, strings and reserved names, bulk
+   writes, transactions, elevated scripts, users, files) and
+   `api-script.g4`. Read the rule book before writing a script.
+3. **The server's `platform-notes.md`**, "Script runtime": what the runtime
+   does around the language.
 
 If a script needs something the `.d.ts` doesn't declare (email, HTTP, files,
 current user), say so and stop on that part. Never invent a module or
@@ -82,7 +84,8 @@ For each top-level class `X` in namespace `ns` the profile can access:
 Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. On an array
 field, `Eq` with `[x, y]` means it holds both and `In` that it holds any.
 A range on one field is two conditions. Filtering and paging rules (no
-total, `top`/`skip`): the platform notes, "Filtering and reading data".
+total, `top`/`skip`): the server's `platform-notes.md`, "Filtering and
+reading data".
 
 Other system modules, when `platform.d.ts` declares them:
 `system.session` (the caller: `getUserId()`, `getOrganizationId()`, …,

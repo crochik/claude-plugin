@@ -66,7 +66,7 @@ were never applied won't be in it.
   page) until a page comes back short. Array fields: `Eq` with `[x]` is
   "contains x", `In` is "holds any". Full text search is the condition
   `{ field: "#text", operator: "Eq", value: "words" }` (any word matches).
-  The rest: platform notes, "Filtering and reading data".
+  The rest: the server's `platform-notes.md`, "Filtering and reading data".
 - Sort parameters: use them only if the generated signature has them.
 - Discriminated classes (variants with `discriminatorValue`, see
   `bootstrapp-object-types`): list and filter

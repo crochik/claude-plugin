@@ -13,9 +13,9 @@ code outside `bootstrapp/scripts/`.
 Read from the bootstrapp-kit plugin (the caller usually passes the folder;
 otherwise Glob for `**/bootstrapp-kit/skills/bootstrapp-apiscript/SKILL.md`):
 
-- `skills/bootstrapp-apiscript/SKILL.md`, `references/language.md`,
-  `references/examples.md`
-- `skills/bootstrapp/references/platform-notes.md` (script runtime section)
+- `skills/bootstrapp-apiscript/SKILL.md` and `references/examples.md`
+- The `bootstrapp` MCP server's `bootstrapp://reference/api-script.md` (the
+  language) and `platform-notes.md` ("Script runtime")
 
 Then, for each action in scope: its manifest in `bootstrapp/actions/`, its
 input and output class manifests, and the manifests of every class it reads
@@ -29,7 +29,7 @@ as unverified.
 
 ## Rules
 
-- Only the published grammar subset (see `language.md`). No arrow functions,
+- Only the published grammar subset (see `api-script.md`). No arrow functions,
   async/await, try/catch, switch, for…of, template literals, `new`, `?.`,
   `===`, `++`, `+=`.
 - Import each namespace you use; bare type names resolve only through

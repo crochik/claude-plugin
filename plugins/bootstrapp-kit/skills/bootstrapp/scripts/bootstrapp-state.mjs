@@ -185,7 +185,7 @@ function check(state) {
 
     const props = propsOf(cls);
     if (cls.type === "TopLevel") {
-      if (root && ns !== root) warn(where, `top-level class outside ${root}; actions on it may not run (see platform notes)`);
+      if (root && ns !== root) warn(where, `top-level class outside ${root}; actions on it may not run (see the server's platform-notes.md)`);
       const id = props._id;
       if (!id) error(where, "top-level classes need an _id property (string, format uuid)");
       else if (id.type !== "string" || id.format !== "uuid") error(where, "_id must be { type: string, format: uuid }");

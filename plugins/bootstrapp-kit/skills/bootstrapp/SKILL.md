@@ -96,7 +96,7 @@ The `bootstrapp` MCP server (streamable HTTP, OAuth; the first call opens a
 browser login) is the only way to change the backend. Tool names below are
 the server's own; your harness may prefix them (for example
 `mcp__bootstrapp__add_object_class`). Full argument reference and observed
-behavior: [references/mcp-tools.md](references/mcp-tools.md).
+behavior: the server's `bootstrapp://reference/tools.md` resource.
 
 | Tool | Use |
 |---|---|
@@ -107,7 +107,9 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 | `replace_action` | Change a registered action's input/output classes, scope, summary, description. |
 | `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
 | `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated`. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
-| `get_action_script` | Read the script stored on an action. |
+| `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
+| `validate_action_scripts` | Check every script of the app against the current classes; changes nothing. Run it after changing classes. |
+| `invoke_action` | Run an action's stored script now, as the owner (real writes). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
 | `get_namespaces`, `get_object_classes` | List what exists (names only). |
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
@@ -122,10 +124,23 @@ behavior: [references/mcp-tools.md](references/mcp-tools.md).
 Only the app's owner can call the tools that take an app (or a class or
 action of it); see the `bootstrapp-access` skill for the access tools.
 
-The server also publishes reference resources (schema conventions, filter
-operators, action scopes, the ApiScript grammar and rule book, auth config).
-List the server's resources and read the relevant one before relying on the
-snapshots in this kit; **the server's copy wins** where they differ.
+The platform facts live on the server, so they always match the deployed
+version. Read the resource before relying on a detail it covers:
+
+| Resource (`bootstrapp://reference/…`) | What it covers |
+|---|---|
+| `platform-notes.md` | How the platform behaves beyond the tool descriptions: classes, actions, script runtime, filtering, auth, access, known gaps. |
+| `tools.md` | Every tool's arguments, results and behavior. |
+| `schema-conventions.md` | Class schemas: documentation, `_id`, indexes, references, inheritance, naming. |
+| `api-script.md`, `api-script.g4` | The ApiScript language and modules (rule book and grammar). |
+| `access-control.md` | Profiles, permissions, constraints, recipes. |
+| `filter-operators.json`, `action-scopes.json`, `auth-config.json` | Filter operators, action scopes, sign-in settings. |
+
+Where a tool result lands in this kit: `get_object_class` is the API form of
+a class (drop the generated `{field}|Name` and relation fields before using
+it as a manifest; read the local manifest first when there is one);
+`set_class_full_text_search` changes `isFullTextSearchable`, so update the
+manifest to match.
 
 Download URLs from the generate tools are single use. Fetch them straight to
 disk (`curl -fsSL -o <path> <url>`) and do not print the files: they are large
@@ -179,7 +194,7 @@ name, a change in the BootstrApp admin, or reverting the local file. Scripts
 then go through `update_action_script` with the same arguments.
 
 Known platform gaps and behaviors worth knowing before you rely on something:
-[references/platform-notes.md](references/platform-notes.md).
+the server's `platform-notes.md` resource.
 
 ## Applying (sync)
 

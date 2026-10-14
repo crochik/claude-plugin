@@ -20,11 +20,11 @@ So there is one model, not a database model plus DTOs. Design each class as
 "the document I want to read and write in one go". Only action payloads get
 their own classes (see `bootstrapp-actions`).
 
-Before you start, read the `bootstrapp` skill (folder layout, MCP tools) and,
-if the MCP server is reachable, its schema-conventions and filter-operators
-resources. The output of this skill is one manifest per class in
-`bootstrapp/classes/` (format: the `bootstrapp` skill's
-`references/manifests.md`).
+Before you start, read the `bootstrapp` skill (folder layout, MCP tools) and
+the server's `bootstrapp://reference/` resources `schema-conventions.md`,
+`platform-notes.md` ("Classes") and `filter-operators.json`. The output of
+this skill is one manifest per class in `bootstrapp/classes/` (format: the
+`bootstrapp` skill's `references/manifests.md`).
 
 ## Workflow (adapt to the request)
 
@@ -89,7 +89,7 @@ The full checklist with examples is in
   collection, so one list or filter on the base covers them all, and each
   variant's endpoint covers just its records. The same works for embedded
   classes. Prefer a flat class with an enum and optional fields when the
-  variants differ by a field or two. See platform-notes for the exact
+  variants differ by a field or two. See the server's `platform-notes.md` for the exact
   behavior.
 - **Plain inheritance** (`baseObjectType` without a discriminator) only
   reuses fields: each child has its own collection and the base's list
@@ -120,7 +120,7 @@ The full checklist with examples is in
   properties camelCase.
 - Domain classes go directly in `app.<app_name>`. Use sub-namespaces only for
   action payloads (`app.<app_name>.actions`) unless you have confirmed
-  top-level classes elsewhere behave (see the platform notes).
+  top-level classes elsewhere behave (see the server's `platform-notes.md`).
 - Embed a named class with `{"$ref": "#/components/schemas/<full class
   name>"}` on a property, on array `items` (list) or on
   `additionalProperties` (string-keyed dictionary). The target must be an

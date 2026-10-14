@@ -112,17 +112,20 @@ lives in one action instead of being copied into several scripts:
 
 ```ts
 // instance action: the object's id, then its input
-const label = actions.createShippingLabel(input.id, { id: input.id, carrier: "ups" });
+const label = actions.createShippingLabel(input.Object._id, { carrier: "ups" });
 // class action: just its input
-actions.recordAuditEntry({ kind: "shipped", orderId: input.id });
+actions.recordAuditEntry({ kind: "shipped", orderId: input.Object._id });
 ```
 
 - Use the name `platform.d.ts` declares (regenerate it after registering
   the action). Bulk actions can't be called, and neither can an action
   whose flow is more than its script.
 - The call returns the called script's result. Its input is checked like a
-  request; an instance action's script gets the object as `input.Object`,
-  and gets `input.id` only if you also pass `id` in the input object.
+  request, so pass every required field of its input class (a required `id`
+  field isn't filled from the `id` argument). The `id` argument only picks
+  the object, which the called script gets as `input.Object`, as it does
+  through the API. An instance action's script that other scripts may call
+  reads its target from `input.Object._id`, not from an input field.
 - The caller's profile must be allowed to run it (elevated scripts always
   are, so an action granted to no profile is a helper only elevated
   scripts can call). It runs with its own `elevated` setting, and its

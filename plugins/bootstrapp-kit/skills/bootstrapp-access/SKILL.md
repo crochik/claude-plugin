@@ -49,6 +49,13 @@ Ask, in plain words, and propose defaults:
    (`ownerId`, a uuid set to `{{context "UserId"}}`); "their company's" needs
    `organizationId` (`{{context "OrganizationId"}}`). Add the field to the
    class manifest *before* writing the constraint.
+   A multi-tenant app (each customer sees only its own data) makes every
+   tenant an organization: every tenant class gets `organizationId` and every
+   tenant profile the constraint on it, tenants never use the default
+   profile, and onboarding creates the organization and invites the first
+   user into it (the tools, or an elevated script with
+   `system.user.createOrganization` + `invite`). Read "Multi-tenant apps" in
+   the server's `access-control.md` for the limits.
 4. **Which actions** each profile may run.
 5. **How do people get in?** Providers (Microsoft, Google, Salesforce,
    GitHub), open sign-up or invite only, and which profile new users get.
@@ -139,6 +146,14 @@ in. Invite-only apps need an invitation for everyone, including testers.
 
 Only the app's owner can use the access, auth and user tools; anyone else
 gets an error saying so.
+
+When the app itself must do this (a sign-up action that creates the
+customer's organization and invites its first user), an action script can:
+`system.user` has `getOrganizations`, `createOrganization`,
+`updateOrganization` and `invite(email, profile, name?, organization?)`.
+They need the caller's permission on users and organizations, so they are
+usually elevated scripts that check the caller first (see the
+bootstrapp-apiscript skill).
 
 ## Checking it works
 

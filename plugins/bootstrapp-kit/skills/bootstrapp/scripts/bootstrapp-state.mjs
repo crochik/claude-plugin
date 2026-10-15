@@ -10,7 +10,7 @@
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
 //   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp]
-//        kind: app | profile | class | access | action | action-access | script | auth
+//        kind: app | profile | class | access | action | action-access | shared-script | script | auth
 //
 // No dependencies; Node 18+.
 
@@ -29,6 +29,7 @@ const positional = args.slice(1).filter((a, i, all) => !a.startsWith("--") && al
 const SNAKE = /^[a-z][a-z0-9_]*$/;
 const PASCAL = /^[A-Z][A-Za-z0-9]*$/;
 const CAMEL = /^[a-z][A-Za-z0-9]*$/;
+const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SCOPES = ["Instance", "Bulk", "Class"];
 
 // Access control (see the bootstrapp-access skill). Names as the MCP tools take them.
@@ -44,7 +45,7 @@ const SIGNUP = ["open", "invite_only"];
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
-const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", script: "scripts", auth: null };
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", auth: null };
 
 function fail(message) {
   console.error(`bootstrapp-state: ${message}`);
@@ -90,6 +91,16 @@ const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 
 const actionArgs = (data) => { const { elevated, ...rest } = strip(data); return rest; };
 const scriptHash = (text, action) => hash(action?.elevated === true ? `${text}\n// elevated` : text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
+// replace_script takes the manifest's fields and the script together, so both are one item
+const sharedHash = (shared) => hash(`${JSON.stringify(strip(shared.data ?? {}))}\n${shared.text ?? ""}`);
+
+// Shared scripts a script calls: scripts.<name>(...) through its import of app.<app>.scripts
+function sharedCalls(text, appName) {
+  if (!text || !appName) return [];
+  const module = `app.${appName}.scripts`;
+  const aliases = [...text.matchAll(/import\s+\*\s+as\s+([A-Za-z_]\w*)\s+from\s+["']([^"']+)["']/g)].filter((m) => m[2] === module).map((m) => m[1]);
+  return [...new Set(aliases.flatMap((alias) => [...text.matchAll(new RegExp(`\\b${alias}\\.([A-Za-z_]\\w*)\\s*\\(`, "g"))].map((m) => m[1])))];
+}
 
 function load() {
   if (!existsSync(dir)) return null;
@@ -98,6 +109,13 @@ function load() {
   const actions = listFiles("actions", ".json").map((file) => ({ file, data: readJson(file) }));
   const scripts = listFiles("scripts", ".ts").map((file) => ({ file, name: basename(file, ".ts"), text: readFileSync(file, "utf8") }));
   const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
+  // shared/<scriptName>.json (the replace_script arguments) next to shared/<scriptName>.ts (its script)
+  const sharedNames = [...new Set([...listFiles("shared", ".json"), ...listFiles("shared", ".ts")].map((file) => basename(file).replace(/\.(json|ts)$/, "")))].sort();
+  const shared = sharedNames.map((name) => {
+    const json = join(dir, "shared", `${name}.json`);
+    const ts = join(dir, "shared", `${name}.ts`);
+    return { name, file: json, data: existsSync(json) ? readJson(json) : null, text: existsSync(ts) ? readFileSync(ts, "utf8") : null };
+  });
   // access/<profileName>/<fullObjectType>.json, and access/actions/<actionName>.json
   const accessDir = join(dir, "access");
   const profileDirs = existsSync(accessDir)
@@ -108,8 +126,8 @@ function load() {
   const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "scripts"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, profiles, access, actionAccess, auth, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, shared, profiles, access, actionAccess, auth, ledger, ledgerPath };
 }
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
@@ -254,8 +272,45 @@ function check(state) {
   }
 
   checkAccess(state, byName, propsOf, error, warn);
+  checkShared(state, byName, error, warn);
 
   return problems;
+}
+
+function checkShared(state, byName, error, warn) {
+  const profileNames = new Set(state.profiles.map((p) => p.data?.profileName).filter(Boolean));
+  for (const shared of state.shared) {
+    const where = `shared/${shared.name}.json`;
+    if (!IDENTIFIER.test(shared.name)) error(`shared/${shared.name}`, "the file name is the script's function name: use an identifier such as orderTotal");
+    if (shared.text === null) warn(where, `no script yet (shared/${shared.name}.ts)`);
+    if (!shared.data) { warn(`shared/${shared.name}.ts`, `no manifest (shared/${shared.name}.json with scriptName and description); it can't be applied`); continue; }
+    const data = shared.data;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!data.scriptName) error(where, "scriptName is required");
+    else if (data.scriptName !== shared.name) error(where, `scriptName "${data.scriptName}" doesn't match its file name ${shared.name}`);
+    else if (!CAMEL.test(data.scriptName)) warn(where, "scriptName should be camelCase");
+    if (!data.description) error(where, "description is required (what it does; callers see it in platform.d.ts)");
+    if ("elevated" in data) error(where, "shared scripts have no elevated flag: they run with their caller's access, elevated only when the caller is");
+    for (const key of ["inputObjectType", "outputObjectType"]) {
+      if (data[key] === undefined || data[key] === "") continue;
+      if (typeof data[key] !== "string") error(where, `${key} must be a class's full name`);
+      else if (!byName.has(data[key])) warn(where, `${key} ${data[key]} has no local manifest; it must already exist on the server`);
+    }
+    if (data.profiles !== undefined && !Array.isArray(data.profiles)) { error(where, "profiles must be a list of profile names (leave it out to let every caller run it)"); continue; }
+    for (const p of data.profiles ?? []) {
+      if (p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} can always call it; no need to list it`);
+      else if (!profileNames.has(p)) warn(where, `profile ${p} has no local manifest; it must already exist on the server`);
+    }
+  }
+
+  const sharedNames = new Set(state.shared.map((s) => s.name));
+  const appName = state.app?.name;
+  const callers = [...state.shared.map((s) => ({ where: `shared/${s.name}.ts`, text: s.text })), ...state.scripts.map((s) => ({ where: `scripts/${s.name}.ts`, text: s.text }))];
+  for (const { where, text } of callers) {
+    for (const name of sharedCalls(text, appName)) {
+      if (!sharedNames.has(name)) warn(where, `calls shared script ${name}, which has no local manifest; it must already exist on the server`);
+    }
+  }
 }
 
 function checkAccess(state, byName, propsOf, error, warn) {
@@ -552,6 +607,11 @@ function diff(state) {
     const h = scriptHash(script.text, action);
     items.push({ kind: "script", name: script.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
+  for (const shared of state.shared) {
+    const prev = ledger.sharedScripts[shared.name];
+    const h = sharedHash(shared);
+    items.push({ kind: "shared-script", name: shared.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
+  }
   const manifestItem = (kind, name, data, prev) => ({ kind, name, hash: hashJson(data), state: !prev ? "new" : prev.hash === hashJson(data) ? "applied" : "changed" });
   for (const { data } of state.profiles) {
     if (data.$error || !data.profileName) continue;
@@ -632,6 +692,21 @@ function plan(state) {
     const { data } = state.actionAccess.find((a) => a.data.actionName === item.name);
     calls.push({ tool: "replace_action_access", record: ["action-access", item.name], args: strip(data) });
   }
+  // shared scripts before the scripts that call them: a script is checked against what the server has when it is saved
+  for (const item of sharedOrder(pending("shared-script"), state)) {
+    const shared = state.shared.find((s) => s.name === item.name);
+    if (!shared.data || shared.data.$error || shared.text === null) {
+      blocked.push({ kind: "shared-script", name: item.name, reason: shared.text === null ? `no script (shared/${item.name}.ts)` : `no manifest (shared/${item.name}.json)` });
+      continue;
+    }
+    const { scriptName, description, inputObjectType, outputObjectType, profiles } = strip(shared.data);
+    calls.push({
+      tool: "replace_script",
+      record: ["shared-script", item.name],
+      ...(item.state === "changed" ? { note: "if its classes changed, run validate_action_scripts afterwards to find the callers it broke" } : {}),
+      args: { appName, scriptName, script: `<contents of ${join(dir, "shared", `${item.name}.ts`)}>`, description, ...(inputObjectType ? { inputObjectType } : {}), ...(outputObjectType ? { outputObjectType } : {}), ...(profiles?.length ? { profiles } : {}) },
+    });
+  }
   for (const item of items.filter((i) => i.kind === "script" && i.state !== "applied")) {
     const action = state.actions.find((a) => a.data.actionName === item.name)?.data;
     if (!action || !registered.has(item.name)) {
@@ -659,6 +734,25 @@ function profileOrder(profileItems, state) {
     ordered.push(item);
   };
   profileItems.forEach(visit);
+  return ordered;
+}
+
+// Shared scripts another one calls go first (scripts that call each other can't both be new: save one without the call first).
+function sharedOrder(sharedItems, state) {
+  const byName = new Map(sharedItems.map((i) => [i.name, i]));
+  const ordered = [];
+  const visiting = new Set();
+  const done = new Set();
+  const visit = (item) => {
+    if (done.has(item.name) || visiting.has(item.name)) return;
+    visiting.add(item.name);
+    const text = state.shared.find((s) => s.name === item.name)?.text;
+    for (const dep of sharedCalls(text, state.app?.name)) if (dep !== item.name && byName.has(dep)) visit(byName.get(dep));
+    visiting.delete(item.name);
+    done.add(item.name);
+    ordered.push(item);
+  };
+  sharedItems.forEach(visit);
   return ordered;
 }
 
@@ -698,7 +792,7 @@ function record(state, kind, names) {
   }
   const ordered = {
     app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
-    actions: ledger.actions, actionAccess: ledger.actionAccess, scripts: ledger.scripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
+    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
   };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
@@ -730,7 +824,7 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", script: "Scripts", auth: "Sign-in (auth.json)" };
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", auth: "Sign-in (auth.json)" };
     for (const kind of Object.keys(titles)) {
       const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;

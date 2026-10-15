@@ -90,8 +90,15 @@ reading data".
 Other system modules, when `platform.d.ts` declares them:
 `system.session` (the caller: `getUserId()`, `getOrganizationId()`, …,
 also in elevated scripts) and `system.user` (`invite(email, profile,
-name?, organizationId?)` → user id; check who the caller is before
-inviting from an elevated script, and pick the profile in the script)
+name?, organization?)` → user id, where `organization` is an
+organization's id or name; `getOrganizations(search?)`,
+`createOrganization(name, email?, phone?)` and
+`updateOrganization(organization, name?, email?, phone?, isActive?)` →
+`{ id, name, email, phone, isActive }`, account-wide, needing the
+caller's permission on organizations unless elevated; see the server's
+`api-script.md`, "Organizations". Check who the caller is before
+inviting or changing organizations from an elevated script, and pick the
+profile in the script)
 and `system.files` (`create(bucket, path, name, contentType?,
 downloadProfiles?)`, `confirmUpload(id)`, `getDownloadUrl(id)` and
 `createFolder(bucket, path)`, see

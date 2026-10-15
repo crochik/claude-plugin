@@ -140,6 +140,14 @@ in. Invite-only apps need an invitation for everyone, including testers.
 Only the app's owner can use the access, auth and user tools; anyone else
 gets an error saying so.
 
+When the app itself must do this (a sign-up action that creates the
+customer's organization and invites its first user), an action script can:
+`system.user` has `getOrganizations`, `createOrganization`,
+`updateOrganization` and `invite(email, profile, name?, organization?)`.
+They need the caller's permission on users and organizations, so they are
+usually elevated scripts that check the caller first (see the
+bootstrapp-apiscript skill).
+
 ## Checking it works
 
 Sign in to the client as a test user with each restricted profile (invite a

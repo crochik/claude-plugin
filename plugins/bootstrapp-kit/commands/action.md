@@ -15,7 +15,8 @@ Use the `bootstrapp-actions` and `bootstrapp-apiscript` skills. Request:
    script touches. If it's missing or stale and those classes are
    registered, regenerate it (`generate_platform_definitions`, then
    `curl -fsSL -o bootstrapp/generated/platform.d.ts "<url>"`).
-4. Write `bootstrapp/scripts/<name>.ts`. For several scripts or a port of
+4. Write `bootstrapp/scripts/<name>.ts`. Code another script also needs
+   goes in a shared script (`bootstrapp/shared/`) that both call. For several scripts or a port of
    existing handlers, delegate to the `bootstrapp-script-author` agent with
    the path `${CLAUDE_PLUGIN_ROOT}/skills`.
 5. Check:

@@ -181,6 +181,31 @@ The ApiScript body sent verbatim as `replace_action_script.actionScript`, with
 `elevated` from the action manifest. See
 the `bootstrapp-apiscript` skill.
 
+## `shared/<scriptName>.json` and `shared/<scriptName>.ts`
+
+A shared script: reusable code the app's scripts call as
+`scripts.<scriptName>(args)` from `app.<app>.scripts` (see the
+`bootstrapp-apiscript` skill).
+
+```json
+{
+  "scriptName": "orderTotal",
+  "description": "Sums an order's lines. Returns the total in cents and the line count.",
+  "inputObjectType": "app.shop.actions.OrderTotalInput",
+  "outputObjectType": "app.shop.actions.OrderTotalOutput",
+  "profiles": ["Member"]
+}
+```
+
+Maps to `replace_script` with `appName` added and `script` read verbatim
+from `shared/<scriptName>.ts`. `scriptName` is the file name (an
+identifier, camelCase). `inputObjectType` and `outputObjectType` are
+optional (without them the argument and result are `any`); `profiles` is
+optional (without it every script may call it; the default profile always
+may). There is no `elevated`: a shared script runs with its caller's
+access. Since `replace_script` replaces the whole script, a key removed
+here is cleared on the server.
+
 ## `profiles/<Profile>.json`
 
 ```json
@@ -259,6 +284,7 @@ Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
   "access": { "Member/app.expense_tracker.Expense": { "hash": "…", "classHash": "…", "appliedAt": "…" } },
   "actions": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "actionAccess": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
+  "sharedScripts": { "orderTotal": { "hash": "…", "appliedAt": "…" } },
   "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "auth": { "hash": "…", "appliedAt": "…" }
 }

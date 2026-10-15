@@ -24,9 +24,10 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
    `bootstrapp-state.mjs record <kind> <name>`. On a failure, report it and
    keep going with independent items.
 5. If classes or actions were added, regenerate
-   `bootstrapp/generated/platform.d.ts`, re-run the script check, then attach
-   new or changed scripts with `replace_action_script` (reading each file
-   verbatim, with `elevated` as `plan` lists it) and record them. If the server rejects a script, show its
+   `bootstrapp/generated/platform.d.ts`, re-run the script check, then push
+   new or changed shared scripts with `replace_script` and action scripts
+   with `replace_action_script`, in plan order (reading each file verbatim,
+   with `elevated` as `plan` lists it), and record them. If the server rejects a script, show its
    errors, fix the script, and push again.
 6. Before replacing a class, say what changes for records already stored
    (see "Changing things already applied" in the skill). Report blocked items.

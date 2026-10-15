@@ -1,25 +1,28 @@
 ---
 name: bootstrapp-apiscript
-description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, other actions), atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions and shared scripts - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, shared scripts, other actions), reusable code in shared scripts, atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
 license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
 # Writing ApiScripts
 
-An ApiScript is the body of one action. It runs on the server with the
-action's request body in a global named `input`, may call only the functions
-declared in the app's platform definitions, and returns the action's output.
+An ApiScript is the body of one action, or a shared script: reusable code
+the app's other scripts call as a function. It runs on the server with the
+action's request body (or the caller's argument) in a global named `input`,
+may call only the functions declared in the app's platform definitions, and
+returns the action's output (or the function's result).
 
 ## Ground truth, in order
 
 1. **The app's `bootstrapp/generated/platform.d.ts`**: every module, type and
    function the script may use, generated from the app's registered classes
-   and actions. Regenerate it (`generate_platform_definitions`, save the URL's
-   content to that path) whenever classes or actions changed since it was
+   and actions and shared scripts. Regenerate it (`generate_platform_definitions`, save the URL's
+   content to that path) whenever classes, actions or shared scripts changed since it was
    saved, or if it is missing. Grep it; don't read it whole.
 2. **The server's rule book and grammar**: `bootstrapp://reference/api-script.md`
    (the language, what isn't allowed, strings and reserved names, bulk
-   writes, transactions, elevated scripts, users, files) and
+   writes, shared scripts, calling actions, transactions, elevated scripts,
+   users, files) and
    `api-script.g4`. Read the rule book before writing a script.
 3. **The server's `platform-notes.md`**, "Script runtime": what the runtime
    does around the language.
@@ -79,6 +82,7 @@ For each top-level class `X` in namespace `ns` the profile can access:
 | `deleteXById(id, t?)` | boolean | Hard delete. |
 | `bulkCreateX(items, t?)` | `{ success, id?, error? }[]` | `createX` for each item. One result per item, in the order of `items`; a failing item doesn't stop the rest or throw. |
 | `bulkUpdateX(items, t?)` | `{ success, id?, error? }[]` | `updateXById` for each item; an item is the patch plus the `_id` it applies to (`{ _id: p._id, stock: 3 }`). Same results as `bulkCreateX`. |
+| `scripts.<name>(args)` | the script's output class, or `any` | One of the app's shared scripts, in `app.<app>.scripts`. See Shared scripts. |
 | `<actionName>(input)` / `<actionName>(id, input)` | the action's output | Another registered action of the app, in its input class's namespace; instance actions take the object's id first. See Calling other actions. |
 
 Operators in scripts: `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`. On an array
@@ -112,10 +116,72 @@ the class instead. The checker flags both.
 `t` is an optional transaction from the `system.mongodb` module, always the last
 argument. `filterX` takes none.
 
+## Shared scripts (reusable code)
+
+Code more than one script needs (a calculation, a lookup, a validation, a
+sequence of writes) goes in a **shared script**, never copied into each
+action and never in an action registered only so scripts can call it. Write
+it in `bootstrapp/shared/<name>.ts`, next to its manifest
+`bootstrapp/shared/<name>.json` (`scriptName`, `description`, optional
+`inputObjectType`, `outputObjectType` and `profiles`; format in the
+`bootstrapp` skill's `references/manifests.md`). Every script of the app
+calls it from the `app.<app>.scripts` module:
+
+```ts
+// bootstrapp/shared/orderTotal.ts (inputObjectType app.shop.actions.OrderTotalInput,
+// outputObjectType app.shop.actions.OrderTotalOutput)
+import * as app from "app.shop";
+import * as actions from "app.shop.actions";
+
+function execute(input: OrderTotalInput): OrderTotalOutput {
+  const lines = app.filterOrderLine([{ field: "orderId", operator: "Eq", value: input.orderId }], ["quantity", "unitPriceCents"]);
+  let totalCents = 0;
+  for (let i = 0; i < lines.length; i = i + 1) {
+    totalCents = totalCents + lines[i].quantity * lines[i].unitPriceCents;
+  }
+  return { totalCents: totalCents, lineCount: lines.length };
+}
+
+return execute(input);
+```
+
+```ts
+// in any action script or another shared script
+import * as scripts from "app.shop.scripts";
+
+const total = scripts.orderTotal({ orderId: input.id });
+```
+
+- It is written like an action script: the caller's argument is `input`,
+  the top-level `return` is the result, so it ends with
+  `return execute(input);`, and it has its own imports.
+- One argument. With `inputObjectType` the argument is type checked against
+  that class, and with `outputObjectType` the result is typed; without them
+  both are `any`. Give it classes whenever it takes or returns an object, so
+  its callers are checked. Its payload classes follow the action ones:
+  embedded classes in `app.<app>.actions` named `<ScriptName>Input` /
+  `<ScriptName>Output` (PascalCase), or a domain class when it returns
+  records. The argument is passed as is, not validated like a request.
+- It runs as its caller's code: with the caller's access, elevated only
+  when the calling script is, so it has no `elevated` flag and can never do
+  more than its caller. When the caller is elevated, the caller's checks
+  must cover what it touches.
+- `profiles` limits which profiles' scripts may call it (the default
+  profile and elevated scripts always may); leave it out to let every
+  script call it. It needs no action access.
+- If it throws, the caller fails too. Calls count against the same limits
+  as action calls (16 deep, 200 per run).
+- Push it with `replace_script` before the scripts that call it (the server
+  checks a script against what it already has), then regenerate
+  `platform.d.ts`. Full rules: the server's `api-script.md`, "Shared
+  scripts".
+
 ## Calling other actions
 
-A script can run any other action of the app by calling it, so shared logic
-lives in one action instead of being copied into several scripts:
+A script can run another action of the app by calling it. Do this when you
+need that action itself (its access check, its input validation, its own
+`elevated` setting), typically a step the caller's access doesn't allow; to
+reuse code, use a shared script instead:
 
 ```ts
 // instance action: the object's id, then its input
@@ -133,9 +199,10 @@ actions.recordAuditEntry({ kind: "shipped", orderId: input.id });
   (the called script's `input.Object`); nothing is copied from it into the
   input.
 - The caller's profile must be allowed to run it (elevated scripts always
-  are, so an action granted to no profile is a helper only elevated
-  scripts can call). It runs with its own `elevated` setting, and its
-  `system.session` is still the original caller.
+  are). It runs with its own `elevated` setting, and its `system.session`
+  is still the original caller, so an elevated action granted to a profile
+  lets that profile's scripts do one checked step their own access
+  doesn't allow.
 - If it fails, the calling script fails too; there is no catch. Its writes
   commit on their own, outside your transaction.
 - Recursion is allowed: at most 16 nested calls and 200 calls per run.
@@ -339,8 +406,12 @@ return execute(input);
 2. Make sure `generated/platform.d.ts` is current, then grep it for the
    functions you need (`grep -n "function filterExpense" ...`).
 3. Write `bootstrapp/scripts/<actionName>.ts` (only the script; no Markdown).
+   Logic another script already has, or that a second script will need,
+   goes in a shared script (`bootstrapp/shared/<name>.ts` plus its
+   manifest) that both call.
 4. Run the checker from this skill's folder:
    `node <this skill's folder>/scripts/check-apiscript.mjs bootstrapp/scripts/<actionName>.ts`
+   (shared scripts the same way)
    It flags syntax outside the published grammar, imports and functions not
    in `platform.d.ts`, a missing `return execute(input);`, and a
    transaction that is never committed. It is a lint,
@@ -350,7 +421,9 @@ return execute(input);
    from the action manifest (`bootstrapp-state.mjs plan` fills it in). The server type-checks
    the script against the real classes and modules and returns errors with
    line and column instead of saving a broken script; fix and push again.
-   Record it with `bootstrapp-state.mjs record script <actionName>`, then call
+   Record it with `bootstrapp-state.mjs record script <actionName>`
+   (shared scripts go first, with `replace_script` as `plan` lists it, and
+   `record shared-script <name>`), then call
    it once with `invoke_action` (real writes; pick input that is safe to
    create), or through the client on servers without that tool. A runtime error names the line and the
    call stack; on an older server it names the last line, so throw
@@ -362,6 +435,7 @@ When migrating a handler from an existing backend, translate the logic, not
 the syntax: replace ORM queries with `filterX` calls on indexed fields,
 `async`/`await` with plain calls (calls are synchronous in scripts), `try`/
 `catch` with up-front checks and `throw`, database transactions with a
-`system.mongodb` transaction passed to every write (see Atomic writes), classes and closures with plain
+`system.mongodb` transaction passed to every write (see Atomic writes), helpers and services
+several handlers use with shared scripts, classes and closures with plain
 functions, `for…of` with index loops, template strings with `+`. More
 examples: [references/examples.md](references/examples.md).

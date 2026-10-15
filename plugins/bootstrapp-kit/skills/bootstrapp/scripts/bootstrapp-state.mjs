@@ -341,13 +341,27 @@ function checkAccess(state, byName, propsOf, error, warn) {
 
   const badValues = (values, allowed) => (Array.isArray(values) ? values.filter((v) => !allowed.includes(v)) : null);
 
+  // A class outside this app (another app's, or one no app owns) is granted to this app's profiles with profileApp: this app
+  const appName = state.app?.name;
+  const isOwnClass = (fullObjectType) => !appName || fullObjectType.startsWith(`app.${appName}.`);
+  const checkProfileApp = (where, data) => {
+    if (isOwnClass(data.fullObjectType)) {
+      if (data.profileApp !== undefined && data.profileApp !== appName) error(where, `profileApp must be ${appName} (this app) or left out for its own classes`);
+      return true;
+    }
+    if (data.fullObjectType.startsWith("system.")) error(where, "system.* classes are the platform's; their access isn't set per profile");
+    if (data.profileApp !== appName) error(where, `${data.fullObjectType} isn't a class of ${appName}: set "profileApp": "${appName}" so the grant goes to this app's profile`);
+    return false;
+  };
+
   for (const { file, folder, data } of state.access) {
     const where = `access/${folder}/${basename(file)}`;
     if (data.$error) { error(where, data.$error); continue; }
     if (!data.fullObjectType || !data.profileName) { error(where, "fullObjectType and profileName are required"); continue; }
     if (data.profileName !== folder) error(where, `profileName "${data.profileName}" doesn't match its folder ${folder}`);
     if (basename(file) !== `${data.fullObjectType}.json`) warn(where, `file name should be ${data.fullObjectType}.json`);
-    if (data.profileName.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) { error(where, `${DEFAULT_PROFILE} always has full access and can't be restricted`); continue; }
+    const own = checkProfileApp(where, data);
+    if (own && data.profileName.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) { error(where, `${DEFAULT_PROFILE} always has full access and can't be restricted`); continue; }
     if (!knownProfile(data.profileName)) warn(where, `profile ${data.profileName} has no local manifest; it must already exist on the server`);
 
     const bad = badValues(data.permissions, CLASS_PERMISSIONS);
@@ -359,12 +373,12 @@ function checkAccess(state, byName, propsOf, error, warn) {
     }
 
     const cls = byName.get(data.fullObjectType);
-    if (!cls) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
-    const own = cls?.schema?.properties ?? {};
+    if (!cls && own) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
+    const ownFields = cls?.schema?.properties ?? {};
     const all = cls ? propsOf(cls) : {};
 
     for (const [field, values] of Object.entries(data.fieldPermissions ?? {})) {
-      if (cls && !own[field]) error(where, all[field] ? `field ${field} is inherited from ${cls.baseObjectType}: set its access there` : `${data.fullObjectType} has no field ${field}`);
+      if (cls && !ownFields[field]) error(where, all[field] ? `field ${field} is inherited from ${cls.baseObjectType}: set its access there` : `${data.fullObjectType} has no field ${field}`);
       const badField = badValues(values, FIELD_PERMISSIONS);
       if (!badField) error(where, `fieldPermissions.${field} must be a list ([] hides the field)`);
       else if (badField.length) error(where, `fieldPermissions.${field}: unknown ${badField.join(", ")}. Valid: ${FIELD_PERMISSIONS.join(", ")}`);
@@ -407,12 +421,13 @@ function checkAccess(state, byName, propsOf, error, warn) {
     if (data.$error) { error(where, data.$error); continue; }
     if (!data.fullObjectType || !data.actionName) { error(where, "fullObjectType and actionName are required"); continue; }
     if (basename(file) !== `${data.actionName}.json`) warn(where, `file name should be ${data.actionName}.json`);
+    const own = checkProfileApp(where, data);
     const action = actionsByName.get(data.actionName);
-    if (!action) warn(where, `action ${data.actionName} has no local manifest; it must already be registered`);
-    else if (action.fullObjectType !== data.fullObjectType) error(where, `${data.actionName} is registered on ${action.fullObjectType}, not ${data.fullObjectType}`);
+    if (!action && own) warn(where, `action ${data.actionName} has no local manifest; it must already be registered`);
+    else if (action && action.fullObjectType !== data.fullObjectType) error(where, `${data.actionName} is registered on ${action.fullObjectType}, not ${data.fullObjectType}`);
     if (!Array.isArray(data.profiles)) { error(where, "profiles is required (a list; [] leaves only the default profile)"); continue; }
     for (const p of data.profiles) {
-      if (p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} always runs every action; no need to list it`);
+      if (own && p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} always runs every action; no need to list it`);
       else if (!knownProfile(p)) warn(where, `profile ${p} has no local manifest; it must already exist on the server`);
     }
   }

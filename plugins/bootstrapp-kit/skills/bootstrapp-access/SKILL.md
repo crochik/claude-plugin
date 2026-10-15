@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-access
-description: Decide who can do what in a BootstrApp app - profiles (roles), per-class, per-field and per-relation permissions, row constraints such as "only their own records", which profiles run each action, sign-in providers and sign-up, and the app's users and organizations. Use when the user talks about roles, permissions, access, visibility, multi-tenant or per-company data, login/sign-up, or inviting users.
+description: Decide who can do what in a BootstrApp app - profiles (roles), per-class, per-field and per-relation permissions, row constraints such as "only their own records", which profiles run each action, sign-in providers and sign-up, the app's users and organizations, and giving an app access to another app's classes. Use when the user talks about roles, permissions, access, visibility, multi-tenant or per-company data, login/sign-up, or inviting users.
 license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
@@ -125,6 +125,37 @@ the file and its `applied.json` entry.
 
 For a deployed web client, also allow its origin (`add_oidc_client_origin`)
 and redirect URL (`add_oidc_client_redirect`).
+
+## Classes from another app
+
+An app can use classes it doesn't own: another of the developer's apps'
+classes, or classes created outside the MCP server. The app that uses them
+holds the grant, in its own `access/` folder, with `"profileApp": "<this
+app>"` (format in [references/manifests.md](../bootstrapp/references/manifests.md)):
+
+- Grant **`Admin` first**. `generate_platform_definitions`,
+  `generate_openapi_spec` and script validation include every class the
+  app's `Admin` profile can create, read or update, whatever its namespace,
+  and `Admin` has no access to a class it doesn't own until granted. Then
+  grant each restricted profile that needs it.
+- Regenerate `platform.d.ts` and the OpenAPI spec after the grant; read the
+  class with `get_object_class(fullObjectType, appName: "<this app>")`.
+  Discover it first: `get_object_classes(namespace)` lists other apps'
+  classes, and an account admin can list namespaces outside `app.*`.
+- The developer must own both apps; a class no app owns takes an account
+  admin. The grant is stored on the class, so the owning app's
+  `get_class_access` shows it under `otherEntries` with `app` and `profile`.
+- Ask the user before granting: the other app's records become visible to
+  this app's users, as far as the grant allows. Prefer `ReadOnly`, and hide
+  fields this app doesn't need.
+- Constraints can't be added to a class created outside the MCP server that
+  has none: its first one would replace the platform's default record filter
+  for every user of the class. Such a class may also grant access by role
+  (`otherEntries`), which applies to this app's users too.
+- Actions of that class: `access/actions/<actionName>.json` with
+  `profileApp`, listing this app's profiles (`Admin` included).
+- Only action scripts that run with the caller's access can import the
+  class's module; not elevated actions or shared scripts.
 
 ## Users and organizations
 

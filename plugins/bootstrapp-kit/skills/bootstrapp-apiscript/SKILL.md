@@ -165,7 +165,8 @@ const total = scripts.orderTotal({ orderId: input.id });
 - It runs as its caller's code: with the caller's access, elevated only
   when the calling script is, so it has no `elevated` flag and can never do
   more than its caller. When the caller is elevated, the caller's checks
-  must cover what it touches.
+  must cover what it touches. For the same reason it imports only system
+  modules and its own app's modules.
 - `profiles` limits which profiles' scripts may call it (the default
   profile and elevated scripts always may); leave it out to let every
   script call it. It needs no action access.
@@ -298,6 +299,13 @@ from another one.
   change every record of the app's classes, hidden fields and other users'
   and organizations' records included. Writes are still attributed to the
   caller, and `system.session` still returns the caller's ids.
+
+Classes shared with the app from another app or namespace (the
+`bootstrapp-access` skill, "Classes from another app") are in
+`platform.d.ts` under their own module, e.g. `import * as catalog from
+"app.catalog";`. Only a script with the caller's access may import them:
+the server refuses the import in an elevated action and in a shared script,
+and another app's `scripts` module is never importable.
 
 Pick `false` unless the action needs what the caller's profile doesn't give:
 

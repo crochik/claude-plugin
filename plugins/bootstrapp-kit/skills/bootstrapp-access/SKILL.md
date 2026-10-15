@@ -134,11 +134,24 @@ share.
 
 | Tool | Use |
 |---|---|
-| `get_users` | Who has access: profile, organization, active or invited |
-| `invite_user` | Give an email a profile (creates an invitation if they have no user yet; no email is sent, so tell the user to share the app's URL) |
+| `get_users` | Who has access: id, profile, organization, active or invited |
+| `invite_user` | Give an email a profile by creating an invitation, even if the account already has users with that email (no email is sent, so tell the user to share the app's URL) |
 | `assign_user_profile` | Change someone's profile |
 | `remove_user_access` | Take the app away (the user stays in the account) |
 | `get_organizations`, `add_organization`, `set_user_organization` | Group users, which `{{context "OrganizationId"}}` constraints use |
+
+One email can belong to several users: the developer's own admin user and
+a tenant user, or the same person in two organizations. `invite_user`
+always creates a new invitation and the person picks which user to be when
+they sign in; it refuses only when one of them already has the app in the
+same organization (use `assign_user_profile` for that one). When an email
+matches more than one user of the app, pass the `id` from `get_users` as
+`userId` to the other user tools.
+
+Admin users can't belong to an organization: `set_user_organization` and
+`system.user.invite(..., organization)` refuse them. To give an admin a
+tenant login, use `invite_user` with their email and the organization;
+that makes a separate user.
 
 These change who can get into a real app: **confirm each call with the user**,
 naming the person and the profile. Changes apply from the person's next sign

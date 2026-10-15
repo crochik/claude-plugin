@@ -171,6 +171,13 @@ const total = scripts.orderTotal({ orderId: input.id });
   script call it. It needs no action access.
 - If it throws, the caller fails too. Calls count against the same limits
   as action calls (16 deep, 200 per run).
+- Its writes join the caller's transaction only when the caller passes it
+  in. Give its input class an optional `t` property with no `type`, only
+  `title` and `description` (scripts see it as `any`); the shared script
+  passes `input.t` as the last argument of its writes, and the caller
+  calls `scripts.saveOrder({ orderId: id, t: t })`, or leaves `t` out to
+  write without one. `t` isn't checked as a transaction, so pass only what
+  `createTransaction` returned, and commit in the script that created it.
 - Push it with `replace_script` before the scripts that call it (the server
   checks a script against what it already has), then regenerate
   `platform.d.ts`. Full rules: the server's `api-script.md`, "Shared
@@ -263,7 +270,8 @@ return execute(input);
   example a write conflict with a concurrent request) nothing is applied and
   the action fails.
 - Calling another action doesn't join the transaction; its writes commit on
-  their own. Call writing actions after the commit, or inline their logic.
+  their own. Call writing actions after the commit, or move their logic
+  into a shared script and pass it the transaction (see Shared scripts).
 - A single write doesn't need one. Open the transaction after the reads and
   keep it short.
 - `bulkCreateX` / `bulkUpdateX` don't throw for a bad item, so a transaction

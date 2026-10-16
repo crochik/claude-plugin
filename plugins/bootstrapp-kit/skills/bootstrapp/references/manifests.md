@@ -244,6 +244,20 @@ Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 `relationPermissions`, `constraints`. `permissions: []` removes the
 profile's access. The folder name must equal `profileName`.
 
+A class this app doesn't own (another app's, or one created outside the MCP
+server) is granted to this app's profile with `profileApp` set to this
+app's name; `Admin` is allowed there, since it has no access to such a
+class until granted:
+
+```json
+{
+  "profileName": "Admin",
+  "fullObjectType": "app.catalog.Product",
+  "profileApp": "store",
+  "permissions": ["ReadOnly"]
+}
+```
+
 ## `access/actions/<actionName>.json`
 
 ```json
@@ -256,7 +270,9 @@ profile's access. The folder name must equal `profileName`.
 
 Maps 1:1 to `replace_action_access`. `Admin` always runs every action;
 `profiles: []` leaves only `Admin`. Without this file a registered action's
-profile list is whatever the server has (see `get_actions`).
+profile list is whatever the server has (see `get_actions`). For an action
+of a class this app doesn't own, add `"profileApp": "<this app>"` and list
+this app's profiles that run it, `Admin` included when it should.
 
 ## `auth.json`
 

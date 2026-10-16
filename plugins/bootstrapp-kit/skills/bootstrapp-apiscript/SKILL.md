@@ -299,6 +299,14 @@ from another one.
   and organizations' records included. Writes are still attributed to the
   caller, and `system.session` still returns the caller's ids.
 
+Classes shared with the app from another app or namespace (the
+`bootstrapp-access` skill, "Classes from another app") are in
+`platform.d.ts` under their own module, e.g. `import * as catalog from
+"app.catalog";`. With the caller's access a script reaches what the
+caller's profile was granted there; elevated, it reaches every record of
+the class, shared or not, so weigh that when deciding `elevated`. Another
+app's `scripts` module is never importable.
+
 Pick `false` unless the action needs what the caller's profile doesn't give:
 
 - a total, count or uniqueness check over records the caller can't see (a

@@ -155,8 +155,8 @@ app>"` (format in [references/manifests.md](../bootstrapp/references/manifests.m
   (`otherEntries`), which applies to this app's users too.
 - Actions of that class: `access/actions/<actionName>.json` with
   `profileApp`, listing this app's profiles (`Admin` included).
-- Only action scripts that run with the caller's access can import the
-  class's module; not elevated actions or shared scripts.
+- Scripts can import the class's module. An elevated script (or a shared
+  script it calls) ignores the grant and reaches every record of the class.
 
 ## Users and organizations
 

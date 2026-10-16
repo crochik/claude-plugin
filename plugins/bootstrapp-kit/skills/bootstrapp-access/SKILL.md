@@ -142,8 +142,9 @@ app>"` (format in [references/manifests.md](../bootstrapp/references/manifests.m
   class with `get_object_class(fullObjectType, appName: "<this app>")`.
   Discover it first: `get_object_classes(namespace)` lists other apps'
   classes, and an account admin can list namespaces outside `app.*`.
-- The developer must own both apps; a class no app owns takes an account
-  admin. The grant is stored on the class, so the owning app's
+- Only an account admin can share a class, and must own both apps. The
+  server refuses a class whose records aren't limited to the account. The
+  grant is stored on the class, so the owning app's
   `get_class_access` shows it under `otherEntries` with `app` and `profile`.
 - Ask the user before granting: the other app's records become visible to
   this app's users, as far as the grant allows. Prefer `ReadOnly`, and hide

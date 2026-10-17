@@ -69,6 +69,10 @@ return execute(input);
   does not undo writes already made, unless they were made in a
   transaction that isn't committed yet (see Atomic writes).
 - Return an object that matches the output class exactly.
+- A run is stopped after 60 seconds, everything it calls included. A
+  stopped run usually means a loop or recursion that doesn't end;
+  otherwise split the work across runs. When testing a script you know
+  is slow, pass `invoke_action` a `timeoutSeconds` (at most 600).
 
 ## Function surface (confirm names in `platform.d.ts`)
 
@@ -169,15 +173,16 @@ const total = scripts.orderTotal({ orderId: input.id });
 - `profiles` limits which profiles' scripts may call it (the default
   profile and elevated scripts always may); leave it out to let every
   script call it. It needs no action access.
-- If it throws, the caller fails too. Calls count against the same limits
-  as action calls (16 deep, 200 per run).
+- If it throws, the caller fails too. Calls nest at most 16 deep, like
+  action calls, but don't count against the 200 action calls per run, so
+  a helper can be called once per row.
 - Its writes join the caller's transaction only when the caller passes it
-  in. Give its input class an optional `t` property with no `type`, only
-  `title` and `description` (scripts see it as `any`); the shared script
-  passes `input.t` as the last argument of its writes, and the caller
-  calls `scripts.saveOrder({ orderId: id, t: t })`, or leaves `t` out to
-  write without one. `t` isn't checked as a transaction, so pass only what
-  `createTransaction` returned, and commit in the script that created it.
+  in. Give its input class an optional `t` property with
+  `"format": "transaction"` and no `type` (scripts see it as
+  `Transaction`); the shared script passes `input.t` as the last argument
+  of its writes, and the caller calls
+  `scripts.saveOrder({ orderId: id, t: t })`, or leaves `t` out to write
+  without one. Commit in the script that created the transaction.
 - Push it with `replace_script` before the scripts that call it (the server
   checks a script against what it already has), then regenerate
   `platform.d.ts`. Full rules: the server's `api-script.md`, "Shared
@@ -212,7 +217,8 @@ actions.recordAuditEntry({ kind: "shipped", orderId: input.id });
   doesn't allow.
 - If it fails, the calling script fails too; there is no catch. Its writes
   commit on their own, outside your transaction.
-- Recursion is allowed: at most 16 nested calls and 200 calls per run.
+- Recursion is allowed: at most 16 nested calls and 200 action calls per
+  run (shared script calls aren't counted).
   The full rules are in the server's `api-script.md`, "Calling other
   actions".
 

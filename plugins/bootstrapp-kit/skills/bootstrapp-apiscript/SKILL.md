@@ -71,7 +71,8 @@ return execute(input);
 - Return an object that matches the output class exactly.
 - A run is stopped after 60 seconds, everything it calls included. A
   stopped run usually means a loop or recursion that doesn't end;
-  otherwise split the work across runs.
+  otherwise split the work across runs. When testing a script you know
+  is slow, pass `invoke_action` a `timeoutSeconds` (at most 600).
 
 ## Function surface (confirm names in `platform.d.ts`)
 

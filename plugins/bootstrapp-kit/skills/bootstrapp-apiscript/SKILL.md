@@ -358,10 +358,13 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
 ## Class event scripts
 
 A class event script runs after an object of a class is created or
-updated, whichever client wrote it. It lives in
-`bootstrapp/events/<fullObjectType>.created.ts` or `.updated.ts` and is
-pushed with `replace_class_event_script(fullObjectType, classEvent,
-script)`; nothing is registered first. Read "Class event scripts" in the
+updated, whichever client wrote it. A class can have several per event,
+one per independent behavior: each lives in
+`bootstrapp/events/<fullObjectType>.<created|updated>.<scriptName>.ts`
+and is pushed with `replace_class_event_script(fullObjectType,
+classEvent, scriptName, script)`; nothing is registered first. They run
+in no set order and one failing doesn't stop the others, so steps that
+depend on each other go in one script. Read "Class event scripts" in the
 server's `api-script.md` before writing one. What differs from an action:
 
 - It runs asynchronously, after the write was saved and answered. It
@@ -372,13 +375,13 @@ server's `api-script.md` before writing one. What differs from an action:
 - `input` is the flow run context, typed `any`: `input.Object` (the object
   as stored now), `input.Event.TargetId` (its id), and on updates
   `input.Event.ModifiedFields` and `input.Event.UpdatedValues`.
-- Its own writes fire events. An `.updated.ts` script that writes its own
-  object returns early unless a field it depends on is in
-  `ModifiedFields`; a `.created.ts` script never creates an object of its
-  own class.
+- Its own writes fire events, for every script of that event. An
+  updated script that writes its own object returns early unless a field
+  it depends on is in `ModifiedFields`; a created script never creates
+  an object of its own class.
 
 ```ts
-// bootstrapp/events/app.shop.OrderLine.updated.ts
+// bootstrapp/events/app.shop.OrderLine.updated.updateOrderTotal.ts
 import * as app from "app.shop";
 import * as scripts from "app.shop.scripts";
 
@@ -398,7 +401,7 @@ return execute(input);
 
 Check it with `check-apiscript.mjs` like any script,
 push it as `plan` lists it, record it with `record event-script
-<fullObjectType>.<created|updated>`, then create or update an object to
+<fullObjectType>.<created|updated>.<scriptName>`, then create or update an object to
 see it run.
 
 ## Uploading files

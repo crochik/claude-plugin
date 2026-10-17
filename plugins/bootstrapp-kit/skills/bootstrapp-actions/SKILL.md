@@ -49,7 +49,7 @@ that may run it directly.
 
 Work that must follow every create or update of a class, whichever client
 made it (keep a parent's total in step, stamp a derived field, create a
-related record), is not an action either: it is a class event script
+related record), is not an action either: it is a class event script, one per behavior
 (`replace_class_event_script`, see "Class event scripts" in the
 `bootstrapp-apiscript` skill). It runs after the write, so it can't reject
 one; checks a client must not skip still need an action.

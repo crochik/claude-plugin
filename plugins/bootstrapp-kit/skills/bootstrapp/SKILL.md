@@ -43,8 +43,8 @@ bootstrapp/
   scripts/<actionName>.ts       one ApiScript per action
   shared/<scriptName>.json      a shared script's replace_script arguments (description, classes, profiles)
   shared/<scriptName>.ts        the shared script itself, called as scripts.<scriptName>(args)
-  events/<fullObjectType>.created.ts   script run after an object of the class is created
-  events/<fullObjectType>.updated.ts   script run after an object of the class is updated
+  events/<fullObjectType>.<created|updated>.<scriptName>.ts   one behavior run after an object of the class
+                                is created or updated (several per class and event)
   profiles/<Profile>.json       one file per profile = the add_profile payload
   access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
   access/actions/<actionName>.json         profiles that run an action = replace_action_access
@@ -113,7 +113,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated`. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
-| `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`): list them, read one, validate and save one (safe to repeat), remove one. Nothing to register first. |
+| `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |

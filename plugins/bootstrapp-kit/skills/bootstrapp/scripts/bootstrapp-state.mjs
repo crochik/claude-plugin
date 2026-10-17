@@ -46,9 +46,10 @@ const SIGNUP = ["open", "invite_only"];
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
 const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", auth: null };
-// events/<fullObjectType>.<created|updated>.ts: the script a class runs after one of its objects is created or updated
+// events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
+// is created or updated (several per event, one per behavior)
 const CLASS_EVENTS = { created: "Created", updated: "Updated" };
-const EVENT_FILE = /^(?<cls>.+)\.(?<event>created|updated)$/;
+const EVENT_FILE = /^(?<cls>.+)\.(?<event>created|updated)\.(?<script>[^.]+)$/;
 
 function fail(message) {
   console.error(`bootstrapp-state: ${message}`);
@@ -114,7 +115,7 @@ function load() {
   const events = listFiles("events", ".ts").map((file) => {
     const name = basename(file, ".ts");
     const match = EVENT_FILE.exec(name);
-    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, text: readFileSync(file, "utf8") };
+    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, scriptName: match?.groups.script ?? null, text: readFileSync(file, "utf8") };
   });
   const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
   // shared/<scriptName>.json (the replace_script arguments) next to shared/<scriptName>.ts (its script)
@@ -281,7 +282,9 @@ function check(state) {
 
   for (const event of state.events) {
     const where = `events/${event.name}.ts`;
-    if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.ts or <fullObjectType>.updated.ts"); continue; }
+    if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.<scriptName>.ts or <fullObjectType>.updated.<scriptName>.ts"); continue; }
+    if (!IDENTIFIER.test(event.scriptName)) error(where, `script name "${event.scriptName}" must be an identifier such as updateOrderTotal`);
+    else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
     const target = byName.get(event.fullObjectType);
     if (!target) warn(where, `class ${event.fullObjectType} has no local manifest; it must already exist on the server`);
     else if (target.type !== "TopLevel") error(where, "only top-level classes fire created and updated events");
@@ -763,12 +766,13 @@ function plan(state) {
     calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
   }
   for (const item of pending("event-script")) {
-    const { cls, event } = EVENT_FILE.exec(item.name).groups;
+    const { cls, event, script } = EVENT_FILE.exec(item.name).groups;
+    const args = { fullObjectType: cls, classEvent: CLASS_EVENTS[event], scriptName: script };
     if (item.state === "removed") {
-      calls.push({ tool: "remove_class_event_script", record: ["event-script", item.name], args: { fullObjectType: cls, classEvent: CLASS_EVENTS[event] } });
+      calls.push({ tool: "remove_class_event_script", record: ["event-script", item.name], args });
       continue;
     }
-    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { fullObjectType: cls, classEvent: CLASS_EVENTS[event], script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
+    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
   }
   for (const item of pending("auth")) {
     calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });

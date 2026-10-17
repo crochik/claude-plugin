@@ -52,7 +52,7 @@ in to BootstrApp.
 
 Everything lands in `bootstrapp/` at the root of the user's repository:
 `app.json`, `classes/*.json`, `actions/*.json`, `scripts/*.ts`,
-`shared/` (shared scripts),
+`shared/` (shared scripts), `events/` (class event scripts),
 `profiles/*.json`, `access/`, `auth.json`,
 `generated/` (platform.d.ts, openapi.yaml), `applied.json`, and for
 migrations `MIGRATION.md`. Commit it; it is the record of what the backend

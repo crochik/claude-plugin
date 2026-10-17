@@ -206,6 +206,17 @@ may). There is no `elevated`: a shared script runs with its caller's
 access. Since `replace_script` replaces the whole script, a key removed
 here is cleared on the server.
 
+## `events/<fullObjectType>.<created|updated>.ts`
+
+A class event script: run after an object of the class is created
+(`events/app.shop.OrderLine.created.ts`) or updated
+(`events/app.shop.OrderLine.updated.ts`). There is no manifest: the file
+name gives `replace_class_event_script`'s `fullObjectType` and
+`classEvent` (`Created` | `Updated`), and the file is its `script`,
+verbatim. Only top-level classes directly in `app.<app>` can have one.
+Deleting the file makes `plan` list `remove_class_event_script`. See
+"Class event scripts" in the `bootstrapp-apiscript` skill.
+
 ## `profiles/<Profile>.json`
 
 ```json
@@ -302,6 +313,7 @@ Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
   "actionAccess": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "sharedScripts": { "orderTotal": { "hash": "…", "appliedAt": "…" } },
   "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
+  "eventScripts": { "app.shop.OrderLine.updated": { "hash": "…", "appliedAt": "…" } },
   "auth": { "hash": "…", "appliedAt": "…" }
 }
 ```

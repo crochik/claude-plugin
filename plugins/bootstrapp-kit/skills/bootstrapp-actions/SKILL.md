@@ -47,6 +47,13 @@ must run, for example an elevated step the caller's profile can't do freely;
 the called action is still an endpoint, so grant it only to the profiles
 that may run it directly.
 
+Work that must follow every create or update of a class, whichever client
+made it (keep a parent's total in step, stamp a derived field, create a
+related record), is not an action either: it is a class event script
+(`replace_class_event_script`, see "Class event scripts" in the
+`bootstrapp-apiscript` skill). It runs after the write, so it can't reject
+one; checks a client must not skip still need an action.
+
 When migrating, each custom endpoint of the old backend gets this test. Plain
 reads and writes map to the generated endpoints; the rest become actions.
 

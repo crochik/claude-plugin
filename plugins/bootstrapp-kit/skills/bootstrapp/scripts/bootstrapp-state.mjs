@@ -10,7 +10,7 @@
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
 //   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp]
-//        kind: app | profile | class | access | action | action-access | shared-script | script | auth
+//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | auth
 //
 // No dependencies; Node 18+.
 
@@ -45,7 +45,10 @@ const SIGNUP = ["open", "invite_only"];
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
-const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", auth: null };
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", auth: null };
+// events/<fullObjectType>.<created|updated>.ts: the script a class runs after one of its objects is created or updated
+const CLASS_EVENTS = { created: "Created", updated: "Updated" };
+const EVENT_FILE = /^(?<cls>.+)\.(?<event>created|updated)$/;
 
 function fail(message) {
   console.error(`bootstrapp-state: ${message}`);
@@ -108,6 +111,11 @@ function load() {
   const classes = listFiles("classes", ".json").map((file) => ({ file, data: readJson(file) }));
   const actions = listFiles("actions", ".json").map((file) => ({ file, data: readJson(file) }));
   const scripts = listFiles("scripts", ".ts").map((file) => ({ file, name: basename(file, ".ts"), text: readFileSync(file, "utf8") }));
+  const events = listFiles("events", ".ts").map((file) => {
+    const name = basename(file, ".ts");
+    const match = EVENT_FILE.exec(name);
+    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, text: readFileSync(file, "utf8") };
+  });
   const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
   // shared/<scriptName>.json (the replace_script arguments) next to shared/<scriptName>.ts (its script)
   const sharedNames = [...new Set([...listFiles("shared", ".json"), ...listFiles("shared", ".ts")].map((file) => basename(file).replace(/\.(json|ts)$/, "")))].sort();
@@ -126,8 +134,8 @@ function load() {
   const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, shared, profiles, access, actionAccess, auth, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, auth, ledger, ledgerPath };
 }
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
@@ -271,6 +279,16 @@ function check(state) {
     if (!actionNames.has(script.name)) warn(`scripts/${script.name}.ts`, "no matching action manifest");
   }
 
+  for (const event of state.events) {
+    const where = `events/${event.name}.ts`;
+    if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.ts or <fullObjectType>.updated.ts"); continue; }
+    const target = byName.get(event.fullObjectType);
+    if (!target) warn(where, `class ${event.fullObjectType} has no local manifest; it must already exist on the server`);
+    else if (target.type !== "TopLevel") error(where, "only top-level classes fire created and updated events");
+    if (root && event.fullObjectType.split(".").slice(0, -1).join(".") !== root) error(where, `only classes directly in ${root} have a flow to run it from`);
+    if (!event.text.trim()) error(where, "the script is empty");
+  }
+
   checkAccess(state, byName, propsOf, error, warn);
   checkShared(state, byName, error, warn);
 
@@ -305,7 +323,11 @@ function checkShared(state, byName, error, warn) {
 
   const sharedNames = new Set(state.shared.map((s) => s.name));
   const appName = state.app?.name;
-  const callers = [...state.shared.map((s) => ({ where: `shared/${s.name}.ts`, text: s.text })), ...state.scripts.map((s) => ({ where: `scripts/${s.name}.ts`, text: s.text }))];
+  const callers = [
+    ...state.shared.map((s) => ({ where: `shared/${s.name}.ts`, text: s.text })),
+    ...state.scripts.map((s) => ({ where: `scripts/${s.name}.ts`, text: s.text })),
+    ...state.events.map((s) => ({ where: `events/${s.name}.ts`, text: s.text })),
+  ];
   for (const { where, text } of callers) {
     for (const name of sharedCalls(text, appName)) {
       if (!sharedNames.has(name)) warn(where, `calls shared script ${name}, which has no local manifest; it must already exist on the server`);
@@ -627,6 +649,16 @@ function diff(state) {
     const h = sharedHash(shared);
     items.push({ kind: "shared-script", name: shared.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
+  for (const event of state.events) {
+    if (!event.fullObjectType) continue;
+    const prev = ledger.eventScripts[event.name];
+    const h = hash(event.text);
+    items.push({ kind: "event-script", name: event.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
+  }
+  // a class event script whose file was deleted is removed from the server too
+  for (const name of Object.keys(ledger.eventScripts)) {
+    if (!state.events.some((e) => e.name === name)) items.push({ kind: "event-script", name, state: "removed" });
+  }
   const manifestItem = (kind, name, data, prev) => ({ kind, name, hash: hashJson(data), state: !prev ? "new" : prev.hash === hashJson(data) ? "applied" : "changed" });
   for (const { data } of state.profiles) {
     if (data.$error || !data.profileName) continue;
@@ -730,6 +762,14 @@ function plan(state) {
     }
     calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
   }
+  for (const item of pending("event-script")) {
+    const { cls, event } = EVENT_FILE.exec(item.name).groups;
+    if (item.state === "removed") {
+      calls.push({ tool: "remove_class_event_script", record: ["event-script", item.name], args: { fullObjectType: cls, classEvent: CLASS_EVENTS[event] } });
+      continue;
+    }
+    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { fullObjectType: cls, classEvent: CLASS_EVENTS[event], script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
+  }
   for (const item of pending("auth")) {
     calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });
   }
@@ -802,12 +842,13 @@ function record(state, kind, names) {
     const item = items.find((i) => i.kind === kind && i.name === name);
     if (!item) fail(`no local ${kind} named ${name}`);
     if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
+    else if (item.state === "removed") delete ledger[KINDS[kind]][name];
     else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
     else ledger[KINDS[kind]][name] = { hash: item.hash, appliedAt: now };
   }
   const ordered = {
     app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
-    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
+    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
   };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
@@ -839,7 +880,7 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", auth: "Sign-in (auth.json)" };
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", auth: "Sign-in (auth.json)" };
     for (const kind of Object.keys(titles)) {
       const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;

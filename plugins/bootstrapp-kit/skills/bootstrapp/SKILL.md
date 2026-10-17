@@ -13,7 +13,7 @@ kit has one skill for each:
 |---|---|---|
 | Data + API model | **ObjectTypes** (classes): JSON Schemas stored as MongoDB collections. The same schema is the API model: the platform generates CRUD + filter endpoints from it. | `bootstrapp-object-types` |
 | Operations | **Actions**: named server operations on a class, each with a typed input class and output class. | `bootstrapp-actions` |
-| Logic | **ApiScripts**: the body of an action, in a small TypeScript dialect, calling only the functions the platform exposes for the app's classes. Code several scripts reuse is a **shared script** they call as a function. | `bootstrapp-apiscript` |
+| Logic | **ApiScripts**: the body of an action, in a small TypeScript dialect, calling only the functions the platform exposes for the app's classes. Code several scripts reuse is a **shared script** they call as a function. A **class event script** runs after an object of a class is created or updated. | `bootstrapp-apiscript` |
 | Access | **Profiles** (roles), what each may do on every class, field, relation and action, which records it sees (constraints), and how users sign in. | `bootstrapp-access` |
 | Client | A strongly typed client generated from the OpenAPI spec the MCP server produces. | `bootstrapp-client` |
 
@@ -43,6 +43,8 @@ bootstrapp/
   scripts/<actionName>.ts       one ApiScript per action
   shared/<scriptName>.json      a shared script's replace_script arguments (description, classes, profiles)
   shared/<scriptName>.ts        the shared script itself, called as scripts.<scriptName>(args)
+  events/<fullObjectType>.<created|updated>.<scriptName>.ts   one behavior run after an object of the class
+                                is created or updated (several per class and event)
   profiles/<Profile>.json       one file per profile = the add_profile payload
   access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
   access/actions/<actionName>.json         profiles that run an action = replace_action_access
@@ -111,7 +113,8 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated`. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
-| `validate_action_scripts` | Check every action and shared script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
+| `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
+| `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
 | `get_namespaces`, `get_object_classes` | List what exists (names only). |
@@ -178,6 +181,8 @@ When the state helper reports something changed after it was applied, `plan`
 lists the replace call for it:
 
 - **Script changed**, or its action's `elevated` → `replace_action_script` again.
+- **Class event script changed** → `replace_class_event_script` again;
+  **deleted** → `remove_class_event_script`.
 - **Shared script changed** (script or manifest) → `replace_script` again. If
   its classes changed, run `validate_action_scripts` to find the callers
   it broke.
@@ -214,7 +219,8 @@ When the user wants local definitions pushed:
    title, and description.
 4. Make the calls in the order `plan` lists them: profiles, classes (base
    and embedded classes first), class access, actions, action access,
-   shared scripts (the ones others call first), action scripts, `auth.json`. Actions don't depend on each other and can go in
+   shared scripts (the ones others call first), action scripts, class
+   event scripts, `auth.json`. Actions don't depend on each other and can go in
    parallel; so can access calls. Access shown as `recheck` is applied again
    because its class changed. Classes that reference each other show up
    twice: an `add_object_class` with `record: null` and a `note` (don't
@@ -222,12 +228,15 @@ When the user wants local definitions pushed:
    is recorded.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
-   `shared-script`, `script`, `auth`; an access item's name is `<Profile>/<fullObjectType>`).
+   `shared-script`, `script`, `event-script`, `auth`; an access item's name is
+   `<Profile>/<fullObjectType>`, an event script's its file name without
+   `.ts`).
    Record only what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
    surface, then push changed shared scripts with `replace_script` and
-   changed action scripts with `replace_action_script`, and record them.
+   changed action scripts with `replace_action_script` and class event
+   scripts with `replace_class_event_script`, and record them.
    Regenerate it again after adding shared scripts, so the local check
    sees them.
 7. Regenerate the OpenAPI spec and client if the API surface changed.

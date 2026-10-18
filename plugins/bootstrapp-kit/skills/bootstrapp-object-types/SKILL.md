@@ -50,17 +50,15 @@ this skill is one manifest per class in `bootstrapp/classes/` (format: the
 
 ## Modeling rules for MongoDB
 
-The full checklist with examples is in
+Relationship shapes on the platform:
 [references/mongo-modeling.md](references/mongo-modeling.md). The core:
 
 - **Top-level** when the thing is queried on its own, referenced from more
   than one place, has its own lifecycle, or can grow without bound.
   **Embedded** when it only makes sense inside its parent and is read with it
   (an order's lines, an address, a settings block).
-- **Embed bounded, reference unbounded.** An array that can grow forever
-  (comments, events, log entries) becomes its own top-level class with a
-  `<parent>Id` reference. MongoDB documents cap at 16 MB and large arrays make
-  every read and write expensive.
+- **Embed bounded, reference unbounded**: an array that can grow forever
+  becomes its own top-level class with a `<parent>Id` reference.
 - **References** are `<name>Id` fields, `{ "type": "string", "format": "uuid" }`,
   declared in `foreignKeys` and listed in `indexedFields`. Every property
   that holds ids of other records goes in `foreignKeys`; a plain uuid
@@ -72,9 +70,9 @@ The full checklist with examples is in
   or a top-level link class when the link carries data. User ids
   (`ownerId`, `assigneeId`) point at platform users, not app classes, and
   stay plain uuid strings.
-- **Denormalize deliberately.** Copying a display field (`customerName` next
-  to `customerId`) saves a lookup on every list screen, but someone must keep
-  it in sync; note who (an action, or the client on update) in `$notes`.
+- **Denormalize deliberately.** A copied display field (`customerName` next
+  to `customerId`) needs someone to keep it in sync: note who in `$notes`
+  (a class event script on the source class is the usual answer).
 - **Index only what you filter or sort on.** Filters accept indexed fields
   only, and script `orderBy` too. Enums sort alphabetically, so a rank
   order (priority) needs a numeric rank field. Always `_id` and every
@@ -95,14 +93,16 @@ The full checklist with examples is in
   reuses fields: each child has its own collection and the base's list
   never includes them. Use it for classes that share a shape but are never
   read together.
-- **Types that survive the trip.** Money as integer minor units
-  (`amountCents`) or a decimal string, never a float. `integer` is 32-bit
+- **Types.** Money as integer minor units (`amountCents`) or a decimal
+  string. `integer` is 32-bit
   signed whatever `maximum` says; larger values (ARGB colors, byte counts)
   go in a string. Dates as strings with
   `format: date` or `date-time`. Enums as `enum` on a string. No
-  `byte`/`binary`; store files elsewhere and keep a URL.
+  `byte`/`binary`: files go to storage through `system.files` (see the
+  `bootstrapp-apiscript` skill) and the class keeps the file id in a
+  string field (`receiptFileId`).
 - **Users** are platform objects. Store `ownerId`, `assigneeId`, … as uuid
-  strings. Never define `User` or `Group`. Access is set per profile and
+  strings. Never define `User`, `Organization` or `Group`. Access is set per profile and
   enforced by the platform (`bootstrapp-access` skill); don't add ACL fields.
   When some profile should see only its own records, or its organization's,
   the class needs the field the constraint filters on: an `ownerId` (or

@@ -1,20 +1,8 @@
 # Migration mapping details
 
-## Where to look, by stack
-
-| Stack | Models | Endpoints |
-|---|---|---|
-| Node + Prisma | `prisma/schema.prisma` | `src/**/routes`, `pages/api`, `app/**/route.ts` |
-| Node + TypeORM / Sequelize / Drizzle | `**/entities`, `**/models`, `**/schema.ts` | Express/Nest controllers |
-| Mongoose | `**/models/*.ts` (`new Schema(`) | as above |
-| Django | `*/models.py` | `urls.py`, `views.py`, DRF serializers |
-| Rails | `db/schema.rb`, `app/models` | `config/routes.rb`, `app/controllers` |
-| .NET | `DbContext`, entity classes, migrations | controllers, minimal APIs |
-| Firebase | Firestore rules, `collection(` calls | Cloud Functions |
-| Flutter/mobile only | model classes, JSON serializers | repository/service classes |
-| Any | existing `openapi.*`, `*.graphql` | same |
-
 ## Field translation
+
+Only the rows where BootstrApp differs from a straight type mapping:
 
 | Source | ObjectType property |
 |---|---|
@@ -22,17 +10,12 @@
 | `uuid` primary key | `_id` uuid; keep the same values on import if the platform accepts them, otherwise `legacyId` |
 | foreign key column | `<name>Id` uuid + `foreignKeys` entry + indexed |
 | join table without extra columns | `<name>Ids` array of uuids on the side read most + `foreignKeys` entry |
-| `varchar(n)` / `text` | `string` with `maxLength` when meaningful |
 | `decimal(p,s)` money | integer minor units, or string decimal |
-| `float`/`double` | `number` |
-| `boolean` | `boolean` |
-| `timestamp` / `datetime` | `string`, `format: date-time` |
-| `date` | `string`, `format: date` |
-| `enum` / check constraint | `string` with `enum` |
-| `json` / `jsonb` | inline object schema when the shape is known; avoid untyped blobs |
-| array column | `array` of the element type |
-| blob / file | store elsewhere; keep a URL string |
-| `created_at`/`updated_at` set by DB | set in the action script, or by the client on create/update |
+| `bigint` | `number` or string: `integer` is 32-bit |
+| `timestamp` / `date` | `string` with `format: date-time` / `date` |
+| `json` / `jsonb` | an embedded class when the shape is known; avoid untyped blobs |
+| blob / file | uploaded through `system.files`; the class keeps the file id as a string |
+| `created_at`/`updated_at` set by DB | a class event script, the action script, or the client |
 
 ## Logic translation
 
@@ -43,25 +26,22 @@
 | state machine transitions | an `Instance` action per transition (`submitOrder`, `cancelOrder`) |
 | batch operations | `Bulk` action |
 | reports / aggregates | `Class` action returning a summary class |
-| DB transaction across tables | one action that validates everything, then writes |
-| triggers | fold into the action that causes the write |
+| DB transaction across tables | one action that validates everything, then writes in a `system.mongodb` transaction |
+| triggers | a class event script (runs after every create or update of the class), or fold into the action that causes the write |
 | cron jobs / queues / webhooks / emails | check `platform.d.ts` and the platform for support; otherwise keep on the old backend and list as a gap |
-| per-row permission checks | platform group-based access; if a rule depends on data (owner-only), enforce it inside an action and ask the user how it maps to groups |
+| per-row permission checks | profile access; a rule that depends on data (owner-only, same organization) is a profile constraint (`ownerId Eq {{context "UserId"}}`), see `bootstrapp-access` |
 
-## Client cutover patterns
+## Client cutover
 
-- **Single data layer exists** (repositories/services): implement the same
-  interface on top of the generated client wrapper; switch per feature.
-- **Calls scattered through components**: first extract a data layer for the
-  slice being moved (pure refactor, no behavior change), then switch it.
-- **Dual running**: during a slice, reads may come from BootstrApp while
-  writes still go to the old backend only if the data is synced; otherwise
-  move reads and writes of a class together.
+Switch one slice at a time behind the app's data layer (extract one first
+if calls are scattered). Move a class's reads and writes together unless
+the data is synced both ways.
 
 ## Data import
 
 - Small data: a script using the generated client (`create<Class>` per
-  record), run locally with an admin login.
+  record), run locally with an admin login. A handful of records can also
+  go in with the MCP `create_object` tool.
 - Larger data or derived fields: a `Class`-scoped import action that takes a
   batch of records, validates, and creates them with `bulkCreate<Class>` (when
   `platform.d.ts` has it), returning the per-record results so failures

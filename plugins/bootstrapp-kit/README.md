@@ -46,7 +46,9 @@ skills.
 Or from a checkout: `claude --plugin-dir ./plugins/bootstrapp-kit`.
 
 The helper scripts need Node 18+. The first MCP call opens a browser to log
-in to BootstrApp.
+in to BootstrApp. Your BootstrApp user needs developer access (granted by a
+platform administrator) for the app tools; without it the server only
+offers the tools that read and write records.
 
 ## The app folder
 
@@ -55,8 +57,9 @@ Everything lands in `bootstrapp/` at the root of the user's repository:
 `shared/` (shared scripts), `events/` (class event scripts),
 `profiles/*.json`, `access/`, `auth.json`,
 `generated/` (platform.d.ts, openapi.yaml), `applied.json`, and for
-migrations `MIGRATION.md`. Commit it; it is the record of what the backend
-has, since the MCP server cannot return full class definitions.
+migrations `MIGRATION.md`. Commit it: the manifests are the record of
+intent and `applied.json` of what was pushed when, which the backend's API
+form of each class doesn't keep.
 
 ## Other harnesses
 

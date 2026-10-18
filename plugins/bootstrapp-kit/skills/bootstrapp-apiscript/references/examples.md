@@ -37,7 +37,9 @@ return execute(input);
 
 ## Bulk: apply to several rows, all or nothing up front
 
-Validate every row before writing any, since there is no rollback.
+Validate every row before writing any. Without a transaction, writes
+already made stay when a later one fails; pass one to make it all or
+nothing (see the last example).
 
 ```ts
 import * as app from "app.shop";

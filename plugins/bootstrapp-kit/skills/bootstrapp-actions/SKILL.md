@@ -27,8 +27,8 @@ Make it an action only when the client genuinely can't do it that way:
 - **Computation over data the client shouldn't fetch**: totals over many
   rows, checks against other users' data.
 
-Authorization is **not** a reason: the platform enforces group-based access
-on every CRUD, filter, and action call. If one of the generated endpoints
+Authorization is **not** a reason: the platform enforces each profile's
+access on every CRUD, filter, and action call. If one of the generated endpoints
 already does the job, drop the action. The exception is a controlled step the
 caller's profile must not be able to do freely (bump a balance they can only
 read, approve someone else's request): that is an action whose script runs
@@ -40,7 +40,7 @@ elevated script too. Everything else runs with the caller's access; see
 
 Logic two actions share goes in a shared script both scripts call, not
 copied into each script and not in an action registered only so scripts can
-call it (see "Shared scripts" in the `bootstrapp-apiscript` skill). A shared
+call it (see "Choosing the tool for reused or follow-up logic" in the `bootstrapp-apiscript` skill). A shared
 script is not an endpoint: clients can't call it, and it runs with its
 caller's access. A script calls another action only when that action itself
 must run, for example an elevated step the caller's profile can't do freely;
@@ -50,8 +50,8 @@ that may run it directly.
 Work that must follow every create or update of a class, whichever client
 made it (keep a parent's total in step, stamp a derived field, create a
 related record), is not an action either: it is a class event script, one per behavior
-(`replace_class_event_script`, see "Class event scripts" in the
-`bootstrapp-apiscript` skill). It runs after the write, so it can't reject
+(`replace_class_event_script`, see "Class event scripts" in the server's
+`api-script.md`). It runs after the write, so it can't reject
 one; checks a client must not skip still need an action.
 
 When migrating, each custom endpoint of the old backend gets this test. Plain
@@ -96,8 +96,9 @@ request/response, not a stored document.
 
 - Registered actions appear in the OpenAPI spec (regenerate the client) and as
   callable functions in other scripts (regenerate `platform.d.ts`).
-- Invoke the action once through the generated client to confirm the script
-  runs (see the server's `platform-notes.md`, "Actions", about script wiring).
+- Run the action once with `invoke_action` (real writes) to confirm the
+  script runs, then through the generated client (see the server's
+  `platform-notes.md`, "Actions", about script wiring).
 - Scope, payload classes, summary and description can change later with
   `replace_action`. The name can't: a renamed action is a new action, and the
   old one stays.

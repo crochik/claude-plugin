@@ -1,76 +1,30 @@
-# MongoDB modeling checklist for ObjectTypes
+# Relationship shapes on BootstrApp
 
-## Decide top-level vs embedded
+How common relationships map to the platform's mechanisms. General MongoDB
+modeling (embed what is read together and bounded, reference what grows or
+is shared) applies as usual; this is the BootstrApp side of it.
 
-Ask, for each candidate class:
-
-| Question | If yes |
+| Relationship | Shape |
 |---|---|
-| Will anything list or search it on its own? | top-level |
-| Is it referenced from more than one parent class? | top-level |
-| Does it outlive or move between parents? | top-level |
-| Can the count per parent grow without a known bound? | top-level with `<parent>Id` |
-| Is it always read and written together with its parent, and small? | embedded |
-| Is it a value (address, money, range, settings)? | embedded |
+| 1:1 or 1:few owned (address, order lines) | embedded class by `$ref`, directly or as array `items` |
+| keyed set owned (settings per locale) | `additionalProperties: {"$ref": ...}` |
+| 1:many (project, tasks) | top-level child with `projectId`: `foreignKeys` entry, indexed |
+| many:many without data (posts, tags) | `tagIds` array of uuids on the side read most, `foreignKeys` entry (multi reference; reads return only the ids) |
+| many:many with data (enrollment with a grade) | top-level link class with both ids |
+| map keyed or valued by ids | `additionalProperties: {type: string}` + `foreignKeys` with `dictionaryPart` |
+| polymorphic rows read together (card or bank payment) | discriminated base (`kind`) + variants; or one flat class with a `kind` enum when variants differ by a field or two |
+| shared shape, never read together | `baseObjectType` without a discriminator (separate collections) |
+| users, organizations | plain uuid fields (`ownerId`, `organizationId`), no `foreignKeys` target in the app |
+| files | `system.files`; keep the file id as a string field |
 
-## Relationship patterns
+Platform limits that change the design:
 
-| Relational shape | Document shape |
-|---|---|
-| 1:1 owned (user ↔ profile settings) | embed in the owner |
-| 1:few owned (order ↔ lines, ≤ ~100) | array of embedded objects (`items: {"$ref": ...}`) |
-| keyed set owned (settings per locale) | dictionary of embedded objects (`additionalProperties: {"$ref": ...}`) |
-| 1:many (project ↔ tasks) | top-level child with `projectId` (indexed, foreign key) |
-| many:many without data (posts ↔ tags) | array of ids on the side read most (`tagIds`, foreign key → multi reference), or strings when tags aren't records |
-| many:many with data (students ↔ courses with grade) | top-level link class (`Enrollment` with `studentId`, `courseId`, `grade`) |
-| lookup table (status, category used for filtering) | string `enum` if fixed; top-level class if users edit it |
-| polymorphic rows (card or bank payment) | base with a `kind` string + variants (`discriminatorField`, `discriminatorValue`), or one flat class with a `kind` enum when variants are small |
-| shared shape, never read together | base class + children via `baseObjectType` (separate collections) |
-| audit/history | top-level append-only class with `<subject>Id` and timestamp |
-
-## Read-path checklist
-
-- Each list screen: which class, which filters, which sort. Every filtered or
-  sorted field is in `indexedFields`.
-- Each detail screen: can it be served by one document? If it needs three
-  lookups every time, consider embedding or denormalizing.
-- Filters are AND-only over direct fields of one class. Anything needing OR,
-  joins, or aggregation becomes several client calls or an action.
-
-## Write-path checklist
-
-- What must change together atomically? If two documents must change in one
-  step, that's an action whose script uses a transaction, or a reason to
-  embed.
-- What must follow every write of a class, whichever client made it (a
-  parent's total, a derived field)? That's a class event script.
-- Which denormalized copies exist and who updates them?
-- Which fields are server-assigned (`_id`, timestamps set by scripts)?
-
-## Field conventions
-
-| Kind | Schema |
-|---|---|
-| id / reference | `{ "type": "string", "format": "uuid" }` + `foreignKeys` entry |
-| list of references | `{ "type": "array", "items": { "type": "string", "format": "uuid" } }` named `…Ids` + `foreignKeys` entry |
-| map keyed (or valued) by references | `{ "type": "object", "additionalProperties": { "type": "string" } }` + `foreignKeys` entry with `dictionaryPart` |
-| money | `{ "type": "integer", "minimum": 0 }` named `…Cents`, or string decimal |
-| timestamp | `{ "type": "string", "format": "date-time" }` |
-| date | `{ "type": "string", "format": "date" }` |
-| status | `{ "type": "string", "enum": [...], "default": "..." }` |
-| tags | `{ "type": "array", "items": { "type": "string" } }` |
-| email / url | `format: email` / `format: uri` |
-| geo point | array of two numbers `[lng, lat]` |
-| user reference | uuid string, e.g. `ownerId` |
-
-## Migrating from an existing schema
-
-- SQL table → class; primary key → `_id` (generate new uuids and keep the old
-  key in `legacyId`, indexed, while migrating).
-- Foreign key → `<name>Id` reference; join table → see many:many above.
-- Child tables always loaded with the parent → embedded array.
-- Nullable columns → optional properties (not in `required`).
-- Check constraints / enums → `enum`; triggers → class event scripts;
-  stored procedures → actions.
-- ORM-level validation → JSON Schema keywords (`minimum`, `maxLength`,
-  `pattern`) where supported, else the client or an action.
+- Filters are AND-only over a class's own indexed fields, with no joins,
+  OR or aggregation: those become several client calls, denormalized
+  fields, or an action.
+- A reference's target must exist first and be top level; classes that
+  reference each other are added without the foreign key, then replaced
+  with it (`plan` does this).
+- `integer` is 32-bit; there is no `byte`/`binary`.
+- Writes that must change several documents together need an action with a
+  transaction; work that must follow every write is a class event script.

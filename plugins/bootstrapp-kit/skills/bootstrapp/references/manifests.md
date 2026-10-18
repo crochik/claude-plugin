@@ -216,7 +216,7 @@ gives `replace_class_event_script`'s `fullObjectType`, `classEvent`
 (`Created` | `Updated`) and `scriptName` (camelCase identifier), and the
 file is its `script`, verbatim. Only top-level classes directly in `app.<app>` can have one.
 Deleting the file makes `plan` list `remove_class_event_script`. See
-"Class event scripts" in the `bootstrapp-apiscript` skill.
+"Class event scripts" in the server's `api-script.md`.
 
 ## `profiles/<Profile>.json`
 

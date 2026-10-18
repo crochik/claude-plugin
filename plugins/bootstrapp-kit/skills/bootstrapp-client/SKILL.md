@@ -29,11 +29,8 @@ were never applied won't be in it.
    - The BootstrApp generator, when `bootstrapp-gen-<language>` is on `PATH`:
      `bash <this skill's folder>/scripts/generate_api.sh "$(pwd)/bootstrapp/generated/openapi.yaml" <outputDir> <language>`
      (first argument must be absolute).
-   - Otherwise a standard generator the project can own. Propose one and ask
-     before adding a dependency, e.g. TypeScript: `openapi-typescript` for
-     types plus `openapi-fetch` for calls; Dart/Flutter and other languages:
-     `openapi-generator-cli generate -g dart-dio` (or the language's
-     generator). Record the exact command in `app.json` as
+   - Otherwise a standard OpenAPI generator for the language. Ask before
+     adding the dependency, and record the exact command in `app.json` as
      `client.command` so regeneration is one step.
 4. **Wrap.** Create or update the wrapper module: base URL from env, access
    token injection, error mapping, and a few typed helpers the app needs.
@@ -85,9 +82,7 @@ were never applied won't be in it.
 - Per-user privacy is a profile constraint (`ownerId Eq UserId`), set with
   the `bootstrapp-access` skill; the backend then filters every read. Don't
   filter by owner on the client as a security measure.
-- Nothing is pushed to the client. After a write, refresh or invalidate the
-  queries it affects (React Query/SWR invalidation), and refetch on focus
-  for lists other users change.
+- Nothing is pushed to the client: refresh what a write affects.
 
 ## Uploading files
 
@@ -137,16 +132,11 @@ access rules on the client.
 
 ## New frontends
 
-For an app with no UI yet, use the platform's own scaffolder in the
-repository (web: `npm create vite@latest` with React + TypeScript unless the
-user picks another stack; Flutter: `flutter create`; desktop: the framework
-the user chose), then:
+For an app with no UI yet, use the stack's own scaffolder in the
+repository (web defaults to React + TypeScript with Vite, mobile to
+Flutter), then:
 
-1. Generate the client into it and write the wrapper (steps above). Web: a
-   `src/lib/bootstrapp.ts` module, with React Query or SWR for caching.
-   Flutter: a `lib/bootstrapp/` package exposing repositories, `dio` or
-   `http`, and `flutter_secure_storage` for tokens. CLI: one module reading
-   credentials from env or the OS config folder.
+1. Generate the client into it and write the wrapper (steps above).
 2. Wire sign-in first (see Auth above) and confirm login, logout and an
    authenticated call work.
 3. Add one real read screen (a named view) and one real write against live

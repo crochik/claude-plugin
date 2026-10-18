@@ -40,7 +40,7 @@ elevated script too. Everything else runs with the caller's access; see
 
 Logic two actions share goes in a shared script both scripts call, not
 copied into each script and not in an action registered only so scripts can
-call it (see "Shared scripts" in the `bootstrapp-apiscript` skill). A shared
+call it (see "Choosing the tool for reused or follow-up logic" in the `bootstrapp-apiscript` skill). A shared
 script is not an endpoint: clients can't call it, and it runs with its
 caller's access. A script calls another action only when that action itself
 must run, for example an elevated step the caller's profile can't do freely;
@@ -50,8 +50,8 @@ that may run it directly.
 Work that must follow every create or update of a class, whichever client
 made it (keep a parent's total in step, stamp a derived field, create a
 related record), is not an action either: it is a class event script, one per behavior
-(`replace_class_event_script`, see "Class event scripts" in the
-`bootstrapp-apiscript` skill). It runs after the write, so it can't reject
+(`replace_class_event_script`, see "Class event scripts" in the server's
+`api-script.md`). It runs after the write, so it can't reject
 one; checks a client must not skip still need an action.
 
 When migrating, each custom endpoint of the old backend gets this test. Plain

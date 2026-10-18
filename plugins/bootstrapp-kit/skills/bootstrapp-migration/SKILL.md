@@ -14,22 +14,11 @@ the app's existing data-access layer.
 
 Work out what the current backend does. For a large codebase, delegate the
 reading to the `bootstrapp-migration-analyst` agent (or another subagent) so
-the main conversation keeps only the findings. Look for:
-
-- **Data models**: SQL DDL and migrations, ORM models (Prisma, TypeORM,
-  Sequelize, Drizzle, Django, Rails, SQLAlchemy, Entity Framework, Hibernate),
-  Mongoose/ODM schemas, Firestore collections, TypeScript/Dart model types,
-  existing OpenAPI or GraphQL schemas.
-- **Endpoints**: route tables and controllers, GraphQL resolvers, RPC
-  handlers, serverless functions, background jobs, webhooks.
-- **Business logic**: what each non-trivial endpoint enforces, what it writes
-  together, external calls it makes (email, payments, storage, third-party
-  APIs).
-- **Auth**: identity provider, roles/permissions, row-level rules.
-- **Clients**: where the frontend(s) call the backend, and whether that goes
-  through one layer (a services folder, repositories, hooks) or is scattered.
-- **Data volume and shape**: rough row counts, largest tables, anything
-  unbounded per parent.
+the main conversation keeps only the findings: data models, endpoints and
+jobs, the business logic each non-trivial endpoint enforces (what it writes
+together, external calls), auth and row-level rules, where the client calls
+the backend (one layer or scattered), and data volume (largest tables,
+anything unbounded per parent).
 
 ## 2. Map
 
@@ -40,12 +29,12 @@ Produce a mapping table per area:
 | table/model | top-level or embedded ObjectType | per the `bootstrapp-object-types` rules |
 | plain CRUD/list endpoint | generated create/update/delete/filter | check filters only need indexed fields, AND-only |
 | endpoint with logic, multi-write, or aggregate | action + ApiScript | per `bootstrapp-actions`; port the logic per `bootstrapp-apiscript` |
-| service function or helper shared by several endpoints | a shared script the action scripts call | per "Shared scripts" in `bootstrapp-apiscript`; an action only if clients call it too or it needs more access than its callers |
+| service function or helper shared by several endpoints | a shared script the action scripts call | per `bootstrapp-apiscript`; an action only if clients call it too or it needs more access than its callers |
 | logic needing a capability scripts lack | stays outside (existing service, or a gap to raise) | check `platform.d.ts` |
 | roles/permissions | profiles, class/field access and constraints (enforced server-side) | per `bootstrapp-access`; don't port ACL fields into schemas |
 | login | BootstrApp OIDC | per `bootstrapp-client` auth section |
-| work that follows every write (DB triggers, model hooks) | class event script | per "Class event scripts" in `bootstrapp-apiscript` |
-| file storage | `system.files` uploads through an action | per "Uploading files" in `bootstrapp-apiscript` |
+| work that follows every write (DB triggers, model hooks) | class event script | per `bootstrapp-apiscript` |
+| file storage | `system.files` uploads through an action | per "Files" in `bootstrapp-apiscript` |
 | background jobs, webhooks | out of scope unless the platform exposes them | list as open items |
 
 Mark anything that doesn't fit (OR queries, joins, aggregation pipelines,

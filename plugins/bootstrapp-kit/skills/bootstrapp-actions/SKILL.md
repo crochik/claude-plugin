@@ -27,8 +27,8 @@ Make it an action only when the client genuinely can't do it that way:
 - **Computation over data the client shouldn't fetch**: totals over many
   rows, checks against other users' data.
 
-Authorization is **not** a reason: the platform enforces group-based access
-on every CRUD, filter, and action call. If one of the generated endpoints
+Authorization is **not** a reason: the platform enforces each profile's
+access on every CRUD, filter, and action call. If one of the generated endpoints
 already does the job, drop the action. The exception is a controlled step the
 caller's profile must not be able to do freely (bump a balance they can only
 read, approve someone else's request): that is an action whose script runs
@@ -96,8 +96,9 @@ request/response, not a stored document.
 
 - Registered actions appear in the OpenAPI spec (regenerate the client) and as
   callable functions in other scripts (regenerate `platform.d.ts`).
-- Invoke the action once through the generated client to confirm the script
-  runs (see the server's `platform-notes.md`, "Actions", about script wiring).
+- Run the action once with `invoke_action` (real writes) to confirm the
+  script runs, then through the generated client (see the server's
+  `platform-notes.md`, "Actions", about script wiring).
 - Scope, payload classes, summary and description can change later with
   `replace_action`. The name can't: a renamed action is a new action, and the
   old one stays.

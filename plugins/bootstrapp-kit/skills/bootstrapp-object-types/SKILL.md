@@ -100,9 +100,11 @@ The full checklist with examples is in
   signed whatever `maximum` says; larger values (ARGB colors, byte counts)
   go in a string. Dates as strings with
   `format: date` or `date-time`. Enums as `enum` on a string. No
-  `byte`/`binary`; store files elsewhere and keep a URL.
+  `byte`/`binary`: files go to storage through `system.files` (see the
+  `bootstrapp-apiscript` skill) and the class keeps the file id in a
+  string field (`receiptFileId`).
 - **Users** are platform objects. Store `ownerId`, `assigneeId`, … as uuid
-  strings. Never define `User` or `Group`. Access is set per profile and
+  strings. Never define `User`, `Organization` or `Group`. Access is set per profile and
   enforced by the platform (`bootstrapp-access` skill); don't add ACL fields.
   When some profile should see only its own records, or its organization's,
   the class needs the field the constraint filters on: an `ownerId` (or

@@ -103,10 +103,15 @@ File bytes never go through an action. When the app uploads files:
 3. Confirm with `PUT /files/api/File({id})/Upload` using the user's token,
    or call the confirm action if the app has one.
 
-Show the file later through `GET /files/api/File({id})/Download` with the
-user's token (it redirects to a short-lived url), or through an action
-whose script returns `files.getDownloadUrl(id)`. Only the uploader and the
-profiles the upload action listed in `downloadProfiles` may read it.
+Show the file later with the user's token: `GET
+/files/api/File({id})/Download` redirects to a short-lived url, and `GET
+/files/api/File({id})/Redirect` returns `{ Success, Message, Url }` with
+that url, for an `<img src>` or a download link (which can't send the
+token; request a fresh one each time, it expires in 10 minutes). An action
+whose script returns `files.getDownloadUrl(id)` works too. Only the
+uploader and the profiles the upload action listed in `downloadProfiles`
+may read it. These file routes are platform endpoints, not in the app's
+generated spec, so call them through the wrapper with the same token.
 
 ## Named views
 

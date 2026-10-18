@@ -6,11 +6,13 @@ license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use re
 
 # Writing ApiScripts
 
-An ApiScript is the body of one action, or a shared script: reusable code
-the app's other scripts call as a function. It runs on the server with the
-action's request body (or the caller's argument) in a global named `input`,
-may call only the functions declared in the app's platform definitions, and
-returns the action's output (or the function's result).
+An ApiScript is the body of one action, a shared script (reusable code
+the app's other scripts call as a function), or a class event script (run
+after an object of a class is created or updated). It runs on the server
+with the action's request body (the caller's argument, or the event's run
+context) in a global named `input`, may call only the functions declared in
+the app's platform definitions, and returns the action's output (or the
+function's result).
 
 ## Ground truth, in order
 
@@ -27,8 +29,8 @@ returns the action's output (or the function's result).
 3. **The server's `platform-notes.md`**, "Script runtime": what the runtime
    does around the language.
 
-If a script needs something the `.d.ts` doesn't declare (email, HTTP, files,
-current user), say so and stop on that part. Never invent a module or
+If a script needs something the `.d.ts` doesn't declare (email, HTTP),
+say so and stop on that part. Never invent a module or
 function.
 
 ## Shape of every script
@@ -284,11 +286,6 @@ return execute(input);
   around them is only all-or-nothing if the script checks every result's
   `success` and throws when one is `false`. After a database error inside
   the transaction, the rest of the items can fail too.
-- It needs the `system.mongodb` module in `platform.d.ts` (BootstrApp PRs #36
-  and #43). A server between those two declares it as plain `mongodb`;
-  import whichever name the file declares. If neither is there after
-  regenerating, the server is older: say so, and order the script as
-  validate everything, then write.
 
 ## Elevated or the caller's access
 
@@ -356,10 +353,6 @@ function execute(input: WithdrawExpenseInput): WithdrawExpenseOutput {
 - Who may run the action is still its action access (`access/actions/`),
   elevated or not. Elevated actions are usually limited to the profiles
   that need them.
-- `system.session` is in `platform.d.ts` on current servers (ignore the
-  stale `session` module with `currUser()` at the top of the file). If it
-  is missing, the server is older: say so instead of elevating without the
-  checks.
 
 ## Class event scripts
 
@@ -467,8 +460,8 @@ return execute(input);
   access to the file (its creator or a listed download profile), or an
   elevated script; an elevated script checks the caller via
   `system.session` before returning the url, since the url needs no token.
-  Clients can also use `GET /files/api/File({id})/Download` with their
-  token under the same rule.
+  Clients can also download with their token under the same rule, without
+  an action (see the `bootstrapp-client` skill, "Uploading files").
 
 ## Workflow
 
@@ -496,9 +489,8 @@ return execute(input);
    (shared scripts go first, with `replace_script` as `plan` lists it, and
    `record shared-script <name>`), then call
    it once with `invoke_action` (real writes; pick input that is safe to
-   create), or through the client on servers without that tool. A runtime error names the line and the
-   call stack; on an older server it names the last line, so throw
-   `{ code, message }` with distinct messages to find the spot.
+   create; `profileName` runs it with a restricted profile's access). A
+   runtime error names the line, the source and the call stack.
 
 ## Porting existing server code
 

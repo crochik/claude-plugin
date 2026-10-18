@@ -40,7 +40,10 @@ Ask, for each candidate class:
 ## Write-path checklist
 
 - What must change together atomically? If two documents must change in one
-  step, that's an action (scripts run server-side) or a reason to embed.
+  step, that's an action whose script uses a transaction, or a reason to
+  embed.
+- What must follow every write of a class, whichever client made it (a
+  parent's total, a derived field)? That's a class event script.
 - Which denormalized copies exist and who updates them?
 - Which fields are server-assigned (`_id`, timestamps set by scripts)?
 
@@ -67,6 +70,7 @@ Ask, for each candidate class:
 - Foreign key → `<name>Id` reference; join table → see many:many above.
 - Child tables always loaded with the parent → embedded array.
 - Nullable columns → optional properties (not in `required`).
-- Check constraints / enums → `enum`; triggers and stored procedures → actions.
+- Check constraints / enums → `enum`; triggers → class event scripts;
+  stored procedures → actions.
 - ORM-level validation → JSON Schema keywords (`minimum`, `maxLength`,
   `pattern`) where supported, else the client or an action.

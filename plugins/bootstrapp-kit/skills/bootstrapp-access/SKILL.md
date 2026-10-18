@@ -190,7 +190,8 @@ naming the person and the profile. Changes apply from the person's next sign
 in. Invite-only apps need an invitation for everyone, including testers.
 
 Only the app's owner can use the access, auth and user tools; anyone else
-gets an error saying so.
+gets an error saying so. Like every app tool, they also need the user's
+developer access (see the `bootstrapp` skill).
 
 When the app itself must do this (a sign-up action that creates the
 customer's organization and invites its first user), an action script can:
@@ -204,5 +205,7 @@ bootstrapp-apiscript skill).
 
 Sign in to the client as a test user with each restricted profile (invite a
 second address) and try one read and one write that should succeed and one
-that should fail. A spec generated with `generate_openapi_spec` reflects the
-caller's own (full) access, not a restricted profile's.
+that should fail. A spec generated with `generate_openapi_spec` reflects
+the default `Admin` profile's (full) access, not a restricted profile's.
+`invoke_action` with `profileName` tries an action with a restricted
+profile's access without signing in as someone else.

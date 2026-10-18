@@ -42,14 +42,18 @@ Produce a mapping table per area:
 | endpoint with logic, multi-write, or aggregate | action + ApiScript | per `bootstrapp-actions`; port the logic per `bootstrapp-apiscript` |
 | service function or helper shared by several endpoints | a shared script the action scripts call | per "Shared scripts" in `bootstrapp-apiscript`; an action only if clients call it too or it needs more access than its callers |
 | logic needing a capability scripts lack | stays outside (existing service, or a gap to raise) | check `platform.d.ts` |
-| roles/permissions | platform groups (enforced server-side) | don't port ACL fields into schemas |
+| roles/permissions | profiles, class/field access and constraints (enforced server-side) | per `bootstrapp-access`; don't port ACL fields into schemas |
 | login | BootstrApp OIDC | per `bootstrapp-client` auth section |
-| background jobs, webhooks, file storage | out of scope unless the platform exposes them | list as open items |
+| work that follows every write (DB triggers, model hooks) | class event script | per "Class event scripts" in `bootstrapp-apiscript` |
+| file storage | `system.files` uploads through an action | per "Uploading files" in `bootstrapp-apiscript` |
+| background jobs, webhooks | out of scope unless the platform exposes them | list as open items |
 
-Mark anything that doesn't fit (OR queries, joins, full-text search,
-transactions across many documents, binary storage) and propose the
-workaround: client-side composition, denormalization, an action, or keeping
-that piece on the old backend for now.
+Mark anything that doesn't fit (OR queries, joins, aggregation pipelines,
+capabilities `platform.d.ts` lacks) and propose the workaround: client-side
+composition, denormalization, an action, or keeping that piece on the old
+backend for now. Full text search (`#text`), multi-document transactions
+(an action script with `system.mongodb`) and file storage (`system.files`)
+do fit.
 
 ## 3. Plan the cutover
 

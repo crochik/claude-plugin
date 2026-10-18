@@ -115,8 +115,9 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
-| `invoke_action` | Run an action's stored script now, as the owner (real writes). |
+| `invoke_action` | Run an action's stored script now, as the owner (real writes), optionally with a profile's access (`profileName`) or another time limit (`timeoutSeconds`, default 60, at most 600). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
+| `set_class_full_text_search` | Turn a class's `#text` search on or off without sending the class again. |
 | `get_namespaces`, `get_object_classes` | List what exists (names only). |
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
 | `generate_openapi_spec` | URL of the OpenAPI spec for client generation. |
@@ -126,9 +127,16 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_app_auth`, `replace_app_auth`, `add_oidc_client_origin` | Sign-in providers, sign-up, browser origins. |
 | `get_users`, `invite_user`, `assign_user_profile`, `remove_user_access`, `get_organizations`, `add_organization`, `set_user_organization` | People. They change real access: confirm each call. |
 | `get_buckets`, `add_bucket`, `update_bucket`, `get_folders`, `create_folder`, `get_folder_access`, `replace_folder_access` | Where `system.files` stores files. Buckets are added without credentials (the platform owner sets keys outside MCP); never ask for or handle bucket keys. Confirm before adding or changing a bucket. |
+| `get_current_user` | Who is signed in (user, account, role, claims). |
+| `list_object_types`, `describe_object_type`, `find_object`, `filter_objects`, `create_object`, `update_object` | Read and write records (the app's included) with the signed-in user's own access: look at real data, or seed a few records while building. Writes are real. Describe first and use its keys; see "Object data tools" in `tools.md`. Clients use the generated API instead. |
 
 Only the app's owner can call the tools that take an app (or a class or
 action of it); see the `bootstrapp-access` skill for the access tools.
+Every tool above except `get_current_user` and the object data tools also
+needs **developer access**, an `mcp_role` of `developer` that a platform
+administrator grants on the user. Without it those tools aren't listed: if
+only the object data tools show up, tell the user to ask for developer
+access and sign in again, rather than working around it.
 
 The platform facts live on the server, so they always match the deployed
 version. Read the resource before relying on a detail it covers:
@@ -168,8 +176,10 @@ and you can grep them when needed.
 - **Namespaces are rooted at `app.<app_name>`.** Domain classes live directly
   in `app.<app_name>`; action input/output classes in `app.<app_name>.actions`.
   Action payload classes are never domain classes.
-- **Platform `User` and `Group` already exist.** Reference users with a
-  `*Id` uuid field; never define `User`/`Group` in the app namespace.
+- **Users and organizations are platform records.** Reference users with
+  a `*Id` uuid field (`ownerId`) and organizations with `organizationId`;
+  never define `User`, `Organization` or `Group` classes in the app
+  namespace.
 - **Secrets stay out of git.** `.env.example` committed, `.env` ignored.
 - **Ask, don't stall.** When something is ambiguous, propose a default, say
   which one, and continue unless the step cannot be undone (registering an
@@ -194,15 +204,8 @@ lists the replace call for it:
   records, and never switch a class between `TopLevel` and `Embedded` (the
   server refuses; add a new class instead).
 
-There are no delete tools. Renaming a class or action means adding the new
-one and leaving the old one in place.
-
-Older servers (before crochik/BootstrApp PR #28) have no replace tools,
-`get_object_class`, `get_action_script` or `get_actions`, and `register_action` silently creates
-duplicates there. If the tool list lacks `replace_object_class`, a changed
-class or action can't be applied through MCP: tell the user and offer a new
-name, a change in the BootstrApp admin, or reverting the local file. Scripts
-then go through `update_action_script` with the same arguments.
+There are no delete tools for classes or actions. Renaming a class or
+action means adding the new one and leaving the old one in place.
 
 Known platform gaps and behaviors worth knowing before you rely on something:
 the server's `platform-notes.md` resource.

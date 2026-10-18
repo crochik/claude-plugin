@@ -19,9 +19,11 @@ passes the folder; otherwise Glob for `**/bootstrapp-kit/skills/*/SKILL.md`):
 - `skills/bootstrapp-actions/SKILL.md`
 
 Then read `bootstrapp/app.json`, the existing manifests you are changing, and
-`bootstrapp/applied.json` if present. Treat applied classes and actions as
-fixed: changing them is not possible through MCP, so propose a new class or
-action instead and say why.
+`bootstrapp/applied.json` if present. Applied classes and actions can be
+changed (the sync replaces them), but stored records are not migrated:
+prefer additive changes, say what a removed or newly required property does
+to existing records, and never switch a class between `TopLevel` and
+`Embedded` or rename one (propose a new class instead).
 
 ## What to do
 

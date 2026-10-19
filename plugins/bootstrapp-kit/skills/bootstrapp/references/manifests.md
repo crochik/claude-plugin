@@ -214,9 +214,44 @@ updated (`events/app.shop.OrderLine.updated.updateOrderTotal.ts`). A
 class can have several per event. There is no manifest: the file name
 gives `replace_class_event_script`'s `fullObjectType`, `classEvent`
 (`Created` | `Updated`) and `scriptName` (camelCase identifier), and the
-file is its `script`, verbatim. Only top-level classes directly in `app.<app>` can have one.
+file is its `script`, verbatim. Only top-level classes directly in `app.<app>`,
+and webhook event classes (`app.<app>.webhook.<Name>WebhookEvent`, from
+`webhooks/`), can have one.
 Deleting the file makes `plan` list `remove_class_event_script`. See
 "Class event scripts" in the server's `api-script.md`.
+
+## `webhooks/<name>.json`
+
+An inbound webhook: the `replace_webhook` arguments without `appName`.
+
+```json
+{
+  "name": "stripe",
+  "description": "Stripe payment events",
+  "bodyClass": "app.shop.webhook.StripeEventBody",
+  "auth": [{ "type": "stripe", "secret": "${env:STRIPE_WEBHOOK_SECRET}" }],
+  "dedupeKey": "body:id"
+}
+```
+
+`name` is camelCase and names the event class,
+`app.<app>.webhook.<Name>WebhookEvent`, which `replace_webhook` makes (with
+the base `app.<app>.webhook.WebhookEvent`); don't write class manifests for
+them. `bodyClass` is an Embedded class with a manifest of its own, applied
+first. Optional: `methods` (default `["POST"]`), `format` (`json`, `form`,
+`xml`, `raw`), `registration`, `response`, `dedupeKey`, `keepRawBody`,
+`enabled`. Auth step types and fields are in the server's `tools.md`.
+
+Secrets (`secret`, `token`, `password`) are written `${env:NAME}`, and
+the values live in `.env` (list the names in `.env.example`). `plan` keeps
+the placeholders; replace them when calling and never print the values.
+Changing only a value in `.env` doesn't change the manifest, so apply it by
+calling `replace_webhook` yourself. `"generate"` (bearer, apikey, basic)
+makes the server create a secret and return it once: save it to `.env`
+and switch the manifest to `${env:NAME}`. The URL isn't in the manifest:
+`replace_webhook` and `get_webhooks` return it; `rotateUrl` is a one-off
+call, not a manifest key. Deleting the file makes `plan` list
+`remove_webhook` (the event class and its events stay).
 
 ## `profiles/<Profile>.json`
 
@@ -315,6 +350,7 @@ Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
   "sharedScripts": { "orderTotal": { "hash": "…", "appliedAt": "…" } },
   "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "eventScripts": { "app.shop.OrderLine.updated.updateOrderTotal": { "hash": "…", "appliedAt": "…" } },
+  "webhooks": { "stripe": { "hash": "…", "appliedAt": "…" } },
   "auth": { "hash": "…", "appliedAt": "…" }
 }
 ```

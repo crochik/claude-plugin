@@ -54,7 +54,7 @@ offers the tools that read and write records.
 
 Everything lands in `bootstrapp/` at the root of the user's repository:
 `app.json`, `classes/*.json`, `actions/*.json`, `scripts/*.ts`,
-`shared/` (shared scripts), `events/` (class event scripts),
+`shared/` (shared scripts), `events/` (class event scripts), `webhooks/` (inbound webhooks),
 `profiles/*.json`, `access/`, `auth.json`,
 `generated/` (platform.d.ts, openapi.yaml), `applied.json`, and for
 migrations `MIGRATION.md`. Commit it: the manifests are the record of

@@ -24,12 +24,12 @@ function's result).
 2. **The server's rule book**: `bootstrapp://reference/api-script.md`, and
    the grammar `api-script.g4`. It is the only copy of the language rules
    and of how shared scripts, action calls, transactions, elevated scripts,
-   class event scripts, users, organizations and files behave. **Read it
+   class event scripts, users, organizations, files and HTTP calls behave. **Read it
    before writing a script**, and the section for any of those you use.
 3. **The server's `platform-notes.md`**, "Script runtime" and "Filtering and
    reading data".
 
-If a script needs something the `.d.ts` doesn't declare (email, HTTP),
+If a script needs something the `.d.ts` doesn't declare (email, for example),
 say so and stop on that part. Never invent a module or function.
 
 ## Shape of every script
@@ -126,6 +126,20 @@ path in the script, never from `input`; set up the bucket and folder with
 the MCP tools (`get_buckets`, `create_folder`, `replace_folder_access`) and
 never ask for bucket keys. Store the file id on the domain object
 (`receiptFileId`). The client side is in the `bootstrapp-client` skill.
+
+## HTTP calls
+
+A script calls another service with `system.http.fetch(url, init?)`,
+shaped like `fetch` but returning the finished response with the body in
+`res.text` and `res.json` (rule book, "Calling HTTP APIs"). Check
+`res.ok`; error statuses don't throw. A script can only call what its
+network policy allows: write `network/<name>.json` with the hosts,
+schemes and methods it needs, and list the script in it (manifest
+formats in the `bootstrapp` skill). Allow only the hosts and methods the
+script uses. API keys never come from `input` or the script source:
+keep them in a record only elevated scripts read, and call the API from
+an elevated action that checks the caller. Prefer the client calling a
+public API itself when nothing secret or server-side is involved.
 
 ## Workflow
 

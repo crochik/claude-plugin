@@ -23,7 +23,8 @@ Make it an action only when the client genuinely can't do it that way:
 - **Server-side effects**: work that must not run in the client, such as
   enforcing an invariant against data the caller can't see, or using a
   server-only capability. Scripts can only call what `platform.d.ts` declares,
-  so check it exposes the capability (email, HTTP, files) before promising it.
+  so check it exposes the capability (email, HTTP calls, files) before promising it.
+  An HTTP call also needs a network policy that allows its host.
 - **Computation over data the client shouldn't fetch**: totals over many
   rows, checks against other users' data.
 

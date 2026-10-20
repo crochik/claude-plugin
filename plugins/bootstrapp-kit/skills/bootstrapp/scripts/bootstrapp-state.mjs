@@ -9,8 +9,9 @@
 //   node bootstrapp-state.mjs status            [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
-//   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp]
+//   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp] [--id <networkPolicyId>]
 //        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | network-policy | auth
+//        (network-policy: --id is the id replace_network_policy returned)
 //
 // No dependencies; Node 18+.
 
@@ -24,7 +25,9 @@ const dirFlag = args.indexOf("--dir");
 const dir = dirFlag >= 0 ? args[dirFlag + 1] : "bootstrapp";
 const asJson = args.includes("--json");
 const summary = args.includes("--summary");
-const positional = args.slice(1).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--dir");
+const idFlag = args.indexOf("--id");
+const recordedId = idFlag >= 0 ? args[idFlag + 1] : undefined;
+const positional = args.slice(1).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--dir" && all[i - 1] !== "--id");
 
 const SNAKE = /^[a-z][a-z0-9_]*$/;
 const PASCAL = /^[A-Z][A-Za-z0-9]*$/;
@@ -47,7 +50,10 @@ const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolea
 const INT32_MAX = 2147483647;
 const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", auth: null };
 // network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
-// shared scripts it calls included (replace_network_policy + set_script_network_policy)
+// shared scripts it calls included (replace_network_policy + set_script_network_policy). The server keeps policies by id
+// (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
+// saved as a new policy with a new id
+const POLICY_ID = "<id replace_network_policy returned>";
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
@@ -841,15 +847,21 @@ function plan(state) {
     const group = [];
     if (item.state !== "removed") {
       const { name, description, rules } = strip(state.network.find((n) => n.data.name === item.name).data);
-      group.push({ tool: "replace_network_policy", args: { appName, name, rules, ...(description ? { description } : {}) } });
-      for (const script of item.scripts) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicy: name } });
+      const id = state.ledger.networkPolicies[item.name]?.id;
+      group.push({ tool: "replace_network_policy", args: { appName, name, rules, ...(description ? { description } : {}), ...(id ? { id } : {}) } });
+      for (const script of item.scripts) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicyId: POLICY_ID } });
     }
     // scripts it no longer lists (and no other policy does) lose their network access
     for (const script of state.ledger.networkPolicies[item.name]?.scripts ?? []) {
-      if (!item.scripts.includes(script) && !listed.has(script)) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicy: "" } });
+      if (!item.scripts.includes(script) && !listed.has(script)) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicyId: "" } });
     }
     if (!group.length) group.push({ tool: "(none)", args: {}, note: "nothing to call on the server; record it" });
-    group.forEach((call, i) => calls.push({ ...call, record: i === group.length - 1 ? ["network-policy", item.name] : null, ...(i < group.length - 1 ? { note: `part of network policy ${item.name}; recorded with its last call` } : {}) }));
+    const recordNote = item.state === "removed" ? undefined : `record with --id ${POLICY_ID}`;
+    group.forEach((call, i) => {
+      const last = i === group.length - 1;
+      const note = last ? recordNote : `part of network policy ${item.name}; recorded with its last call`;
+      calls.push({ ...call, record: last ? ["network-policy", item.name] : null, ...(note ? { note } : {}) });
+    });
   }
   for (const item of pending("auth")) {
     calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });
@@ -925,7 +937,11 @@ function record(state, kind, names) {
     if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
     else if (item.state === "removed") delete ledger[KINDS[kind]][name];
     else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
-    else if (kind === "network-policy") ledger.networkPolicies[name] = { hash: item.hash, scripts: item.scripts, appliedAt: now };
+    else if (kind === "network-policy") {
+      // the id can change: a change to an active policy is saved as a new one
+      if (!recordedId) fail(`record network-policy ${name} --id <id replace_network_policy returned>`);
+      ledger.networkPolicies[name] = { id: recordedId, hash: item.hash, scripts: item.scripts, appliedAt: now };
+    }
     else ledger[KINDS[kind]][name] = { hash: item.hash, appliedAt: now };
   }
   const ordered = {
@@ -984,7 +1000,7 @@ switch (command) {
   case "plan": {
     const result = plan(state);
     if (!summary) { console.log(JSON.stringify(result, null, 2)); break; }
-    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.args?.script ? `${c.args.script} -> ${c.args.networkPolicy || "no policy"}` : c.record?.[1] ?? c.args?.fullObjectType ?? ""}${c.note ? ` (${c.note})` : ""}`);
+    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.args?.script ? `${c.args.script} -> ${c.args.networkPolicyId || "no policy"}` : c.record?.[1] ?? c.args?.fullObjectType ?? ""}${c.note ? ` (${c.note})` : ""}`);
     for (const b of result.blocked) console.log(`BLOCKED ${b.kind} ${b.name}: ${b.reason}`);
     if (!result.calls.length && !result.blocked.length) console.log("Nothing to apply.");
     break;

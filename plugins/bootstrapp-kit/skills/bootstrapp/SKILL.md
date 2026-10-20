@@ -116,7 +116,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
-| `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create or replace one (rules of host, schemes, methods; safe to repeat), point an action or class event script at one or take its network access away. The policy binds the whole run the script starts (called actions and shared scripts included); a run whose script has none can't make HTTP calls. |
+| `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create one or change an inactive one (rules of host, schemes, methods; safe to repeat; a change to an active one is saved as a new inactive policy), point an action or class event script at one by id or take its network access away. Policies allow calls only once activated outside the MCP server. The policy binds the whole run the script starts (called actions and shared scripts included); a run whose script has none can't make HTTP calls. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes), optionally with a profile's access (`profileName`) or another time limit (`timeoutSeconds`, default 60, at most 600). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
@@ -196,9 +196,12 @@ lists the replace call for it:
 - **Script changed**, or its action's `elevated` → `replace_action_script` again.
 - **Class event script changed** → `replace_class_event_script` again;
   **deleted** → `remove_class_event_script`.
-- **Network policy changed** → `replace_network_policy` and
-  `set_script_network_policy` for its scripts again; a script dropped from
-  it gets an empty policy. Replacing a script keeps its policy.
+- **Network policy changed** → `replace_network_policy` (with the
+  ledger's `id`) and `set_script_network_policy` for its scripts with the
+  id it returns; a script dropped from it gets an empty policy. An active
+  policy is never changed: the change comes back as a new, inactive
+  policy someone has to activate outside the MCP server. Replacing a
+  script keeps its policy.
 - **Shared script changed** (script or manifest) → `replace_script` again. If
   its classes changed, run `validate_action_scripts` to find the callers
   it broke.
@@ -240,8 +243,15 @@ When the user wants local definitions pushed:
    `shared-script`, `script`, `event-script`, `network-policy`, `auth`; an access item's name is
    `<Profile>/<fullObjectType>`, an event script's its file name without
    `.ts`).
-   A network policy is several calls; only its last one carries `record`.
-   Record only what succeeded.
+   A network policy is several calls; only its last one carries `record`,
+   with `--id` set to the `id` `replace_network_policy` returned, which the
+   `set_script_network_policy` calls take too. Policies are saved
+   inactive and allow no call until someone activates them outside the
+   MCP server; tell the user. When the result has `replacesId`, the policy
+   was active and the change is a new policy: pointing the scripts at it
+   takes their network access away until it is activated, so ask whether
+   to point them now or after activation (record it once they point at
+   it). Record only what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
    surface, then push changed shared scripts with `replace_script` and

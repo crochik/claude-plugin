@@ -138,7 +138,8 @@ binds the whole run: a shared script or a called action uses its
 caller's. Write `network/<name>.json` with the hosts, schemes and
 methods needed, and list the actions and class event scripts that start
 those runs (manifest formats in the `bootstrapp` skill). Allow only the
-hosts and methods the run uses. API keys never come from `input` or the script source:
+hosts and methods the run uses. A policy allows nothing until someone
+activates it outside the MCP server, so tell the user it needs approval. API keys never come from `input` or the script source:
 keep them in a record only elevated scripts read, and call the API from
 an elevated action that checks the caller. Prefer the client calling a
 public API itself when nothing secret or server-side is involved.

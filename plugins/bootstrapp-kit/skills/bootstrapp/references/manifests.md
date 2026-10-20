@@ -224,7 +224,9 @@ A network policy: the HTTP calls (`system.http.fetch`) a run started by
 one of the scripts it lists may make. The policy binds the whole run:
 the actions and shared scripts it calls make their calls under it, and
 their own policies don't apply. A run whose starting script no policy
-lists can't make any.
+lists, or whose policy isn't active, can't make any. Policies are
+account wide and approved outside the MCP server: the server saves them
+inactive and someone activates them there.
 
 ```json
 {
@@ -238,7 +240,11 @@ lists can't make any.
 ```
 
 `name`, `description` and `rules` are `replace_network_policy`'s
-arguments (`appName` added). A rule's `host` is exact or `*.example.com`
+arguments (`appName` added, and `id` from the ledger once it is
+applied). The server keeps the policy by id: `replace_network_policy`
+returns it, `set_script_network_policy` takes it, and the ledger
+records it. A change to an active policy comes back as a new, inactive
+policy with a new id. A rule's `host` is exact or `*.example.com`
 (its subdomains), with `:port` for a non-default port; `schemes`
 defaults to `["https"]`, `methods` to any. `scripts` are the server's
 names of scripts that start a run, each set with
@@ -347,7 +353,7 @@ Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
   "sharedScripts": { "orderTotal": { "hash": "…", "appliedAt": "…" } },
   "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "eventScripts": { "app.shop.OrderLine.updated.updateOrderTotal": { "hash": "…", "appliedAt": "…" } },
-  "networkPolicies": { "stripe": { "hash": "…", "scripts": ["app.shop.Order.chargeOrder"], "appliedAt": "…" } },
+  "networkPolicies": { "stripe": { "id": "…", "hash": "…", "scripts": ["app.shop.Order.chargeOrder"], "appliedAt": "…" } },
   "auth": { "hash": "…", "appliedAt": "…" }
 }
 ```

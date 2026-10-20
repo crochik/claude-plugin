@@ -132,11 +132,13 @@ never ask for bucket keys. Store the file id on the domain object
 A script calls another service with `system.http.fetch(url, init?)`,
 shaped like `fetch` but returning the finished response with the body in
 `res.text` and `res.json` (rule book, "Calling HTTP APIs"). Check
-`res.ok`; error statuses don't throw. A script can only call what its
-network policy allows: write `network/<name>.json` with the hosts,
-schemes and methods it needs, and list the script in it (manifest
-formats in the `bootstrapp` skill). Allow only the hosts and methods the
-script uses. API keys never come from `input` or the script source:
+`res.ok`; error statuses don't throw. A run can only call what the
+network policy of the script that started it allows, and that policy
+binds the whole run: a shared script or a called action uses its
+caller's. Write `network/<name>.json` with the hosts, schemes and
+methods needed, and list the actions and class event scripts that start
+those runs (manifest formats in the `bootstrapp` skill). Allow only the
+hosts and methods the run uses. API keys never come from `input` or the script source:
 keep them in a record only elevated scripts read, and call the API from
 an elevated action that checks the caller. Prefer the client calling a
 public API itself when nothing secret or server-side is involved.

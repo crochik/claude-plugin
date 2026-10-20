@@ -46,7 +46,8 @@ const SIGNUP = ["open", "invite_only"];
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
 const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", auth: null };
-// network/<name>.json: the HTTP calls (system.http) the scripts it lists may make (replace_network_policy + set_script_network_policy)
+// network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
+// shared scripts it calls included (replace_network_policy + set_script_network_policy)
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
@@ -145,14 +146,13 @@ function load() {
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
 
-// The server's name of each local script, the one set_script_network_policy takes
+// The server's name of each local script that starts a run (actions and class event scripts), the one set_script_network_policy takes
 function scriptServerNames(state) {
   const names = new Map();
   for (const script of state.scripts) {
     const action = state.actions.find((a) => !a.data.$error && a.data.actionName === script.name)?.data;
     if (action?.fullObjectType) names.set(`${action.fullObjectType}.${script.name}`, `scripts/${script.name}.ts`);
   }
-  if (state.app?.name) for (const shared of state.shared) names.set(`app.${state.app.name}.scripts.${shared.name}`, `shared/${shared.name}.ts`);
   for (const event of state.events) {
     if (!event.fullObjectType) continue;
     names.set(`${event.fullObjectType}#${event.classEvent.toLowerCase()}#${event.scriptName}`, `events/${event.name}.ts`);
@@ -383,7 +383,8 @@ function checkNetwork(state, error, warn) {
     if (data.scripts !== undefined && !Array.isArray(data.scripts)) { error(where, "scripts must be a list of script names"); continue; }
     for (const script of data.scripts ?? []) {
       if (appName && !String(script).startsWith(`app.${appName}.`)) error(where, `script ${script} isn't one of ${appName}'s (their names start with app.${appName}.)`);
-      else if (!local.has(script)) warn(where, `script ${script} has no local file; it must already exist on the server. Names: <fullObjectType>.<actionName>, app.${appName ?? "<app>"}.scripts.<name>, <fullObjectType>#created#<name>`);
+      else if (appName && String(script).startsWith(`app.${appName}.scripts.`)) error(where, `script ${script} is a shared script: it runs under the policy of the action or class event script that calls it, so list that one instead`);
+      else if (!local.has(script)) warn(where, `script ${script} has no local file; it must already exist on the server. Names: <fullObjectType>.<actionName>, <fullObjectType>#created#<name> or #updated#`);
       if (owner.has(script)) error(where, `script ${script} is also in network/${owner.get(script)}.json; a script has one network policy`);
       else owner.set(script, data.name);
     }

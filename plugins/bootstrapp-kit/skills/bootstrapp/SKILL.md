@@ -45,7 +45,8 @@ bootstrapp/
   shared/<scriptName>.ts        the shared script itself, called as scripts.<scriptName>(args)
   events/<fullObjectType>.<created|updated>.<scriptName>.ts   one behavior run after an object of the class
                                 is created or updated (several per class and event)
-  network/<name>.json           a network policy (HTTP calls system.http may make) and the scripts that use it
+  network/<name>.json           a network policy (HTTP calls system.http may make) and the actions/class
+                                event scripts whose runs it binds
   profiles/<Profile>.json       one file per profile = the add_profile payload
   access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
   access/actions/<actionName>.json         profiles that run an action = replace_action_access
@@ -115,7 +116,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
-| `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create or replace one (rules of host, schemes, methods; safe to repeat), point a script at one or take its network access away. A script without a policy can't make HTTP calls. |
+| `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create or replace one (rules of host, schemes, methods; safe to repeat), point an action or class event script at one or take its network access away. The policy binds the whole run the script starts (called actions and shared scripts included); a run whose script has none can't make HTTP calls. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes), optionally with a profile's access (`profileName`) or another time limit (`timeoutSeconds`, default 60, at most 600). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |

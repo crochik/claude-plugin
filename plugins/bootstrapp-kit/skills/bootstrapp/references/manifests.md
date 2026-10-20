@@ -220,8 +220,11 @@ Deleting the file makes `plan` list `remove_class_event_script`. See
 
 ## `network/<name>.json`
 
-A network policy: the HTTP calls (`system.http.fetch`) the scripts it
-lists may make. A script no policy lists can't make any.
+A network policy: the HTTP calls (`system.http.fetch`) a run started by
+one of the scripts it lists may make. The policy binds the whole run:
+the actions and shared scripts it calls make their calls under it, and
+their own policies don't apply. A run whose starting script no policy
+lists can't make any.
 
 ```json
 {
@@ -230,7 +233,7 @@ lists may make. A script no policy lists can't make any.
   "rules": [
     { "host": "api.stripe.com", "methods": ["GET", "POST"] }
   ],
-  "scripts": ["app.shop.Order.chargeOrder", "app.shop.scripts.refund"]
+  "scripts": ["app.shop.Order.chargeOrder", "app.shop.Order#created#notify"]
 }
 ```
 
@@ -238,11 +241,11 @@ lists may make. A script no policy lists can't make any.
 arguments (`appName` added). A rule's `host` is exact or `*.example.com`
 (its subdomains), with `:port` for a non-default port; `schemes`
 defaults to `["https"]`, `methods` to any. `scripts` are the server's
-script names, each set with `set_script_network_policy`:
-`<fullObjectType>.<actionName>` for an action,
-`app.<app>.scripts.<name>` for a shared script,
-`<fullObjectType>#created#<name>` (or `#updated#`) for a class event
-script. A script is in at most one policy. Dropping a script from the
+names of scripts that start a run, each set with
+`set_script_network_policy`: `<fullObjectType>.<actionName>` for an
+action, `<fullObjectType>#created#<name>` (or `#updated#`) for a class
+event script. Shared scripts can't be listed: they run under their
+caller's policy. A script is in at most one policy. Dropping a script from the
 list, or deleting the file, makes `plan` take that script's network
 access away (the policy itself stays on the server: there is no delete
 tool). See "Calling HTTP APIs" in the server's `api-script.md`.

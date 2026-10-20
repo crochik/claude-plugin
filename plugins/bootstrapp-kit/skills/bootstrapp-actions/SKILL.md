@@ -24,7 +24,8 @@ Make it an action only when the client genuinely can't do it that way:
   enforcing an invariant against data the caller can't see, or using a
   server-only capability. Scripts can only call what `platform.d.ts` declares,
   so check it exposes the capability (email, HTTP calls, files) before promising it.
-  An HTTP call also needs a network policy that allows its host.
+  An HTTP call also needs a network policy that allows its host, set on the
+  action (it binds every script the action's run calls).
 - **Computation over data the client shouldn't fetch**: totals over many
   rows, checks against other users' data.
 

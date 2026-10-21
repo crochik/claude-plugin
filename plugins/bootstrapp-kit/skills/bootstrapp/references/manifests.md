@@ -339,7 +339,7 @@ value) shows a record only when its related record
 is one the profile can see.
 
 `updateConstraints` and `deleteConstraints` have the same shape as
-`constraints` (top-level fields only) and narrow which visible records the
+`constraints` (top-level fields, or `Exists` on a relation) and narrow which visible records the
 profile may update or delete:
 
 ```json

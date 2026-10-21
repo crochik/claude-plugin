@@ -100,7 +100,9 @@ Rules worth knowing while writing them:
   key. Constraints apply to top-level classes only.
 - **An `Eq` constraint also stamps the field on create**: `ownerId Eq
   {{context "UserId"}}` limits the profile to its records *and* fills
-  `ownerId` on the records it creates. The client doesn't send it.
+  `ownerId` on the records it creates. The client doesn't send it. The
+  profile also can't change a field its row constraints test, so it can't
+  move a record to another owner or organization.
 - **Update and delete constraints** (`updateConstraints`,
   `deleteConstraints`) narrow, within what the profile sees, which records it
   may update and delete. A delete must match the row, update *and* delete

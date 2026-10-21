@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-apiscript
-description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions, shared scripts and class event scripts (run when an object is created or updated) - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, shared scripts, other actions), reusable code in shared scripts, atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions, shared scripts and class event scripts (run when an object is created or updated) - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, updateManyX, shared scripts, other actions), reusable code in shared scripts, atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
 license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
@@ -64,6 +64,12 @@ The mistakes that matter most (the rule book has the rest):
 - `filterX` conditions and `orderBy` use indexed fields only, and `fields`
   names everything you read.
 - `updateXById` is a patch: send only the changed fields.
+- The same change to every record matching a filter (archive all open
+  tasks of a project, `Inc` a counter, `AddToSet` a tag) is one
+  `updateManyX(filter, operations)` call, not a loop of `updateXById`. It
+  updates only what the caller's constraints allow and fails whole (nothing
+  written) on a field it can't change or over 1000 matches. Rule book,
+  "Update many".
 - A transaction still open when the script ends is aborted: commit before
   returning.
 - No string methods, no `try`/`catch`, no arrow functions, `++`, `===`,

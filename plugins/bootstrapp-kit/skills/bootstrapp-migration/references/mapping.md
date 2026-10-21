@@ -25,6 +25,7 @@ Only the rows where BootstrApp differs from a straight type mapping:
 | "on create set X" defaults | `default` in the schema, or the client |
 | state machine transitions | an `Instance` action per transition (`submitOrder`, `cancelOrder`) |
 | batch operations | `Bulk` action |
+| `UPDATE … SET … WHERE …` (same change to many rows) | `updateMany<Class>(filter, operations)` in the action's script |
 | reports / aggregates | `Class` action returning a summary class |
 | DB transaction across tables | one action that validates everything, then writes in a `system.mongodb` transaction |
 | triggers | a class event script (runs after every create or update of the class), or fold into the action that causes the write |

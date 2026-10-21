@@ -104,8 +104,12 @@ Rules worth knowing while writing them:
   exists and the profile can see it, so the project's constraints decide.
   `fieldName` is a relation name: a string foreign key creates one named
   after the referenced class without its namespace (`Project` for
-  `app.tasks.Project`), or after the field when two reach classes with the
-  same name or the name is one of the class' fields. Never dots. A class
+  `app.tasks.Project`). When two reach classes with the same name, or the
+  name is taken, it is the field without `Id` (`project`), then with a
+  `Relation` suffix. A relation never has dots and never matches a field or
+  another relation of the class, its base classes or the classes extending
+  it (ignoring case), so a class can't add a field named like a relation of
+  its base class. `check` prints the names it expects. A class
   added before that rule keeps names like `app.tasks.Project` until it is
   replaced (`get_class_access` shows the current ones); re-apply its
   manifest with `replace_object_class` first, which renames them and moves

@@ -333,7 +333,8 @@ on the server: the file is the whole access.
 
 A row constraint can also follow a relation: `{ "fieldName": "Category",
 "operator": "Exists" }` (a relation name from a string foreign key: the
-referenced class without its namespace, or the field when that repeats; no
+referenced class without its namespace, or the field without `Id` when
+that repeats or is taken, since relation names never match a field; no
 value) shows a record only when its related record
 is one the profile can see.
 

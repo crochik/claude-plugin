@@ -99,12 +99,13 @@ Rules worth knowing while writing them:
   `AllUserIds`, `AllOrganizationIds`, `AllEntityIds`, and `Claims.<name>`
   from `auth.json`'s `calculatedClaims`). `In`/`Nin` take a list or an `All*`
   key. Constraints apply to top-level classes only.
-- **`Exists` follows a relation**: `{ "fieldName": "app.tasks.Project",
+- **`Exists` follows a relation**: `{ "fieldName": "Project",
   "operator": "Exists" }` (no value) shows a task only when its project
   exists and the profile can see it, so the project's constraints decide.
   `fieldName` is a relation name: a string foreign key creates one named
-  after the referenced class (after the field when two reach the same
-  class). The profile needs `Read` on the relation and on the related
+  after the referenced class without its namespace (`Project` for
+  `app.tasks.Project`), or after the field when two reach classes with the
+  same name or the name is one of the class' fields. Never dots. The profile needs `Read` on the relation and on the related
   class. Row constraints only. Writes don't check the reference, so make
   `projectId` `["Read", "SetOnCreate"]` and create through an action when a
   member must not file tasks into projects they can't see. Loading one

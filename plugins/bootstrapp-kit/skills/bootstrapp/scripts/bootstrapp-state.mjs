@@ -539,6 +539,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
       else if (badDefault.length) error(where, `defaultFieldPermissions: unknown ${badDefault.join(", ")}. Valid: ${FIELD_PERMISSIONS.join(", ")}`);
     }
     for (const [relation, values] of Object.entries(data.relationPermissions ?? {})) {
+      if (cls && !relationsOf(cls, byName).includes(relation)) warn(where, `relationPermissions.${relation}: ${data.fullObjectType} has no relation with that name (relations: ${relationsOf(cls, byName).join(", ") || "none"}); relation names dropped their namespace, e.g. app.x.Project is now Project`);
       const badRelation = badValues(values, RELATION_PERMISSIONS);
       if (!badRelation) error(where, `relationPermissions.${relation} must be a list`);
       else if (badRelation.length) error(where, `relationPermissions.${relation}: only Read, or [] to hide it`);
@@ -681,13 +682,19 @@ function checkDiscriminator(cls, where, byName, error, warn) {
 
 // The shape a foreign key's property must have: a string (reference), an array of strings (multi reference),
 // or a dictionary of strings (its keys or values are references, per dictionaryPart). null when it can't hold ids.
-// The relations add_object_class creates: one per string foreign key, named after the referenced class, or after the
-// field when two of them reach the same class (base class relations included)
+// The relations add_object_class creates: one per string foreign key, named after the referenced class without its
+// namespace, or after the field when two of them reach classes with the same name or the name is one of the class'
+// fields (base class relations included)
 function relationsOf(cls, byName, seen = new Set()) {
   const props = cls?.schema?.properties ?? {};
   const refs = (cls?.foreignKeys ?? []).filter((fk) => !fk.dictionaryPart && foreignKeyShape(props[fk.localFieldName]) === "reference");
-  const count = (target) => refs.filter((fk) => fk.referenceObjectType === target).length;
-  const own = refs.map((fk) => (count(fk.referenceObjectType) > 1 ? fk.localFieldName : fk.referenceObjectType));
+  const short = (target) => (target ?? "").split(".").at(-1);
+  const count = (name) => refs.filter((fk) => short(fk.referenceObjectType) === name).length;
+  const isField = (name) => Object.keys(props).some((f) => f.toLowerCase() === name.toLowerCase());
+  const own = refs.map((fk) => {
+    const name = short(fk.referenceObjectType);
+    return count(name) > 1 || isField(name) ? fk.localFieldName : name;
+  });
   const base = cls?.baseObjectType && !seen.has(cls.baseObjectType) ? byName.get(cls.baseObjectType) : null;
   return base ? [...relationsOf(base, byName, seen.add(cls.baseObjectType)), ...own] : own;
 }

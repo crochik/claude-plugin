@@ -68,7 +68,7 @@ The mistakes that matter most (the rule book has the rest):
   tasks of a project, `Inc` a counter, `AddToSet` a tag) is one
   `updateManyX(filter, operations, max?)` call, not a loop of `updateXById`.
   It isn't paged: every match changes, not the first 100 (that's
-  `filterX`'s page size). It updates only what the caller's constraints
+  `filterX`'s default `top`; pass a larger `top` or page with `skip`). It updates only what the caller's constraints
   allow and fails whole (nothing written) on a field it can't change or
   over `max` matches (1000 by default; pass more when the set can be
   bigger). Rule book, "Update many".

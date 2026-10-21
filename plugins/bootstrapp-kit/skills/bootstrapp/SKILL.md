@@ -248,10 +248,10 @@ When the user wants local definitions pushed:
    `set_script_network_policy` calls take too. Policies are saved
    inactive and allow no call until someone activates them outside the
    MCP server; tell the user. When the result has `replacesId`, the policy
-   was active and the change is a new policy: pointing the scripts at it
-   takes their network access away until it is activated, so ask whether
-   to point them now or after activation (record it once they point at
-   it). Record only what succeeded.
+   was active and the change is a new policy: point the scripts at it
+   anyway, as `plan` lists; their runs make no HTTP call until the
+   developer activates it, so tell them it needs approval. Record only
+   what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
    surface, then push changed shared scripts with `replace_script` and

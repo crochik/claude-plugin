@@ -271,6 +271,12 @@ function check(state) {
       if (!props[field]) error(where, `indexed field "${field}" is not a property`);
     }
     checkForeignKeys(cls, propsOf, where, byName, error, warn);
+    // relation names are path segments next to field names: a field can't take a base class relation's name
+    const base = cls.baseObjectType ? byName.get(cls.baseObjectType) : null;
+    for (const field of Object.keys(cls.schema?.properties ?? {})) {
+      const lower = field.toLowerCase();
+      if (base && relationsOf(base, byName).some((r) => r.toLowerCase() === lower)) error(where, `${field} matches a relation of the base class ${base.fullObjectType}; rename the field`);
+    }
     for (const key of Object.keys(schema.properties ?? {})) {
       if (key !== "_id" && !CAMEL.test(key)) warn(where, `property "${key}" should be camelCase`);
     }
@@ -539,6 +545,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
       else if (badDefault.length) error(where, `defaultFieldPermissions: unknown ${badDefault.join(", ")}. Valid: ${FIELD_PERMISSIONS.join(", ")}`);
     }
     for (const [relation, values] of Object.entries(data.relationPermissions ?? {})) {
+      if (cls && !relationsOf(cls, byName).includes(relation)) warn(where, `relationPermissions.${relation}: ${data.fullObjectType} has no relation with that name (relations: ${relationsOf(cls, byName).join(", ") || "none"}); relation names dropped their namespace, e.g. app.x.Project is now Project`);
       const badRelation = badValues(values, RELATION_PERMISSIONS);
       if (!badRelation) error(where, `relationPermissions.${relation} must be a list`);
       else if (badRelation.length) error(where, `relationPermissions.${relation}: only Read, or [] to hide it`);
@@ -556,6 +563,15 @@ function checkAccess(state, byName, propsOf, error, warn) {
       for (const [i, c] of (data[list] ?? []).entries()) {
         const at = `${list}[${i}]`;
         if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
+        if (c.operator === "Exists") {
+          if (list !== "constraints") { error(where, `${at}: Exists only works in row constraints`); continue; }
+          const relations = cls ? relationsOf(cls, byName) : null;
+          if (relations && !relations.includes(c.fieldName)) error(where, `${at}: Exists takes a relation name; ${data.fullObjectType}'s relations: ${relations.join(", ") || "none (add a string foreign key)"}`);
+          if (c.value !== undefined && c.value !== true) error(where, `${at}: Exists takes no value`);
+          const relationPerm = data.relationPermissions?.[c.fieldName];
+          if (Array.isArray(relationPerm) && !relationPerm.includes("Read")) error(where, `${at}: the relation ${c.fieldName} must stay readable`);
+          continue;
+        }
         if (list !== "constraints" && c.fieldName.includes(".")) error(where, `${at}: update and delete constraints take top-level fields only, not ${c.fieldName}`);
         if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
         if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
@@ -672,6 +688,40 @@ function checkDiscriminator(cls, where, byName, error, warn) {
 
 // The shape a foreign key's property must have: a string (reference), an array of strings (multi reference),
 // or a dictionary of strings (its keys or values are references, per dictionaryPart). null when it can't hold ids.
+// The relations add_object_class creates: one per string foreign key, named after the referenced class without its
+// namespace, or after the field when two of them reach classes with the same name or the name is one of the class'
+// fields (base class relations included)
+// Mirrors add_object_class: a relation is named after the referenced class without its namespace (Project), or, when another
+// reference reaches a class with that name or the name is taken, after the field without Id (project), then with a Relation
+// suffix. Taken = fields and relations of the class and its base classes, ignoring case (base classes come first, so a class
+// extending this one can't add a field named like one of these relations; the server refuses it).
+function relationsOf(cls, byName, seen = new Set()) {
+  if (cls?.fullObjectType) seen.add(cls.fullObjectType);
+  const props = cls?.schema?.properties ?? {};
+  const refs = (cls?.foreignKeys ?? []).filter((fk) => !fk.dictionaryPart && foreignKeyShape(props[fk.localFieldName]) === "reference");
+  const base = cls?.baseObjectType && !seen.has(cls.baseObjectType) ? byName.get(cls.baseObjectType) : null;
+  const inherited = base ? relationsOf(base, byName, seen) : [];
+  const taken = new Set([...Object.keys(props), ...inherited].map((x) => x.toLowerCase()));
+  for (let b = base, guard = new Set(); b && !guard.has(b.fullObjectType); b = byName.get(b.baseObjectType)) {
+    guard.add(b.fullObjectType);
+    for (const f of Object.keys(b.schema?.properties ?? {})) taken.add(f.toLowerCase());
+  }
+  const short = (target) => (target ?? "").split(".").at(-1);
+  const shared = (name) => refs.filter((fk) => short(fk.referenceObjectType) === name).length > 1;
+  const own = refs.map((fk) => {
+    const field = fk.localFieldName;
+    let stem = field.length > 2 && field.endsWith("Id") ? field.slice(0, -2).replace(/_+$/, "") : field;
+    if (!stem) stem = field;
+    const name = short(fk.referenceObjectType);
+    const candidates = shared(name) ? [stem, `${stem}Relation`] : [name, stem, `${stem}Relation`];
+    let picked = candidates.find((c) => !taken.has(c.toLowerCase()));
+    for (let i = 2; !picked; i++) if (!taken.has(`${stem}Relation${i}`.toLowerCase())) picked = `${stem}Relation${i}`;
+    taken.add(picked.toLowerCase());
+    return picked;
+  });
+  return [...inherited, ...own];
+}
+
 function foreignKeyShape(prop) {
   if (prop?.type === "string" && !prop.enum) return "reference";
   if (prop?.type === "array" && prop.items?.type === "string" && !prop.items.enum) return "multi";

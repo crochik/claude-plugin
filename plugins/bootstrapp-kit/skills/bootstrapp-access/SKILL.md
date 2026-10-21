@@ -114,7 +114,10 @@ Rules worth knowing while writing them:
   replaced (`get_class_access` shows the current ones); re-apply its
   manifest with `replace_object_class` first, which renames them and moves
   their access along. The profile needs `Read` on the relation and on the related
-  class. Row constraints only. Writes don't check the reference, so make
+  class. Update and delete constraints take it too (edit a task only when
+  its project is visible); writes check it by loading the record first, and
+  `updateMany` then goes one record at a time. Writes don't check the
+  reference, so make
   `projectId` `["Read", "SetOnCreate"]` and create through an action when a
   member must not file tasks into projects they can't see. Loading one
   record by id checks only the first relation of a chain; lists check all.
@@ -127,7 +130,8 @@ Rules worth knowing while writing them:
   `deleteConstraints`) narrow, within what the profile sees, which records it
   may update and delete. A delete must match the row, update *and* delete
   constraints. They need the `Update`/`Delete` permission (they never grant
-  it), take top-level fields only, and stamp nothing on create.
+  it), take top-level fields (or `Exists` on a relation) only, and stamp
+  nothing on create.
 - **They test the record as stored, before the change**, not the new values.
   A profile that can update `ownerId` can give the record away, and one that
   can update `status` can move it out of a `status Eq Draft` constraint (fine

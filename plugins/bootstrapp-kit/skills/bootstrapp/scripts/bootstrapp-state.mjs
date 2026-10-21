@@ -564,7 +564,6 @@ function checkAccess(state, byName, propsOf, error, warn) {
         const at = `${list}[${i}]`;
         if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
         if (c.operator === "Exists") {
-          if (list !== "constraints") { error(where, `${at}: Exists only works in row constraints`); continue; }
           const relations = cls ? relationsOf(cls, byName) : null;
           if (relations && !relations.includes(c.fieldName)) error(where, `${at}: Exists takes a relation name; ${data.fullObjectType}'s relations: ${relations.join(", ") || "none (add a string foreign key)"}`);
           if (c.value !== undefined && c.value !== true) error(where, `${at}: Exists takes no value`);

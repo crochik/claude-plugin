@@ -35,6 +35,7 @@ Produce a mapping table per area:
 | login | BootstrApp OIDC | per `bootstrapp-client` auth section |
 | work that follows every write (DB triggers, model hooks) | class event script | per `bootstrapp-apiscript` |
 | file storage | `system.files` uploads through an action | per "Files" in `bootstrapp-apiscript` |
+| calls to third-party APIs (payments, email services, webhooks it sends) | an action calling `system.http.fetch`, with a network policy for that host | per "HTTP calls" in `bootstrapp-apiscript`; keys stay out of the client |
 | background jobs, webhooks | out of scope unless the platform exposes them | list as open items |
 
 Mark anything that doesn't fit (OR queries, joins, aggregation pipelines,

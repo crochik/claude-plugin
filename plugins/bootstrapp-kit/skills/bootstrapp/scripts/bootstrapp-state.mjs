@@ -9,8 +9,9 @@
 //   node bootstrapp-state.mjs status            [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
-//   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp]
-//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | auth
+//   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp] [--id <networkPolicyId>]
+//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | network-policy | auth
+//        (network-policy: --id is the id replace_network_policy returned)
 //
 // No dependencies; Node 18+.
 
@@ -24,7 +25,9 @@ const dirFlag = args.indexOf("--dir");
 const dir = dirFlag >= 0 ? args[dirFlag + 1] : "bootstrapp";
 const asJson = args.includes("--json");
 const summary = args.includes("--summary");
-const positional = args.slice(1).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--dir");
+const idFlag = args.indexOf("--id");
+const recordedId = idFlag >= 0 ? args[idFlag + 1] : undefined;
+const positional = args.slice(1).filter((a, i, all) => !a.startsWith("--") && all[i - 1] !== "--dir" && all[i - 1] !== "--id");
 
 const SNAKE = /^[a-z][a-z0-9_]*$/;
 const PASCAL = /^[A-Z][A-Za-z0-9]*$/;
@@ -45,7 +48,14 @@ const SIGNUP = ["open", "invite_only"];
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
-const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", auth: null };
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", auth: null };
+// network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
+// shared scripts it calls included (replace_network_policy + set_script_network_policy). The server keeps policies by id
+// (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
+// saved as a new policy with a new id
+const POLICY_ID = "<id replace_network_policy returned>";
+const HTTP_SCHEMES = ["https", "http"];
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
 // is created or updated (several per event, one per behavior)
 const CLASS_EVENTS = { created: "Created", updated: "Updated" };
@@ -133,13 +143,28 @@ function load() {
   const access = profileDirs.flatMap((folder) => listFiles(join("access", folder), ".json").map((file) => ({ file, folder, data: readJson(file) })));
   const actionAccess = listFiles(join("access", "actions"), ".json").map((file) => ({ file, data: readJson(file) }));
   const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
+  const network = listFiles("network", ".json").map((file) => ({ file, data: readJson(file) }));
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, auth, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts", "networkPolicies"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, auth, network, ledger, ledgerPath };
 }
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
+
+// The server's name of each local script that starts a run (actions and class event scripts), the one set_script_network_policy takes
+function scriptServerNames(state) {
+  const names = new Map();
+  for (const script of state.scripts) {
+    const action = state.actions.find((a) => !a.data.$error && a.data.actionName === script.name)?.data;
+    if (action?.fullObjectType) names.set(`${action.fullObjectType}.${script.name}`, `scripts/${script.name}.ts`);
+  }
+  for (const event of state.events) {
+    if (!event.fullObjectType) continue;
+    names.set(`${event.fullObjectType}#${event.classEvent.toLowerCase()}#${event.scriptName}`, `events/${event.name}.ts`);
+  }
+  return names;
+}
 
 // ---------------------------------------------------------------- checks
 
@@ -294,6 +319,7 @@ function check(state) {
 
   checkAccess(state, byName, propsOf, error, warn);
   checkShared(state, byName, error, warn);
+  checkNetwork(state, error, warn);
 
   return problems;
 }
@@ -334,6 +360,39 @@ function checkShared(state, byName, error, warn) {
   for (const { where, text } of callers) {
     for (const name of sharedCalls(text, appName)) {
       if (!sharedNames.has(name)) warn(where, `calls shared script ${name}, which has no local manifest; it must already exist on the server`);
+    }
+  }
+}
+
+function checkNetwork(state, error, warn) {
+  const appName = state.app?.name;
+  const local = scriptServerNames(state);
+  const owner = new Map();
+  for (const { file, data } of state.network) {
+    const where = `network/${basename(file)}`;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: an identifier such as stripe"); continue; }
+    if (basename(file) !== `${data.name}.json`) warn(where, `file name should be ${data.name}.json`);
+    if (!data.description) warn(where, "description: say what the policy is for");
+    if (!Array.isArray(data.rules)) error(where, "rules is required (a list; [] refuses every call)");
+    for (const [i, rule] of (Array.isArray(data.rules) ? data.rules : []).entries()) {
+      const at = `rules[${i}]`;
+      const host = typeof rule?.host === "string" ? rule.host.trim() : "";
+      if (!host) { error(where, `${at}.host is required`); continue; }
+      if (host.includes("/")) error(where, `${at}.host must be the host alone (api.example.com), not a url`);
+      else if (/^\*\.[^.]+$/.test(host)) error(where, `${at}.host ${host} matches a whole top level domain`);
+      else if (host.slice(host.startsWith("*.") ? 2 : 0).includes("*")) error(where, `${at}.host: only a leading *. is allowed`);
+      if (rule.schemes !== undefined && !(Array.isArray(rule.schemes) && rule.schemes.every((x) => HTTP_SCHEMES.includes(String(x).toLowerCase())))) error(where, `${at}.schemes must be a list of ${HTTP_SCHEMES.join(", ")}`);
+      if (rule.methods !== undefined && !(Array.isArray(rule.methods) && rule.methods.every((x) => HTTP_METHODS.includes(String(x).toUpperCase())))) error(where, `${at}.methods must be a list of ${HTTP_METHODS.join(", ")}`);
+      if ((rule.schemes ?? []).some((x) => String(x).toLowerCase() === "http")) warn(where, `${at}: http sends the request (and any key in it) unencrypted; use https unless the service has no https`);
+    }
+    if (data.scripts !== undefined && !Array.isArray(data.scripts)) { error(where, "scripts must be a list of script names"); continue; }
+    for (const script of data.scripts ?? []) {
+      if (appName && !String(script).startsWith(`app.${appName}.`)) error(where, `script ${script} isn't one of ${appName}'s (their names start with app.${appName}.)`);
+      else if (appName && String(script).startsWith(`app.${appName}.scripts.`)) error(where, `script ${script} is a shared script: it runs under the policy of the action or class event script that calls it, so list that one instead`);
+      else if (!local.has(script)) warn(where, `script ${script} has no local file; it must already exist on the server. Names: <fullObjectType>.<actionName>, <fullObjectType>#created#<name> or #updated#`);
+      if (owner.has(script)) error(where, `script ${script} is also in network/${owner.get(script)}.json; a script has one network policy`);
+      else owner.set(script, data.name);
     }
   }
 }
@@ -682,6 +741,14 @@ function diff(state) {
     if (data.$error || !data.actionName) continue;
     items.push(manifestItem("action-access", data.actionName, data, ledger.actionAccess[data.actionName]));
   }
+  for (const { data } of state.network) {
+    if (data.$error || !data.name) continue;
+    items.push({ ...manifestItem("network-policy", data.name, data, ledger.networkPolicies[data.name]), scripts: data.scripts ?? [] });
+  }
+  // a policy whose file was deleted: its scripts lose their network access (there is no tool to delete the policy itself)
+  for (const name of Object.keys(ledger.networkPolicies)) {
+    if (!state.network.some((n) => n.data.name === name)) items.push({ kind: "network-policy", name, state: "removed", scripts: [] });
+  }
   if (state.auth && !state.auth.data.$error) items.push(manifestItem("auth", "auth", state.auth.data, ledger.auth));
   return items;
 }
@@ -774,6 +841,28 @@ function plan(state) {
     }
     calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
   }
+  // after the scripts: a script has to exist to be pointed at a policy (replacing a script keeps its policy)
+  const listed = new Set(state.network.flatMap((n) => (n.data.$error ? [] : n.data.scripts ?? [])));
+  for (const item of pending("network-policy")) {
+    const group = [];
+    if (item.state !== "removed") {
+      const { name, description, rules } = strip(state.network.find((n) => n.data.name === item.name).data);
+      const id = state.ledger.networkPolicies[item.name]?.id;
+      group.push({ tool: "replace_network_policy", args: { appName, name, rules, ...(description ? { description } : {}), ...(id ? { id } : {}) } });
+      for (const script of item.scripts) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicyId: POLICY_ID } });
+    }
+    // scripts it no longer lists (and no other policy does) lose their network access
+    for (const script of state.ledger.networkPolicies[item.name]?.scripts ?? []) {
+      if (!item.scripts.includes(script) && !listed.has(script)) group.push({ tool: "set_script_network_policy", args: { appName, script, networkPolicyId: "" } });
+    }
+    if (!group.length) group.push({ tool: "(none)", args: {}, note: "nothing to call on the server; record it" });
+    const recordNote = item.state === "removed" ? undefined : `record with --id ${POLICY_ID}`;
+    group.forEach((call, i) => {
+      const last = i === group.length - 1;
+      const note = last ? recordNote : `part of network policy ${item.name}; recorded with its last call`;
+      calls.push({ ...call, record: last ? ["network-policy", item.name] : null, ...(note ? { note } : {}) });
+    });
+  }
   for (const item of pending("auth")) {
     calls.push({ tool: "replace_app_auth", record: ["auth", "auth"], args: { appName, ...strip(state.auth.data) } });
   }
@@ -848,11 +937,16 @@ function record(state, kind, names) {
     if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
     else if (item.state === "removed") delete ledger[KINDS[kind]][name];
     else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
+    else if (kind === "network-policy") {
+      // the id can change: a change to an active policy is saved as a new one
+      if (!recordedId) fail(`record network-policy ${name} --id <id replace_network_policy returned>`);
+      ledger.networkPolicies[name] = { id: recordedId, hash: item.hash, scripts: item.scripts, appliedAt: now };
+    }
     else ledger[KINDS[kind]][name] = { hash: item.hash, appliedAt: now };
   }
   const ordered = {
     app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
-    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, ...(ledger.auth ? { auth: ledger.auth } : {}),
+    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, networkPolicies: ledger.networkPolicies, ...(ledger.auth ? { auth: ledger.auth } : {}),
   };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
@@ -884,7 +978,7 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", auth: "Sign-in (auth.json)" };
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", "network-policy": "Network policies", auth: "Sign-in (auth.json)" };
     for (const kind of Object.keys(titles)) {
       const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;
@@ -906,7 +1000,7 @@ switch (command) {
   case "plan": {
     const result = plan(state);
     if (!summary) { console.log(JSON.stringify(result, null, 2)); break; }
-    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.record?.[1] ?? c.args.fullObjectType}${c.note ? ` (${c.note})` : ""}`);
+    for (const c of result.calls) console.log(`${c.tool.padEnd(22)} ${c.args?.script ? `${c.args.script} -> ${c.args.networkPolicyId || "no policy"}` : c.record?.[1] ?? c.args?.fullObjectType ?? ""}${c.note ? ` (${c.note})` : ""}`);
     for (const b of result.blocked) console.log(`BLOCKED ${b.kind} ${b.name}: ${b.reason}`);
     if (!result.calls.length && !result.blocked.length) console.log("Nothing to apply.");
     break;

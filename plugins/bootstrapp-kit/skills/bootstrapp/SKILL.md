@@ -46,6 +46,8 @@ bootstrapp/
   events/<fullObjectType>.<created|updated>.<scriptName>.ts   one behavior run after an object of the class
                                 is created or updated (several per class and event)
   webhooks/<name>.json          an inbound webhook = replace_webhook (secrets as ${env:NAME})
+  network/<name>.json           a network policy (HTTP calls system.http may make) and the actions/class
+                                event scripts whose runs it binds
   profiles/<Profile>.json       one file per profile = the add_profile payload
   access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
   access/actions/<actionName>.json         profiles that run an action = replace_action_access
@@ -115,6 +117,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
+| `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create one or change an inactive one (rules of host, schemes, methods; safe to repeat; a change to an active one is saved as a new inactive policy), point an action or class event script at one by id or take its network access away. Policies allow calls only once activated outside the MCP server. The policy binds the whole run the script starts (called actions and shared scripts included); a run whose script has none can't make HTTP calls. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes), optionally with a profile's access (`profileName`) or another time limit (`timeoutSeconds`, default 60, at most 600). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
@@ -194,6 +197,13 @@ lists the replace call for it:
 - **Script changed**, or its action's `elevated` → `replace_action_script` again.
 - **Class event script changed** → `replace_class_event_script` again;
   **deleted** → `remove_class_event_script`.
+- **Network policy changed** → `replace_network_policy` (with the
+  ledger's `id`) and `set_script_network_policy` for its scripts with the
+  id it returns; a script dropped from it gets an empty policy. An active
+  policy is never changed: the change comes back as a new, inactive
+  policy someone has to activate outside the MCP server, and the server
+  moves the scripts on the old one to it. Replacing a
+  script keeps its policy.
 - **Shared script changed** (script or manifest) → `replace_script` again. If
   its classes changed, run `validate_action_scripts` to find the callers
   it broke.
@@ -224,7 +234,7 @@ When the user wants local definitions pushed:
 4. Make the calls in the order `plan` lists them: profiles, classes (base
    and embedded classes first), class access, actions, action access,
    shared scripts (the ones others call first), action scripts, class
-   event scripts, `auth.json`. Actions don't depend on each other and can go in
+   event scripts, network policies (after the scripts they list), `auth.json`. Actions don't depend on each other and can go in
    parallel; so can access calls. Access shown as `recheck` is applied again
    because its class changed. Classes that reference each other show up
    twice: an `add_object_class` with `record: null` and a `note` (don't
@@ -232,10 +242,20 @@ When the user wants local definitions pushed:
    is recorded.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
-   `shared-script`, `script`, `event-script`, `auth`; an access item's name is
+   `shared-script`, `script`, `event-script`, `network-policy`, `auth`; an access item's name is
    `<Profile>/<fullObjectType>`, an event script's its file name without
    `.ts`).
-   Record only what succeeded.
+   A network policy is several calls; only its last one carries `record`,
+   with `--id` set to the `id` `replace_network_policy` returned, which the
+   `set_script_network_policy` calls take too. Policies are saved
+   inactive and allow no call until someone activates them outside the
+   MCP server; tell the user. When the result has `replacesId`, the policy
+   was active and the change is a new policy: the server already moved
+   the scripts on the old one to it (`movedScripts`), and their runs make
+   no HTTP call until the developer activates it, so tell them it needs
+   approval. Still make the `set_script_network_policy` calls `plan`
+   lists (they are harmless repeats). Record only
+   what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new
    surface, then push changed shared scripts with `replace_script` and

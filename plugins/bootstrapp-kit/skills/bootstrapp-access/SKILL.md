@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-access
-description: Decide who can do what in a BootstrApp app - profiles (roles), per-class, per-field and per-relation permissions, row constraints such as "only their own records", which profiles run each action, sign-in providers and sign-up, the app's users and organizations, and giving an app access to another app's classes. Use when the user talks about roles, permissions, access, visibility, multi-tenant or per-company data, login/sign-up, or inviting users.
+description: Decide who can do what in a BootstrApp app - profiles (roles), per-class, per-field and per-relation permissions, row constraints such as "only their own records", update and delete constraints such as "everyone reads, only the owner edits", which profiles run each action, sign-in providers and sign-up, the app's users and organizations, and giving an app access to another app's classes. Use when the user talks about roles, permissions, access, visibility, multi-tenant or per-company data, login/sign-up, or inviting users.
 license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
@@ -19,8 +19,9 @@ matters, since **the server's copy wins**.
   profile starts with **no access** until it is granted.
 - Per profile and class: class permissions (`Read`, `Create`, `Update`,
   `Delete`, ...), field permissions (a field can be hidden or read-only),
-  relation permissions, and **constraints**: row filters such as
-  `ownerId Eq {{context "UserId"}}`.
+  relation permissions, **constraints**: row filters such as
+  `ownerId Eq {{context "UserId"}}`, and **update/delete constraints**,
+  which narrow which of the visible records it may change or delete.
 - Per action: the list of profiles that can run it (`Admin` always can).
 - Sign-in: which identity providers, whether sign-up is **open** (anyone who
   signs in gets the **signup profile**) or **invite only**.
@@ -49,6 +50,9 @@ Ask, in plain words, and propose defaults:
    (`ownerId`, a uuid set to `{{context "UserId"}}`); "their company's" needs
    `organizationId` (`{{context "OrganizationId"}}`). Add the field to the
    class manifest *before* writing the constraint.
+   Ask separately **which of those records each may change or delete**:
+   "everyone sees the team's tasks, only the owner edits them" or "members
+   can't touch a submitted order" is an update constraint, not a row one.
    A multi-tenant app (each customer sees only its own data) makes every
    tenant an organization: every tenant class gets `organizationId` and every
    tenant profile the constraint on it, tenants never use the default
@@ -96,11 +100,26 @@ Rules worth knowing while writing them:
   key. Constraints apply to top-level classes only.
 - **An `Eq` constraint also stamps the field on create**: `ownerId Eq
   {{context "UserId"}}` limits the profile to its records *and* fills
-  `ownerId` on the records it creates. The client doesn't send it.
+  `ownerId` on the records it creates. The client doesn't send it. The
+  profile also can't change a field its row constraints test, so it can't
+  move a record to another owner or organization.
+- **Update and delete constraints** (`updateConstraints`,
+  `deleteConstraints`) narrow, within what the profile sees, which records it
+  may update and delete. A delete must match the row, update *and* delete
+  constraints. They need the `Update`/`Delete` permission (they never grant
+  it), take top-level fields only, and stamp nothing on create.
+- **They test the record as stored, before the change**, not the new values.
+  A profile that can update `ownerId` can give the record away, and one that
+  can update `status` can move it out of a `status Eq Draft` constraint (fine
+  for "submit locks it"). Make the fields they test read-only with
+  `fieldPermissions` when that must not happen. With an update constraint
+  on `ownerId` and no row constraint, nothing stamps the owner: the client
+  sends it (`["Read", "SetOnCreate"]`) or a create action sets it from
+  `system.session`.
 - **Inheritance is first match, constraints are AND.** For a profile with
   `inheritsFrom: [A, B]`, each class, field and relation permission comes
   from the first of [profile, A, B] that has an entry, without merging; the
-  constraints of all three apply together. So a `Manager` inheriting from a
+  constraints (row, update, delete) of all three apply together. So a `Manager` inheriting from a
   constrained `Member` is still constrained; give `Manager` its own access
   file for that class instead of relying on inheritance there.
 

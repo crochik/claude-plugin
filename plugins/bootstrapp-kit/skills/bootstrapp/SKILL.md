@@ -14,7 +14,7 @@ kit has one skill for each:
 | Data + API model | **ObjectTypes** (classes): JSON Schemas stored as MongoDB collections. The same schema is the API model: the platform generates CRUD + filter endpoints from it. | `bootstrapp-object-types` |
 | Operations | **Actions**: named server operations on a class, each with a typed input class and output class. | `bootstrapp-actions` |
 | Logic | **ApiScripts**: the body of an action, in a small TypeScript dialect, calling only the functions the platform exposes for the app's classes. Code several scripts reuse is a **shared script** they call as a function. A **class event script** runs after an object of a class is created or updated. | `bootstrapp-apiscript` |
-| Access | **Profiles** (roles), what each may do on every class, field, relation and action, which records it sees (constraints), and how users sign in. | `bootstrapp-access` |
+| Access | **Profiles** (roles), what each may do on every class, field, relation and action, which records it sees and may change or delete (constraints), and how users sign in. | `bootstrapp-access` |
 | Client | A strongly typed client generated from the OpenAPI spec the MCP server produces. | `bootstrapp-client` |
 
 Moving an existing app onto BootstrApp has its own skill:

@@ -112,7 +112,8 @@ never by elevating.
 
 An elevated script is the only guard on what it touches: filter by
 `system.session` (`getUserId()`, `getOrganizationId()`) wherever the
-profile has a constraint, return only what the caller may see, and say in
+profile has a constraint, check the record before changing it wherever it
+has an update or delete constraint, return only what the caller may see, and say in
 the action's `actionDescription` what it checks. Elevated also reaches
 every record of classes shared from other apps. Rule book: "Elevated
 scripts".

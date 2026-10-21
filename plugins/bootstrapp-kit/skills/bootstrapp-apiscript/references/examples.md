@@ -37,9 +37,10 @@ return execute(input);
 
 ## Bulk: apply to several rows, all or nothing up front
 
-Validate every row before writing any. Without a transaction, writes
-already made stay when a later one fails; pass one to make it all or
-nothing (see the last example).
+Validate every row before writing any, then give them all the same
+change with one `updateManyX` call. When each row gets its own values,
+use `bulkUpdateX` (or `updateXById` per row) and a transaction to make it
+all or nothing (see the last example).
 
 ```ts
 import * as app from "app.shop";
@@ -58,10 +59,11 @@ function execute(input: ArchiveProductsInput): ArchiveProductsOutput {
       throw { code: "ALREADY_ARCHIVED", message: "Product " + products[i]._id + " is already archived" };
     }
   }
-  for (let i = 0; i < products.length; i = i + 1) {
-    app.updateProductById(products[i]._id, { status: "archived" });
-  }
-  return { archivedCount: products.length };
+  const result = app.updateManyProduct(
+    [{ field: "_id", operator: "In", value: input.ids }],
+    [{ field: "status", operator: "Set", value: "archived" }]
+  );
+  return { archivedCount: result.modified };
 }
 
 return execute(input);

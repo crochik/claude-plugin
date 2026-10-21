@@ -200,7 +200,8 @@ lists the replace call for it:
   ledger's `id`) and `set_script_network_policy` for its scripts with the
   id it returns; a script dropped from it gets an empty policy. An active
   policy is never changed: the change comes back as a new, inactive
-  policy someone has to activate outside the MCP server. Replacing a
+  policy someone has to activate outside the MCP server, and the server
+  moves the scripts on the old one to it. Replacing a
   script keeps its policy.
 - **Shared script changed** (script or manifest) → `replace_script` again. If
   its classes changed, run `validate_action_scripts` to find the callers
@@ -248,9 +249,11 @@ When the user wants local definitions pushed:
    `set_script_network_policy` calls take too. Policies are saved
    inactive and allow no call until someone activates them outside the
    MCP server; tell the user. When the result has `replacesId`, the policy
-   was active and the change is a new policy: point the scripts at it
-   anyway, as `plan` lists; their runs make no HTTP call until the
-   developer activates it, so tell them it needs approval. Record only
+   was active and the change is a new policy: the server already moved
+   the scripts on the old one to it (`movedScripts`), and their runs make
+   no HTTP call until the developer activates it, so tell them it needs
+   approval. Still make the `set_script_network_policy` calls `plan`
+   lists (they are harmless repeats). Record only
    what succeeded.
 6. If any class or action changed, regenerate `generated/platform.d.ts`
    (`generate_platform_definitions`) so scripts are checked against the new

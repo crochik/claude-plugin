@@ -66,10 +66,12 @@ The mistakes that matter most (the rule book has the rest):
 - `updateXById` is a patch: send only the changed fields.
 - The same change to every record matching a filter (archive all open
   tasks of a project, `Inc` a counter, `AddToSet` a tag) is one
-  `updateManyX(filter, operations)` call, not a loop of `updateXById`. It
-  updates only what the caller's constraints allow and fails whole (nothing
-  written) on a field it can't change or over 1000 matches. Rule book,
-  "Update many".
+  `updateManyX(filter, operations, max?)` call, not a loop of `updateXById`.
+  It isn't paged: every match changes, not the first 100 (that's
+  `filterX`'s page size). It updates only what the caller's constraints
+  allow and fails whole (nothing written) on a field it can't change or
+  over `max` matches (1000 by default; pass more when the set can be
+  bigger). Rule book, "Update many".
 - A transaction still open when the script ends is aborted: commit before
   returning.
 - No string methods, no `try`/`catch`, no arrow functions, `++`, `===`,

@@ -10,7 +10,7 @@
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
 //   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp] [--id <networkPolicyId>]
-//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | network-policy | auth
+//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | network-policy | webhook | auth
 //        (network-policy: --id is the id replace_network_policy returned)
 //
 // No dependencies; Node 18+.
@@ -48,7 +48,7 @@ const SIGNUP = ["open", "invite_only"];
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
-const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", auth: null };
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", webhook: "webhooks", auth: null };
 // network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
 // shared scripts it calls included (replace_network_policy + set_script_network_policy). The server keeps policies by id
 // (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
@@ -60,6 +60,17 @@ const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"
 // is created or updated (several per event, one per behavior)
 const CLASS_EVENTS = { created: "Created", updated: "Updated" };
 const EVENT_FILE = /^(?<cls>.+)\.(?<event>created|updated)\.(?<script>[^.]+)$/;
+// webhooks/<name>.json: the replace_webhook arguments (without appName). replace_webhook makes the event classes:
+// app.<app>.webhook.WebhookEvent (the base) and app.<app>.webhook.<Name>WebhookEvent per webhook
+const WEBHOOK_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const WEBHOOK_FORMATS = ["json", "form", "xml", "raw"];
+const WEBHOOK_AUTH = {
+  none: [], hmac: ["header", "secret"], bearer: ["token"], apikey: ["token"], basic: ["username", "password"], ipAllowlist: ["ranges"],
+  twilio: ["token"], ecdsa: ["publicKey"], stripe: ["secret"], docuseal: ["secret"], openphone: ["secret"], clientCert: ["thumbprints|subject"], bodyField: ["path", "value"],
+};
+const WEBHOOK_SECRETS = ["secret", "token", "password"];
+const ENV_VALUE = /^\$\{env:(?<name>[A-Za-z_][A-Za-z0-9_]*)\}$/;
+const webhookEventClass = (appName, name) => `app.${appName}.webhook.${name.charAt(0).toUpperCase()}${name.slice(1)}WebhookEvent`;
 
 function fail(message) {
   console.error(`bootstrapp-state: ${message}`);
@@ -142,12 +153,13 @@ function load() {
     : [];
   const access = profileDirs.flatMap((folder) => listFiles(join("access", folder), ".json").map((file) => ({ file, folder, data: readJson(file) })));
   const actionAccess = listFiles(join("access", "actions"), ".json").map((file) => ({ file, data: readJson(file) }));
+  const webhooks = listFiles("webhooks", ".json").map((file) => ({ file, data: readJson(file) }));
   const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
   const network = listFiles("network", ".json").map((file) => ({ file, data: readJson(file) }));
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts", "networkPolicies"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, auth, network, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts", "networkPolicies", "webhooks"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, webhooks, auth, network, ledger, ledgerPath };
 }
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
@@ -211,6 +223,7 @@ function check(state) {
     for (const seg of parts.slice(0, -1)) if (!SNAKE.test(seg)) error(where, `namespace segment "${seg}" must be snake_case`);
     if (!PASCAL.test(short)) warn(where, `class name "${short}" should be PascalCase`);
     if (["User", "Group"].includes(short)) error(where, "User and Group are platform classes; reference them by a *Id field instead");
+    if (root && ns === `${root}.webhook` && cls.type === "TopLevel") error(where, `top-level classes in ${root}.webhook are webhook event classes, made by replace_webhook from webhooks/*.json; keep only embedded body classes here`);
 
     if (!["TopLevel", "Embedded"].includes(cls.type)) error(where, `type must be TopLevel or Embedded, got ${cls.type}`);
     if (!Array.isArray(cls.indexedFields)) error(where, "indexedFields is required (use [] for embedded classes)");
@@ -305,23 +318,76 @@ function check(state) {
     if (!actionNames.has(script.name)) warn(`scripts/${script.name}.ts`, "no matching action manifest");
   }
 
+  const webhookClasses = new Set(state.app?.name ? state.webhooks.filter((w) => !w.data.$error && w.data.name).map((w) => webhookEventClass(state.app.name, w.data.name)) : []);
   for (const event of state.events) {
     const where = `events/${event.name}.ts`;
     if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.<scriptName>.ts or <fullObjectType>.updated.<scriptName>.ts"); continue; }
     if (!IDENTIFIER.test(event.scriptName)) error(where, `script name "${event.scriptName}" must be an identifier such as updateOrderTotal`);
     else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
     const target = byName.get(event.fullObjectType);
-    if (!target) warn(where, `class ${event.fullObjectType} has no local manifest; it must already exist on the server`);
-    else if (target.type !== "TopLevel") error(where, "only top-level classes fire created and updated events");
-    if (root && event.fullObjectType.split(".").slice(0, -1).join(".") !== root) error(where, `only classes directly in ${root} have a flow to run it from`);
+    const webhookClass = webhookClasses.has(event.fullObjectType);
+    if (!target && !webhookClass) warn(where, `class ${event.fullObjectType} has no local manifest; it must already exist on the server`);
+    else if (target && target.type !== "TopLevel") error(where, "only top-level classes fire created and updated events");
+    if (root && !webhookClass && event.fullObjectType.split(".").slice(0, -1).join(".") !== root) error(where, `only classes directly in ${root} (and webhook event classes, from webhooks/*.json) have a flow to run it from`);
     if (!event.text.trim()) error(where, "the script is empty");
   }
 
   checkAccess(state, byName, propsOf, error, warn);
   checkShared(state, byName, error, warn);
+  checkWebhooks(state, byName, error, warn);
   checkNetwork(state, error, warn);
 
   return problems;
+}
+
+function checkWebhooks(state, byName, error, warn) {
+  const appName = state.app?.name;
+  for (const { file, data: hook } of state.webhooks) {
+    const where = `webhooks/${basename(file)}`;
+    if (hook.$error) { error(where, hook.$error); continue; }
+    if (!CAMEL.test(hook.name ?? "")) { error(where, `name "${hook.name}" must be camelCase, such as stripe or githubPullRequests`); continue; }
+    if (basename(file) !== `${hook.name}.json`) warn(where, `file name should be ${hook.name}.json`);
+    if ("appName" in hook) warn(where, "appName comes from app.json; leave it out");
+    if ("rotateUrl" in hook) error(where, "rotateUrl is a one-off: call replace_webhook with rotateUrl: true yourself, don't keep it in the manifest");
+
+    if (!hook.bodyClass) error(where, "bodyClass is required: the embedded class the parsed body is stored as");
+    else {
+      const body = byName.get(hook.bodyClass);
+      if (appName && !hook.bodyClass.startsWith(`app.${appName}.`)) error(where, `bodyClass must live under app.${appName}`);
+      if (!body) warn(where, `body class ${hook.bodyClass} has no local manifest; it must already exist on the server`);
+      else if (body.type !== "Embedded") error(where, `body class ${hook.bodyClass} must be Embedded`);
+    }
+
+    if (!Array.isArray(hook.auth) || !hook.auth.length) error(where, 'auth is required: the provider\'s checks, or [{ "type": "none" }] for a webhook anyone with the URL can call');
+    else {
+      if (hook.auth.some((a) => a?.type === "none") && hook.auth.length > 1) error(where, "auth: none can't be combined with other steps");
+      hook.auth.forEach((step, i) => {
+        const required = WEBHOOK_AUTH[step?.type];
+        if (!required) { error(where, `auth[${i}]: unknown type ${step?.type}; use one of ${Object.keys(WEBHOOK_AUTH).join(", ")}`); return; }
+        for (const field of required) {
+          if (!field.split("|").some((f) => step[f] !== undefined && step[f] !== "" && !(Array.isArray(step[f]) && !step[f].length))) error(where, `auth[${i}] (${step.type}) needs ${field.replace("|", " or ")}`);
+        }
+        for (const field of WEBHOOK_SECRETS) {
+          const value = step[field];
+          if (typeof value !== "string" || ENV_VALUE.test(value)) continue;
+          if (value === "generate") {
+            if (!["bearer", "apikey", "basic"].includes(step.type)) error(where, `auth[${i}].${field}: "generate" only works for bearer, apikey and basic; a ${step.type} secret comes from the provider`);
+            else warn(where, `auth[${i}].${field}: "generate" makes a new secret on every apply; after the first, save the returned one in .env and write \${env:NAME} here`);
+          } else if (value === "set") warn(where, `auth[${i}].${field}: "set" keeps the server's secret, but a new environment can't be set up from this manifest; prefer \${env:NAME}`);
+          else error(where, `auth[${i}].${field}: don't commit secrets; write \${env:NAME} and put the value in .env`);
+        }
+      });
+    }
+
+    for (const method of hook.methods ?? []) if (!WEBHOOK_METHODS.includes(method)) error(where, `methods: ${method} is not one of ${WEBHOOK_METHODS.join(", ")}`);
+    if (hook.methods && !hook.methods.length) error(where, "methods can't be empty (leave it out for POST)");
+    if (hook.format !== undefined && !WEBHOOK_FORMATS.includes(hook.format)) error(where, `format must be one of ${WEBHOOK_FORMATS.join(", ")}`);
+    if (hook.dedupeKey && !/^(header|body):[^:\s]+$/.test(hook.dedupeKey)) error(where, "dedupeKey must be header:<name> or body:<dot.path>");
+    if (!hook.dedupeKey) warn(where, "no dedupeKey: a delivery the provider sends again is saved twice, so the processing script must be safe to run twice");
+    if (appName && !state.events.some((e) => e.fullObjectType === webhookEventClass(appName, hook.name) && e.classEvent === "Created")) {
+      warn(where, `nothing processes its events yet: add events/${webhookEventClass(appName, hook.name)}.created.<scriptName>.ts`);
+    }
+  }
 }
 
 function checkShared(state, byName, error, warn) {
@@ -741,6 +807,14 @@ function diff(state) {
     if (data.$error || !data.actionName) continue;
     items.push(manifestItem("action-access", data.actionName, data, ledger.actionAccess[data.actionName]));
   }
+  for (const { data } of state.webhooks) {
+    if (data.$error || !data.name) continue;
+    items.push(manifestItem("webhook", data.name, data, ledger.webhooks[data.name]));
+  }
+  // a webhook whose manifest was deleted is removed from the server too (its event class and events stay)
+  for (const name of Object.keys(ledger.webhooks)) {
+    if (!state.webhooks.some((w) => !w.data.$error && w.data.name === name)) items.push({ kind: "webhook", name, state: "removed" });
+  }
   for (const { data } of state.network) {
     if (data.$error || !data.name) continue;
     items.push({ ...manifestItem("network-policy", data.name, data, ledger.networkPolicies[data.name]), scripts: data.scripts ?? [] });
@@ -831,6 +905,21 @@ function plan(state) {
       continue;
     }
     calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
+  }
+  // after the body classes, before the event scripts: replace_webhook makes the event class a script runs on
+  for (const item of pending("webhook")) {
+    if (item.state === "removed") {
+      calls.push({ tool: "remove_webhook", record: ["webhook", item.name], args: { appName, name: item.name } });
+      continue;
+    }
+    const args = { appName, ...strip(state.webhooks.find((w) => w.data.name === item.name).data) };
+    const env = [...new Set((args.auth ?? []).flatMap((step) => WEBHOOK_SECRETS.map((f) => ENV_VALUE.exec(step?.[f] ?? "")?.groups.name).filter(Boolean)))];
+    calls.push({
+      tool: "replace_webhook",
+      record: ["webhook", item.name],
+      ...(env.length ? { note: `replace \${env:...} with the values of ${env.join(", ")} from .env; never print them` } : {}),
+      args,
+    });
   }
   for (const item of pending("event-script")) {
     const { cls, event, script } = EVENT_FILE.exec(item.name).groups;
@@ -946,7 +1035,7 @@ function record(state, kind, names) {
   }
   const ordered = {
     app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
-    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, networkPolicies: ledger.networkPolicies, ...(ledger.auth ? { auth: ledger.auth } : {}),
+    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, networkPolicies: ledger.networkPolicies, webhooks: ledger.webhooks, ...(ledger.auth ? { auth: ledger.auth } : {}),
   };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
@@ -978,7 +1067,7 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", "network-policy": "Network policies", auth: "Sign-in (auth.json)" };
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", "network-policy": "Network policies", webhook: "Webhooks", auth: "Sign-in (auth.json)" };
     for (const kind of Object.keys(titles)) {
       const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;

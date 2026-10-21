@@ -45,6 +45,7 @@ bootstrapp/
   shared/<scriptName>.ts        the shared script itself, called as scripts.<scriptName>(args)
   events/<fullObjectType>.<created|updated>.<scriptName>.ts   one behavior run after an object of the class
                                 is created or updated (several per class and event)
+  webhooks/<name>.json          an inbound webhook = replace_webhook (secrets as ${env:NAME})
   network/<name>.json           a network policy (HTTP calls system.http may make) and the actions/class
                                 event scripts whose runs it binds
   profiles/<Profile>.json       one file per profile = the add_profile payload

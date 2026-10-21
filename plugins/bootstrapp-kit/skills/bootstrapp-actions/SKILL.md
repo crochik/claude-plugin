@@ -56,6 +56,30 @@ related record), is not an action either: it is a class event script, one per be
 `api-script.md`). It runs after the write, so it can't reject
 one; checks a client must not skip still need an action.
 
+A provider calling the app (Stripe, GitHub, a form service) is not an action
+either: it is an inbound webhook, `bootstrapp/webhooks/<name>.json`
+(`replace_webhook`). The webhook saves each request as an event of
+`app.<app>.webhook.<Name>WebhookEvent`, and a class event script on that
+class (`events/app.<app>.webhook.<Name>WebhookEvent.created.<scriptName>.ts`)
+does the work, asynchronously, with access to all of the app's data. To set
+one up:
+
+1. Add the body class: an Embedded class, usually in `app.<app>.webhook`,
+   with only the fields of the provider's payload the script reads (keys it
+   doesn't declare are dropped).
+2. Write the manifest from the provider's docs: its signature check as
+   `auth`, a `dedupeKey` if it sends a delivery id, and every secret as
+   `${env:NAME}` with the value in `.env`.
+3. Write the Created script. Make it safe to run twice, set `status` to
+   `processed`, `failed` (with `error`) or `ignored`, and `processedAt`.
+4. Apply, then give the provider the `url` `replace_webhook` returns.
+   Narrow access to the event class with `replace_class_access` unless app
+   users should see the events.
+5. When deliveries don't show up, `get_webhook` lists the latest requests and
+   why each was refused.
+
+See "Webhooks" in the server's `platform-notes.md`.
+
 When migrating, each custom endpoint of the old backend gets this test. Plain
 reads and writes map to the generated endpoints; the rest become actions.
 

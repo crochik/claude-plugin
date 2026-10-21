@@ -19,7 +19,9 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
    already said to apply, show the list of registrations (they can't be
    undone through MCP) and continue when they confirm.
 4. Execute: `init_app` if planned; then the calls in plan order (profiles,
-   classes, class access, actions, action access, and `replace_app_auth`
+   classes, class access, actions, action access, webhooks with
+   `replace_webhook` or `remove_webhook`, substituting `${env:NAME}` from
+   `.env` without printing it, and `replace_app_auth`
    after the scripts in step 5); record each success immediately with
    `bootstrapp-state.mjs record <kind> <name>`. On a failure, report it and
    keep going with independent items.

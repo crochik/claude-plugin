@@ -18,7 +18,7 @@ skills/
   bootstrapp/                core guide: folder layout, MCP tools, state, sync
   bootstrapp-object-types/   ObjectType design for MongoDB (data model = API model)
   bootstrapp-actions/        when an action is needed; scope, input/output classes
-  bootstrapp-access/         profiles, permissions, row constraints, sign-in, users
+  bootstrapp-access/         profiles, permissions, row/update/delete constraints, sign-in, users
   bootstrapp-apiscript/      writing and checking ApiScripts against platform.d.ts
   bootstrapp-client/         OpenAPI spec → typed client → wrapper → auth
   bootstrapp-migration/      inventory, mapping and slice plan for existing apps

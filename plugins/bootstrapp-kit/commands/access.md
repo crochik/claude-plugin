@@ -1,5 +1,5 @@
 ---
-description: Set who can do what in this BootstrApp app - profiles, class/field access, row constraints, action access, sign-in - or manage its users.
+description: Set who can do what in this BootstrApp app - profiles, class/field access, row, update and delete constraints, action access, sign-in - or manage its users.
 argument-hint: "<roles, permissions, sign-in or users to set up or change>"
 ---
 

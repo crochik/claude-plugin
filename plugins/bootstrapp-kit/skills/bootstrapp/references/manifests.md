@@ -326,8 +326,29 @@ listed first are applied first). Never declare `Admin`, the default profile
 
 Maps 1:1 to `replace_class_access` (no `appName`; the class names the app).
 Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
-`relationPermissions`, `constraints`. `permissions: []` removes the
-profile's access. The folder name must equal `profileName`.
+`relationPermissions`, `constraints`, `updateConstraints`,
+`deleteConstraints`. `permissions: []` removes the profile's access. The
+folder name must equal `profileName`. Leaving a key out removes what it had
+on the server: the file is the whole access.
+
+`updateConstraints` and `deleteConstraints` have the same shape as
+`constraints` (top-level fields only) and narrow which visible records the
+profile may update or delete:
+
+```json
+{
+  "profileName": "Member",
+  "fullObjectType": "app.expense_tracker.Expense",
+  "permissions": ["Full"],
+  "constraints": [
+    { "fieldName": "submittedById", "operator": "Eq", "value": "{{context \"UserId\"}}" }
+  ],
+  "updateConstraints": [
+    { "fieldName": "status", "operator": "Eq", "value": "Draft" }
+  ],
+  "$notes": "Members see their own expenses and can change or delete them only while they're drafts."
+}
+```
 
 A class this app doesn't own (another app's, or one created outside the MCP
 server) is granted to this app's profile with `profileApp` set to this

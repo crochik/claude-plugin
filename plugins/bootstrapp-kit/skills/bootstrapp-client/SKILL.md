@@ -82,6 +82,10 @@ were never applied won't be in it.
 - Per-user privacy is a profile constraint (`ownerId Eq UserId`), set with
   the `bootstrapp-access` skill; the backend then filters every read. Don't
   filter by owner on the client as a security measure.
+- Which records a profile may *edit or delete* can be narrower than what it
+  sees (update and delete constraints). Mirror them in the UI (hide Edit on
+  someone else's task, Delete on a submitted order) and still handle the
+  server refusing the write.
 - Nothing is pushed to the client: refresh what a write affects.
 
 ## Uploading files

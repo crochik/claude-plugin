@@ -518,7 +518,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     if (!bad) error(where, "permissions is required (a list; [] removes the profile's access)");
     else if (bad.length) error(where, `unknown permissions ${bad.join(", ")}. Valid: ${CLASS_PERMISSIONS.join(", ")}`);
     const removing = Array.isArray(data.permissions) && data.permissions.length === 0;
-    if (removing && (Object.keys(data.fieldPermissions ?? {}).length || Object.keys(data.relationPermissions ?? {}).length || data.constraints?.length)) {
+    if (removing && (Object.keys(data.fieldPermissions ?? {}).length || Object.keys(data.relationPermissions ?? {}).length || data.constraints?.length || data.updateConstraints?.length || data.deleteConstraints?.length)) {
       error(where, "permissions [] removes access; don't combine it with field, relation or constraint settings");
     }
 
@@ -544,23 +544,32 @@ function checkAccess(state, byName, propsOf, error, warn) {
       else if (badRelation.length) error(where, `relationPermissions.${relation}: only Read, or [] to hide it`);
     }
 
-    if (data.constraints !== undefined && !Array.isArray(data.constraints)) { error(where, "constraints must be a list"); continue; }
-    if (data.constraints?.length && cls?.type === "Embedded") error(where, "constraints only apply to top-level classes");
-    for (const [i, c] of (data.constraints ?? []).entries()) {
-      const at = `constraints[${i}]`;
-      if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
-      if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
-      if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
-      const values = Array.isArray(c.value) ? c.value : [c.value];
-      const isList = Array.isArray(c.value) || (typeof c.value === "string" && /"All\w+Ids"/.test(c.value));
-      if (["In", "Nin"].includes(c.operator) && !isList) error(where, `${at}: ${c.operator} takes a list (or an All*Ids context value)`);
-      if (OPERATORS.includes(c.operator) && !["In", "Nin"].includes(c.operator) && isList) error(where, `${at}: ${c.operator} takes a single value; use In or Nin with a list`);
-      for (const v of values) {
-        if (typeof v !== "string" || !v.includes("{{")) continue;
-        const key = CONTEXT_VALUE.exec(v)?.groups?.key;
-        if (!key) error(where, `${at}: "${v}" must be exactly {{context "Key"}}`);
-        else if (!CONTEXT_KEYS.includes(key) && !key.startsWith("Claims.")) error(where, `${at}: unknown context key ${key}. Valid: ${CONTEXT_KEYS.join(", ")}, Claims.<name>`);
-        else if (key.startsWith("Claims.") && !(key.slice(7) in (state.auth?.data?.calculatedClaims ?? {}))) warn(where, `${at}: claim ${key.slice(7)} isn't in auth.json calculatedClaims; it must be a claim the token already has`);
+    const shorthands = { ReadOnly: ["Read"], ReadWrite: ["Read", "Create", "Update"], Full: ["Read", "Create", "Update", "Delete"] };
+    const granted = (Array.isArray(data.permissions) ? data.permissions : []).flatMap((p) => shorthands[p] ?? [p]);
+    const grants = (...names) => names.some((n) => granted.includes(n));
+    if (data.updateConstraints?.length && !grants("Update", "Delete", "BulkDelete", "BulkTag")) error(where, "updateConstraints narrow Update and Delete, but permissions grant neither");
+    if (data.deleteConstraints?.length && !grants("Delete", "BulkDelete")) error(where, "deleteConstraints narrow Delete, but permissions don't grant it");
+
+    for (const list of ["constraints", "updateConstraints", "deleteConstraints"]) {
+      if (data[list] !== undefined && !Array.isArray(data[list])) { error(where, `${list} must be a list`); continue; }
+      if (data[list]?.length && cls?.type === "Embedded") error(where, `${list} only apply to top-level classes`);
+      for (const [i, c] of (data[list] ?? []).entries()) {
+        const at = `${list}[${i}]`;
+        if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
+        if (list !== "constraints" && c.fieldName.includes(".")) error(where, `${at}: update and delete constraints take top-level fields only, not ${c.fieldName}`);
+        if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
+        if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
+        const values = Array.isArray(c.value) ? c.value : [c.value];
+        const isList = Array.isArray(c.value) || (typeof c.value === "string" && /"All\w+Ids"/.test(c.value));
+        if (["In", "Nin"].includes(c.operator) && !isList) error(where, `${at}: ${c.operator} takes a list (or an All*Ids context value)`);
+        if (OPERATORS.includes(c.operator) && !["In", "Nin"].includes(c.operator) && isList) error(where, `${at}: ${c.operator} takes a single value; use In or Nin with a list`);
+        for (const v of values) {
+          if (typeof v !== "string" || !v.includes("{{")) continue;
+          const key = CONTEXT_VALUE.exec(v)?.groups?.key;
+          if (!key) error(where, `${at}: "${v}" must be exactly {{context "Key"}}`);
+          else if (!CONTEXT_KEYS.includes(key) && !key.startsWith("Claims.")) error(where, `${at}: unknown context key ${key}. Valid: ${CONTEXT_KEYS.join(", ")}, Claims.<name>`);
+          else if (key.startsWith("Claims.") && !(key.slice(7) in (state.auth?.data?.calculatedClaims ?? {}))) warn(where, `${at}: claim ${key.slice(7)} isn't in auth.json calculatedClaims; it must be a claim the token already has`);
+        }
       }
     }
   }

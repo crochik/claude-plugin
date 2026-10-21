@@ -556,6 +556,15 @@ function checkAccess(state, byName, propsOf, error, warn) {
       for (const [i, c] of (data[list] ?? []).entries()) {
         const at = `${list}[${i}]`;
         if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
+        if (c.operator === "Exists") {
+          if (list !== "constraints") { error(where, `${at}: Exists only works in row constraints`); continue; }
+          const relations = cls ? relationsOf(cls, byName) : null;
+          if (relations && !relations.includes(c.fieldName)) error(where, `${at}: Exists takes a relation name; ${data.fullObjectType}'s relations: ${relations.join(", ") || "none (add a string foreign key)"}`);
+          if (c.value !== undefined && c.value !== true) error(where, `${at}: Exists takes no value`);
+          const relationPerm = data.relationPermissions?.[c.fieldName];
+          if (Array.isArray(relationPerm) && !relationPerm.includes("Read")) error(where, `${at}: the relation ${c.fieldName} must stay readable`);
+          continue;
+        }
         if (list !== "constraints" && c.fieldName.includes(".")) error(where, `${at}: update and delete constraints take top-level fields only, not ${c.fieldName}`);
         if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
         if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
@@ -672,6 +681,17 @@ function checkDiscriminator(cls, where, byName, error, warn) {
 
 // The shape a foreign key's property must have: a string (reference), an array of strings (multi reference),
 // or a dictionary of strings (its keys or values are references, per dictionaryPart). null when it can't hold ids.
+// The relations add_object_class creates: one per string foreign key, named after the referenced class, or after the
+// field when two of them reach the same class (base class relations included)
+function relationsOf(cls, byName, seen = new Set()) {
+  const props = cls?.schema?.properties ?? {};
+  const refs = (cls?.foreignKeys ?? []).filter((fk) => !fk.dictionaryPart && foreignKeyShape(props[fk.localFieldName]) === "reference");
+  const count = (target) => refs.filter((fk) => fk.referenceObjectType === target).length;
+  const own = refs.map((fk) => (count(fk.referenceObjectType) > 1 ? fk.localFieldName : fk.referenceObjectType));
+  const base = cls?.baseObjectType && !seen.has(cls.baseObjectType) ? byName.get(cls.baseObjectType) : null;
+  return base ? [...relationsOf(base, byName, seen.add(cls.baseObjectType)), ...own] : own;
+}
+
 function foreignKeyShape(prop) {
   if (prop?.type === "string" && !prop.enum) return "reference";
   if (prop?.type === "array" && prop.items?.type === "string" && !prop.items.enum) return "multi";

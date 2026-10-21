@@ -46,7 +46,8 @@ Ask, in plain words, and propose defaults:
    hidden or read-only for someone (salary, internal notes, status that only
    managers set).
 3. **Which records?** All of them, only their own, only their organization's,
-   or by a status. "Only their own" needs an owner field on the class
+   by a status, or the ones whose parent they can see ("tasks of the projects
+   I'm on", an `Exists` constraint below). "Only their own" needs an owner field on the class
    (`ownerId`, a uuid set to `{{context "UserId"}}`); "their company's" needs
    `organizationId` (`{{context "OrganizationId"}}`). Add the field to the
    class manifest *before* writing the constraint.
@@ -98,6 +99,16 @@ Rules worth knowing while writing them:
   `AllUserIds`, `AllOrganizationIds`, `AllEntityIds`, and `Claims.<name>`
   from `auth.json`'s `calculatedClaims`). `In`/`Nin` take a list or an `All*`
   key. Constraints apply to top-level classes only.
+- **`Exists` follows a relation**: `{ "fieldName": "app.tasks.Project",
+  "operator": "Exists" }` (no value) shows a task only when its project
+  exists and the profile can see it, so the project's constraints decide.
+  `fieldName` is a relation name: a string foreign key creates one named
+  after the referenced class (after the field when two reach the same
+  class). The profile needs `Read` on the relation and on the related
+  class. Row constraints only. Writes don't check the reference, so make
+  `projectId` `["Read", "SetOnCreate"]` and create through an action when a
+  member must not file tasks into projects they can't see. Loading one
+  record by id checks only the first relation of a chain; lists check all.
 - **An `Eq` constraint also stamps the field on create**: `ownerId Eq
   {{context "UserId"}}` limits the profile to its records *and* fills
   `ownerId` on the records it creates. The client doesn't send it. The

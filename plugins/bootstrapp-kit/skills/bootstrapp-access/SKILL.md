@@ -105,7 +105,11 @@ Rules worth knowing while writing them:
   `fieldName` is a relation name: a string foreign key creates one named
   after the referenced class without its namespace (`Project` for
   `app.tasks.Project`), or after the field when two reach classes with the
-  same name or the name is one of the class' fields. Never dots. The profile needs `Read` on the relation and on the related
+  same name or the name is one of the class' fields. Never dots. A class
+  added before that rule keeps names like `app.tasks.Project` until it is
+  replaced (`get_class_access` shows the current ones); re-apply its
+  manifest with `replace_object_class` first, which renames them and moves
+  their access along. The profile needs `Read` on the relation and on the related
   class. Row constraints only. Writes don't check the reference, so make
   `projectId` `["Read", "SetOnCreate"]` and create through an action when a
   member must not file tasks into projects they can't see. Loading one

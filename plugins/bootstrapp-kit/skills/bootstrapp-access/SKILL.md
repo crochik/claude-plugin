@@ -106,14 +106,14 @@ Rules worth knowing while writing them:
   may update and delete. A delete must match the row, update *and* delete
   constraints. They need the `Update`/`Delete` permission (they never grant
   it), take top-level fields only, and stamp nothing on create.
-- **They test the record as stored, before the change**, not the new values.
-  A profile that can update `ownerId` can give the record away, and one that
-  can update `status` can move it out of a `status Eq Draft` constraint (fine
-  for "submit locks it"). Make the fields they test read-only with
-  `fieldPermissions` when that must not happen. With an update constraint
-  on `ownerId` and no row constraint, nothing stamps the owner: the client
-  sends it (`["Read", "SetOnCreate"]`) or a create action sets it from
-  `system.session`.
+- **A profile can't change a field any of its constraints test** (row,
+  update or delete): the update fails with `Can't change <field>: it is
+  constrained`. Owners can't hand records away, and with `status Eq Draft`
+  the profile can't change `status` at all, so a transition like "submit"
+  is an action (elevated, or run by a profile without that constraint).
+  With an update constraint on `ownerId` and no row constraint, nothing
+  stamps the owner: the client sends it (`["Read", "SetOnCreate"]`) or a
+  create action sets it from `system.session`.
 - **Inheritance is first match, constraints are AND.** For a profile with
   `inheritsFrom: [A, B]`, each class, field and relation permission comes
   from the first of [profile, A, B] that has an entry, without merging; the

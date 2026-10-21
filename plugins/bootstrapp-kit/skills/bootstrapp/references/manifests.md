@@ -346,7 +346,7 @@ profile may update or delete:
   "updateConstraints": [
     { "fieldName": "status", "operator": "Eq", "value": "Draft" }
   ],
-  "$notes": "Members see their own expenses and can change or delete them only while they're drafts."
+  "$notes": "Members see their own expenses and can change or delete them only while they're drafts. They can't change status: submitting is an action."
 }
 ```
 

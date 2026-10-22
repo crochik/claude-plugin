@@ -10,7 +10,7 @@
 //   node bootstrapp-state.mjs check             [--dir bootstrapp] [--json]
 //   node bootstrapp-state.mjs plan              [--dir bootstrapp] [--summary]
 //   node bootstrapp-state.mjs record <kind> <name...> [--dir bootstrapp] [--id <networkPolicyId>]
-//        kind: app | profile | class | access | action | action-access | shared-script | script | event-script | network-policy | webhook | auth
+//        kind: app | profile | class | access | action | action-access | plugin | shared-script | script | event-script | network-policy | webhook | auth
 //        (network-policy: --id is the id replace_network_policy returned)
 //
 // No dependencies; Node 18+.
@@ -48,12 +48,14 @@ const SIGNUP = ["open", "invite_only"];
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
-const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", webhook: "webhooks", auth: null };
+const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", plugin: "plugins", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", webhook: "webhooks", auth: null };
 // network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
 // shared scripts it calls included (replace_network_policy + set_script_network_policy). The server keeps policies by id
 // (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
 // saved as a new policy with a new id
 const POLICY_ID = "<id replace_network_policy returned>";
+// plugins/<name>.json: an optional plugin the app adds (add_plugin), so its scripts can import plugin.<name>
+const PLUGIN_PREFIX = "plugin.";
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
@@ -156,10 +158,11 @@ function load() {
   const webhooks = listFiles("webhooks", ".json").map((file) => ({ file, data: readJson(file) }));
   const auth = existsSync(join(dir, "auth.json")) ? { file: join(dir, "auth.json"), data: readJson(join(dir, "auth.json")) } : null;
   const network = listFiles("network", ".json").map((file) => ({ file, data: readJson(file) }));
+  const plugins = listFiles("plugins", ".json").map((file) => ({ file, data: readJson(file) }));
   const ledgerPath = join(dir, "applied.json");
   const ledger = existsSync(ledgerPath) ? readJson(ledgerPath) : {};
-  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "sharedScripts", "scripts", "eventScripts", "networkPolicies", "webhooks"]) ledger[key] ??= {};
-  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, webhooks, auth, network, ledger, ledgerPath };
+  for (const key of ["profiles", "classes", "access", "actions", "actionAccess", "plugins", "sharedScripts", "scripts", "eventScripts", "networkPolicies", "webhooks"]) ledger[key] ??= {};
+  return { app, classes, actions, scripts, events, shared, profiles, access, actionAccess, webhooks, auth, network, plugins, ledger, ledgerPath };
 }
 
 const accessName = (data) => `${data.profileName}/${data.fullObjectType}`;
@@ -342,6 +345,7 @@ function check(state) {
   checkShared(state, byName, error, warn);
   checkWebhooks(state, byName, error, warn);
   checkNetwork(state, error, warn);
+  checkPlugins(state, error, warn);
 
   return problems;
 }
@@ -465,6 +469,34 @@ function checkNetwork(state, error, warn) {
       else if (!local.has(script)) warn(where, `script ${script} has no local file; it must already exist on the server. Names: <fullObjectType>.<actionName>, <fullObjectType>#created#<name> or #updated#`);
       if (owner.has(script)) error(where, `script ${script} is also in network/${owner.get(script)}.json; a script has one network policy`);
       else owner.set(script, data.name);
+    }
+  }
+}
+
+// The plugins a script imports (import * as x from "plugin.<name>")
+function importedPlugins(text) {
+  if (!text) return [];
+  return [...new Set([...text.matchAll(/import\s+\*\s+as\s+[A-Za-z_]\w*\s+from\s+["']([^"']+)["']/g)].map((m) => m[1]).filter((m) => m.startsWith(PLUGIN_PREFIX)).map((m) => m.slice(PLUGIN_PREFIX.length)))];
+}
+
+function checkPlugins(state, error, warn) {
+  const declared = new Set();
+  for (const { file, data } of state.plugins) {
+    const where = `plugins/${basename(file)}`;
+    if (data.$error) { error(where, data.$error); continue; }
+    if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not plugin.sample)"); continue; }
+    if (basename(file) !== `${data.name}.json`) warn(where, `file name should be ${data.name}.json`);
+    declared.add(data.name);
+  }
+  // saving a script that imports a plugin the app hasn't added fails
+  const sources = [
+    ...state.scripts.map((s) => [`scripts/${s.name}.ts`, s.text]),
+    ...state.shared.map((s) => [`shared/${s.name}.ts`, s.text]),
+    ...state.events.map((e) => [`events/${e.name}.ts`, e.text]),
+  ];
+  for (const [where, text] of sources) {
+    for (const name of importedPlugins(text)) {
+      if (!declared.has(name)) error(where, `imports ${PLUGIN_PREFIX}${name}: add plugins/${name}.json ({ "name": "${name}" }) so the app adds it first`);
     }
   }
 }
@@ -881,6 +913,14 @@ function diff(state) {
   for (const name of Object.keys(ledger.networkPolicies)) {
     if (!state.network.some((n) => n.data.name === name)) items.push({ kind: "network-policy", name, state: "removed", scripts: [] });
   }
+  for (const { data } of state.plugins) {
+    if (data.$error || !data.name) continue;
+    items.push(manifestItem("plugin", data.name, data, ledger.plugins[data.name]));
+  }
+  // a plugin whose manifest was deleted is removed from the app (refused while a script still imports it)
+  for (const name of Object.keys(ledger.plugins)) {
+    if (!state.plugins.some((p) => !p.data.$error && p.data.name === name)) items.push({ kind: "plugin", name, state: "removed" });
+  }
   if (state.auth && !state.auth.data.$error) items.push(manifestItem("auth", "auth", state.auth.data, ledger.auth));
   return items;
 }
@@ -941,6 +981,10 @@ function plan(state) {
     const { data } = state.actionAccess.find((a) => a.data.actionName === item.name);
     calls.push({ tool: "replace_action_access", record: ["action-access", item.name], args: strip(data) });
   }
+  // plugins before the scripts that import them: saving a script that imports a plugin the app hasn't added fails
+  for (const item of pending("plugin").filter((i) => i.state !== "removed")) {
+    calls.push({ tool: "add_plugin", record: ["plugin", item.name], args: { appName, name: item.name } });
+  }
   // shared scripts before the scripts that call them: a script is checked against what the server has when it is saved
   for (const item of sharedOrder(pending("shared-script"), state)) {
     const shared = state.shared.find((s) => s.name === item.name);
@@ -987,6 +1031,10 @@ function plan(state) {
       continue;
     }
     calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
+  }
+  // after the scripts: removing a plugin is refused while a script still imports it
+  for (const item of pending("plugin").filter((i) => i.state === "removed")) {
+    calls.push({ tool: "remove_plugin", record: ["plugin", item.name], args: { appName, name: item.name } });
   }
   // after the scripts: a script has to exist to be pointed at a policy (replacing a script keeps its policy)
   const listed = new Set(state.network.flatMap((n) => (n.data.$error ? [] : n.data.scripts ?? [])));
@@ -1093,7 +1141,7 @@ function record(state, kind, names) {
   }
   const ordered = {
     app: ledger.app, profiles: ledger.profiles, classes: ledger.classes, access: ledger.access,
-    actions: ledger.actions, actionAccess: ledger.actionAccess, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, networkPolicies: ledger.networkPolicies, webhooks: ledger.webhooks, ...(ledger.auth ? { auth: ledger.auth } : {}),
+    actions: ledger.actions, actionAccess: ledger.actionAccess, plugins: ledger.plugins, sharedScripts: ledger.sharedScripts, scripts: ledger.scripts, eventScripts: ledger.eventScripts, networkPolicies: ledger.networkPolicies, webhooks: ledger.webhooks, ...(ledger.auth ? { auth: ledger.auth } : {}),
   };
   writeFileSync(state.ledgerPath, `${JSON.stringify(ordered, null, 2)}\n`);
   console.log(`recorded ${kind}: ${names.join(", ")}`);
@@ -1125,7 +1173,7 @@ switch (command) {
     console.log(`App: ${state.app?.name ?? "(no app.json)"}${state.app?.title ? ` (${state.app.title})` : ""}`);
     const generated = ["platform.d.ts", "openapi.yaml"].map((f) => `${f}: ${existsSync(join(dir, "generated", f)) ? "present" : "missing"}`);
     console.log(`Generated: ${generated.join(", ")}`);
-    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", "network-policy": "Network policies", webhook: "Webhooks", auth: "Sign-in (auth.json)" };
+    const titles = { profile: "Profiles", class: "Classes", access: "Class access (profile/class)", action: "Actions", "action-access": "Action access", plugin: "Plugins", "shared-script": "Shared scripts", script: "Action scripts", "event-script": "Class event scripts", "network-policy": "Network policies", webhook: "Webhooks", auth: "Sign-in (auth.json)" };
     for (const kind of Object.keys(titles)) {
       const group = items.filter((i) => i.kind === kind);
       if (!group.length) continue;

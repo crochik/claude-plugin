@@ -99,6 +99,15 @@ Rules worth knowing while writing them:
   `AllUserIds`, `AllOrganizationIds`, `AllEntityIds`, and `Claims.<name>`
   from `auth.json`'s `calculatedClaims`). `In`/`Nin` take a list or an `All*`
   key. Constraints apply to top-level classes only.
+- **Calculated claims** put values from the user's, their organization's or
+  the account's record into the token (`{{Objects.Organization.Name}}`), for
+  constraints (`Claims.<name>`) and scripts (`session.getClaim`). Only the
+  fields those account-wide classes declare are reachable (list them with
+  `get_calculated_claims`); a reference gives only its id, and the app's own
+  classes can't be read, so per-user app data stays in app records and a
+  constraint or `Exists` on them. Platform claims (`sub`, `role`, `pi_*`,
+  `mcp_*`, ...) can't be calculated. A change reaches a user at their next
+  sign in or token refresh.
 - **`Exists` follows a relation**: `{ "fieldName": "Project",
   "operator": "Exists" }` (no value) shows a task only when its project
   exists and the profile can see it, so the project's constraints decide.

@@ -395,13 +395,24 @@ this app's profiles that run it, `Admin` included when it should.
   "signup": "invite_only",
   "signupProfile": "Member",
   "providerTenants": { "Microsoft": ["8f0c…-tenant-id"] },
-  "calculatedClaims": { "department": "{{Objects.User.department}}" }
+  "calculatedClaims": { "org_name": "{{Objects.Organization.Name}}" }
 }
 ```
 
 Maps to `replace_app_auth` with `appName` added. `signup` is `open` or
 `invite_only`; `providerTenants` and `calculatedClaims` are optional
 (`calculatedClaims` omitted keeps the current ones, `{}` removes them).
+
+`calculatedClaims` maps a claim name (letters, digits, `_`; never a
+platform claim such as `sub`, `role`, `email`, `pi_*`, `client_*`,
+`mcp_*`) to a `{{...}}` expression over `Objects.User.<field>`,
+`Objects.Organization.<field>`, `Objects.Account.<field>` and
+`Object.ProfileId`. Take the fields from `get_calculated_claims`
+(`sources`): only those the account's User, Organization and Account
+classes declare are there, and a reference field gives only its id.
+`add_/replace_/remove_calculated_claim` change one claim on the server;
+mirror the change here so the manifest stays the record. The server
+reference (`tools.md`, "Calculated claims") has the expression rules.
 
 ## `applied.json` (written by the state helper)
 

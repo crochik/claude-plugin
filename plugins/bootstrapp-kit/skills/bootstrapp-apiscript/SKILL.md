@@ -126,6 +126,12 @@ the action's `actionDescription` what it checks. Elevated also reaches
 every record of classes shared from other apps. Rule book: "Elevated
 scripts".
 
+`system.session.getClaim(name)` reads any claim of the caller's token
+(`getClaimValues`, `getClaimNames` too), such as the app's calculated
+claims from `auth.json`; it is the caller's in elevated scripts and `null`
+in class event scripts. Use only claims the token is known to carry. Rule
+book: "Reading the caller's claims".
+
 ## Files
 
 Scripts never carry file contents: an action calls `system.files`

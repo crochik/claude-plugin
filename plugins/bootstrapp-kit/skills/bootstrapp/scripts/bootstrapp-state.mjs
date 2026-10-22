@@ -45,6 +45,13 @@ const CONTEXT_KEYS = ["AccountId", "OrganizationId", "UserId", "EntityId", "Prof
 const CONTEXT_VALUE = /^\{\{\s*context\s+"(?<key>[^"]+)"\s*\}\}$/;
 const PROVIDERS = ["Microsoft", "Google", "Salesforce", "GitHub"];
 const SIGNUP = ["open", "invite_only"];
+// calculated claims: the server refuses these names (they'd take over identity, account, profile, role or MCP access)
+const CLAIM_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+const RESERVED_CLAIMS = new Set(["sub", "name", "given_name", "family_name", "middle_name", "nickname", "preferred_username", "email", "email_verified",
+  "phone_number", "phone_number_verified", "role", "client_id", "scope", "jti", "iss", "aud", "exp", "nbf", "iat",
+  "auth_time", "idp", "amr", "acr", "azp", "sid", "nonce", "at_hash", "c_hash", "cnf", "act", "may_act"]);
+const RESERVED_CLAIM_PREFIXES = ["pi_", "client_", "mcp_", "http"];
+const CLAIM_PATH = /^(Objects\.(User|Organization|Account)(\..+)?|Object\.ProfileId)$/;
 // words the ApiScript grammar reserves: a property with one of these names can't follow "." in a script
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
@@ -655,7 +662,20 @@ function checkAccess(state, byName, propsOf, error, warn) {
       if (!(data.providers ?? []).includes(provider)) error(where, `providerTenants.${provider}: ${provider} isn't in providers`);
     }
     for (const [claim, expression] of Object.entries(data.calculatedClaims ?? {})) {
-      if (typeof expression !== "string" || !expression.includes("{{")) error(where, `calculatedClaims.${claim} must be a {{...}} expression`);
+      if (!CLAIM_NAME.test(claim)) error(where, `calculatedClaims.${claim}: names are letters, digits and _, starting with a letter`);
+      else if (RESERVED_CLAIMS.has(claim.toLowerCase()) || RESERVED_CLAIM_PREFIXES.some((p) => claim.toLowerCase().startsWith(p))) {
+        error(where, `calculatedClaims.${claim} is a platform claim and can't be calculated; pick another name`);
+      }
+      if (typeof expression !== "string" || !expression.includes("{{")) { error(where, `calculatedClaims.${claim} must be a {{...}} expression`); continue; }
+      for (const [, inner] of expression.matchAll(/{{(.*?)}}/g)) {
+        if (!/^[_"\sa-zA-Z.|0-9?!]+$/.test(inner)) { error(where, `calculatedClaims.${claim}: only letters, digits, spaces and _ . | ? ! " can go between {{ and }}`); continue; }
+        for (const token of inner.trim().split(/\s+/)) {
+          if (token === "context") error(where, `calculatedClaims.${claim}: context isn't available; read Objects.User, Objects.Organization, Objects.Account or Object.ProfileId`);
+          if (!token.includes(".") || token.startsWith('"') || /^\d/.test(token)) continue;
+          const path = token.replace(/[?!]+$/, "");
+          if (!CLAIM_PATH.test(path)) error(where, `calculatedClaims.${claim}: ${path} isn't available. Use Objects.User.<field>, Objects.Organization.<field>, Objects.Account.<field> or Object.ProfileId`);
+        }
+      }
     }
   }
 }

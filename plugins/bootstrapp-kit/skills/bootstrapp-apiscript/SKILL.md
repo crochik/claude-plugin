@@ -159,6 +159,19 @@ keep them in a record only elevated scripts read, and call the API from
 an elevated action that checks the caller. Prefer the client calling a
 public API itself when nothing secret or server-side is involved.
 
+## Optional plugins
+
+Besides the `system.*` modules, the platform provides optional plugins:
+modules under `plugin.<name>` an app adds when it needs them (rule
+book, "Optional plugins"). Look for one with `get_plugins` (pass a
+`query`) before writing an integration by hand, and read its functions
+with `get_plugin` (`declarations`). To use one, write
+`plugins/<name>.json` (`{ "name": "<name>" }`), apply it (`add_plugin`),
+regenerate `generated/platform.d.ts`, then import it:
+`import * as sample from "plugin.sample";`. A script can import only
+plugins its app added; the server refuses to save it otherwise. Only
+`sample` (an example with no side effects) exists so far.
+
 ## Workflow
 
 1. Read the action manifest, its input/output class manifests, and the

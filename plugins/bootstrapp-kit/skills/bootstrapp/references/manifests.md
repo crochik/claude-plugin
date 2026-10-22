@@ -414,6 +414,24 @@ classes declare are there, and a reference field gives only its id.
 mirror the change here so the manifest stays the record. The server
 reference (`tools.md`, "Calculated claims") has the expression rules.
 
+## `plugins/<name>.json`
+
+An optional plugin the app adds, so its scripts can import its module
+(`import * as sample from "plugin.sample"`). The file is
+`add_plugin`'s arguments without `appName`:
+
+```json
+{ "name": "sample" }
+```
+
+`name` is the plugin's name from `get_plugins` (`sample`, not
+`plugin.sample`). `check` reports a script (action, shared or class
+event) that imports a plugin with no file here, since saving it would
+fail. `plan` adds plugins before the scripts and removes a deleted
+file's plugin after them (`remove_plugin`, refused while a script still
+imports it). Regenerate `generated/platform.d.ts` after adding one: it
+declares the modules of the plugins the app added.
+
 ## `applied.json` (written by the state helper)
 
 ```json
@@ -424,6 +442,7 @@ reference (`tools.md`, "Calculated claims") has the expression rules.
   "access": { "Member/app.expense_tracker.Expense": { "hash": "…", "classHash": "…", "appliedAt": "…" } },
   "actions": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "actionAccess": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
+  "plugins": { "sample": { "hash": "…", "appliedAt": "…" } },
   "sharedScripts": { "orderTotal": { "hash": "…", "appliedAt": "…" } },
   "scripts": { "approveExpense": { "hash": "…", "appliedAt": "…" } },
   "eventScripts": { "app.shop.OrderLine.updated.updateOrderTotal": { "hash": "…", "appliedAt": "…" } },

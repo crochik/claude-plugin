@@ -48,6 +48,7 @@ bootstrapp/
   webhooks/<name>.json          an inbound webhook = replace_webhook (secrets as ${env:NAME})
   network/<name>.json           a network policy (HTTP calls system.http may make) and the actions/class
                                 event scripts whose runs it binds
+  plugins/<name>.json           an optional plugin the app adds = add_plugin, so scripts can import plugin.<name>
   profiles/<Profile>.json       one file per profile = the add_profile payload
   access/<Profile>/<fullObjectType>.json   a profile's access to one class = replace_class_access
   access/actions/<actionName>.json         profiles that run an action = replace_action_access
@@ -118,6 +119,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
 | `get_network_policies`, `replace_network_policy`, `set_script_network_policy` | Which HTTP calls `system.http` may make: list the policies (with the scripts using each), create one or change an inactive one (rules of host, schemes, methods; safe to repeat; a change to an active one is saved as a new inactive policy), point an action or class event script at one by id or take its network access away. Policies allow calls only once activated outside the MCP server. The policy binds the whole run the script starts (called actions and shared scripts included); a run whose script has none can't make HTTP calls. |
+| `get_plugins`, `get_plugin`, `add_plugin`, `remove_plugin` | Optional plugins: script modules the platform provides (`plugin.<name>`) that an app adds when it needs them. Search the catalog (`query`), read one's functions (`declarations`) and the app's scripts importing it, add one (safe to repeat), remove one (refused while a script imports it). A script can import only plugins its app added. |
 | `validate_action_scripts` | Check every action, shared and class event script of the app against the current classes; changes nothing. Run it after changing classes or deleting a shared script. |
 | `invoke_action` | Run an action's stored script now, as the owner (real writes), optionally with a profile's access (`profileName`) or another time limit (`timeoutSeconds`, default 60, at most 600). |
 | `get_object_class` | Read one class in full: type, base, indexed fields, foreign keys, and its API schemas (read/create/update plus dependencies). |
@@ -234,8 +236,9 @@ When the user wants local definitions pushed:
    title, and description.
 4. Make the calls in the order `plan` lists them: profiles, classes (base
    and embedded classes first), class access, actions, action access,
-   shared scripts (the ones others call first), action scripts, class
-   event scripts, network policies (after the scripts they list), `auth.json`. Actions don't depend on each other and can go in
+   plugins to add (before the scripts that import them), shared scripts (the ones others call first), action scripts, class
+   event scripts, plugins to remove (after the scripts stop importing them),
+   network policies (after the scripts they list), `auth.json`. Actions don't depend on each other and can go in
    parallel; so can access calls. Access shown as `recheck` is applied again
    because its class changed. Classes that reference each other show up
    twice: an `add_object_class` with `record: null` and a `note` (don't
@@ -243,7 +246,7 @@ When the user wants local definitions pushed:
    is recorded.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
-   `shared-script`, `script`, `event-script`, `network-policy`, `auth`; an access item's name is
+   `plugin`, `shared-script`, `script`, `event-script`, `network-policy`, `auth`; an access item's name is
    `<Profile>/<fullObjectType>`, an event script's its file name without
    `.ts`).
    A network policy is several calls; only its last one carries `record`,

@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Claude Code plugins for bootstrapp.cloud.",
-    "version": "0.6.1021"
+    "version": "0.6.1023"
   },
   "plugins": [
     {

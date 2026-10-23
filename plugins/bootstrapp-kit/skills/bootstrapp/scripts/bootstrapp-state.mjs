@@ -40,6 +40,7 @@ const DEFAULT_PROFILE = "Admin"; // created by init_app, always full access, can
 const CLASS_PERMISSIONS = ["Read", "Create", "Update", "Delete", "Import", "Export", "BulkDelete", "BulkTag", "Customize", "DeepClone", "ReadOnly", "ReadWrite", "Full"];
 const FIELD_PERMISSIONS = ["Read", "Update", "SetOnCreate", "Reset", "CreateOnDemand"];
 const RELATION_PERMISSIONS = ["Read"];
+const RELATION_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 const OPERATORS = ["Eq", "Ne", "Gt", "Gte", "Lt", "Lte", "In", "Nin"];
 const CONTEXT_KEYS = ["AccountId", "OrganizationId", "UserId", "EntityId", "ProfileId", "ClientId", "AllProfileIds", "AllUserIds", "AllOrganizationIds", "AllEntityIds"];
 const CONTEXT_VALUE = /^\{\{\s*context\s+"(?<key>[^"]+)"\s*\}\}$/;
@@ -287,12 +288,7 @@ function check(state) {
       if (!props[field]) error(where, `indexed field "${field}" is not a property`);
     }
     checkForeignKeys(cls, propsOf, where, byName, error, warn);
-    // relation names are path segments next to field names: a field can't take a base class relation's name
-    const base = cls.baseObjectType ? byName.get(cls.baseObjectType) : null;
-    for (const field of Object.keys(cls.schema?.properties ?? {})) {
-      const lower = field.toLowerCase();
-      if (base && relationsOf(base, byName).some((r) => r.toLowerCase() === lower)) error(where, `${field} matches a relation of the base class ${base.fullObjectType}; rename the field`);
-    }
+    checkRelationNames(cls, where, state.classes.map((c) => c.data).filter((c) => c && !c.$error), byName, error);
     for (const key of Object.keys(schema.properties ?? {})) {
       if (key !== "_id" && !CAMEL.test(key)) warn(where, `property "${key}" should be camelCase`);
     }
@@ -818,15 +814,12 @@ function checkDiscriminator(cls, where, byName, error, warn) {
   }
 }
 
-// The shape a foreign key's property must have: a string (reference), an array of strings (multi reference),
-// or a dictionary of strings (its keys or values are references, per dictionaryPart). null when it can't hold ids.
-// The relations add_object_class creates: one per string foreign key, named after the referenced class without its
-// namespace, or after the field when two of them reach classes with the same name or the name is one of the class'
-// fields (base class relations included)
-// Mirrors add_object_class: a relation is named after the referenced class without its namespace (Project), or, when another
-// reference reaches a class with that name or the name is taken, after the field without Id (project), then with a Relation
-// suffix. Taken = fields and relations of the class and its base classes, ignoring case (base classes come first, so a class
-// extending this one can't add a field named like one of these relations; the server refuses it).
+// The relations add_object_class creates: one per string foreign key, named relationName when the foreign key has one.
+// Mirrors add_object_class for a new relation without it: named after the referenced class without its namespace (Project),
+// or, when another reference reaches a class with that name or the name is taken, after the field without Id (project), then
+// with a Relation suffix. Taken = fields and relations of the class and its base classes, ignoring case (base classes come
+// first, so a class extending this one can't add a field named like one of these relations; the server refuses it).
+// The server keeps the name an existing relation already has, so a manifest records it in relationName.
 function relationsOf(cls, byName, seen = new Set()) {
   if (cls?.fullObjectType) seen.add(cls.fullObjectType);
   const props = cls?.schema?.properties ?? {};
@@ -840,7 +833,9 @@ function relationsOf(cls, byName, seen = new Set()) {
   }
   const short = (target) => (target ?? "").split(".").at(-1);
   const shared = (name) => refs.filter((fk) => short(fk.referenceObjectType) === name).length > 1;
+  for (const fk of refs) if (fk.relationName) taken.add(fk.relationName.toLowerCase());
   const own = refs.map((fk) => {
+    if (fk.relationName) return fk.relationName;
     const field = fk.localFieldName;
     let stem = field.length > 2 && field.endsWith("Id") ? field.slice(0, -2).replace(/_+$/, "") : field;
     if (!stem) stem = field;
@@ -852,6 +847,57 @@ function relationsOf(cls, byName, seen = new Set()) {
     return picked;
   });
   return [...inherited, ...own];
+}
+
+// Relation names are path segments next to field names (Project|name), so the server refuses a relationName, or a property,
+// that matches a field or another relation of the class, its base classes or the classes extending it (ignoring case)
+function checkRelationNames(cls, where, classes, byName, error) {
+  const props = cls.schema?.properties ?? {};
+  const owners = new Map();
+  const own = (name, owner) => { if (!owners.has(name.toLowerCase())) owners.set(name.toLowerCase(), owner); };
+  for (const f of Object.keys(props)) own(f, `a property of ${cls.fullObjectType}`);
+  const base = cls.baseObjectType ? byName.get(cls.baseObjectType) : null;
+  for (let b = base, guard = new Set(); b && !guard.has(b.fullObjectType); b = byName.get(b.baseObjectType)) {
+    guard.add(b.fullObjectType);
+    for (const f of Object.keys(b.schema?.properties ?? {})) own(f, `a property of its base class ${b.fullObjectType}`);
+  }
+  const baseRelations = base ? relationsOf(base, byName) : [];
+  for (const r of baseRelations) own(r, `a relation of its base class ${base.fullObjectType}`);
+
+  // classes extending this one, directly or through another
+  const descendants = [];
+  for (let level = [cls.fullObjectType], guard = new Set(level); level.length;) {
+    const next = classes.filter((c) => level.includes(c.baseObjectType) && !guard.has(c.fullObjectType));
+    for (const c of next) { guard.add(c.fullObjectType); descendants.push(c); }
+    level = next.map((c) => c.fullObjectType);
+  }
+  // a descendant's own relations: what it adds after the ones it inherits
+  const ownRelations = (d) => relationsOf(d, byName).slice(relationsOf(byName.get(d.baseObjectType), byName).length);
+  for (const d of descendants) {
+    for (const f of Object.keys(d.schema?.properties ?? {})) own(f, `a property of ${d.fullObjectType}, which extends it`);
+    for (const r of ownRelations(d)) own(r, `a relation of ${d.fullObjectType}, which extends it`);
+  }
+
+  // a property can't take the name of a relation of its base class or of a class extending it
+  for (const field of Object.keys(props)) {
+    const lower = field.toLowerCase();
+    if (baseRelations.some((r) => r.toLowerCase() === lower)) error(where, `${field} matches a relation of the base class ${base.fullObjectType}; rename the property`);
+    for (const d of descendants) {
+      if (ownRelations(d).some((r) => r.toLowerCase() === lower)) error(where, `${field} matches a relation of ${d.fullObjectType}, which extends this class; rename the property or give that relation another relationName`);
+    }
+  }
+
+  const names = new Set();
+  for (const fk of cls.foreignKeys ?? []) {
+    if (fk.relationName === undefined || fk.relationName === null) continue;
+    const at = `foreign key "${fk.localFieldName}"`;
+    if (typeof fk.relationName !== "string" || !RELATION_NAME.test(fk.relationName)) { error(where, `${at}: relationName must start with a letter and have only letters, digits and _`); continue; }
+    if (fk.dictionaryPart || foreignKeyShape(props[fk.localFieldName]) !== "reference") { error(where, `${at}: only a string foreign key has a relation; leave relationName out`); continue; }
+    const lower = fk.relationName.toLowerCase();
+    if (owners.has(lower)) error(where, `${at}: relationName ${fk.relationName} is ${owners.get(lower)}; relation names can't match a field or another relation`);
+    else if (names.has(lower)) error(where, `${at}: relationName ${fk.relationName} is already another relation's name`);
+    names.add(lower);
+  }
 }
 
 function foreignKeyShape(prop) {

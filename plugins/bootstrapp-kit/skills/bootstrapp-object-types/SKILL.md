@@ -66,7 +66,18 @@ Relationship shapes on the platform:
   a single id is a reference, an array of ids of one class (`<name>Ids`) a
   multi reference, and a dictionary keyed or valued by ids
   (`additionalProperties: {type: string}`) takes `dictionaryPart: "key"` or
-  `"value"`. Many-to-many: an array of ids on the side that is read more,
+  `"value"`. A single id also gets a **relation** (the read model adds the
+  related record, and `Exists` constraints follow it); name it with
+  `relationName` (letters, digits, `_`), or leave it out for `Project`
+  (the referenced class without its namespace, `project` when taken).
+  Relation names sit next to field names in the API (`Project|name`), so
+  the server refuses a `relationName` that matches a field or another
+  relation of the class, its base classes or the classes extending it, and
+  a property named like an existing relation, in either direction. A
+  relation keeps its name on replace; record it in the manifest
+  (`get_object_class` returns it), and only change it on purpose:
+  renaming moves its access and constraints but changes the API paths, so
+  regenerate the client. Many-to-many: an array of ids on the side that is read more,
   or a top-level link class when the link carries data. User ids
   (`ownerId`, `assigneeId`) point at platform users, not app classes, and
   stay plain uuid strings.

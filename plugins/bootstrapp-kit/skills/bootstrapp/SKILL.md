@@ -160,7 +160,8 @@ version. Read the resource before relying on a detail it covers:
 
 Where a tool result lands in this kit: `get_object_class` is the API form of
 a class (drop the generated `{field}|Name` and relation fields before using
-it as a manifest; read the local manifest first when there is one);
+it as a manifest, and keep each foreign key's `relationName`; read the
+local manifest first when there is one);
 `set_class_full_text_search` changes `isFullTextSearchable`, so update the
 manifest to match.
 

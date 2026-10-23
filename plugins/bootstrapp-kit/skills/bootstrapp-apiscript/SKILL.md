@@ -135,8 +135,12 @@ book: "Reading the caller's claims".
 Prefer elevating to a profile over unrestricted elevation: add
 `"runAsProfile": "<Profile>"` to the action manifest (or
 `events/<name>.json` for a class event script) and the script runs with
-that profile's access, still as the caller (constraints on the user and
-organization resolve to the caller's, `system.session` is the caller).
+that profile's access, still as the caller: its constraints (written with
+`{{context "UserId"}}`, `{{context "OrganizationId"}}` as for any profile)
+resolve to the caller's user and organization, and `system.session` is the
+caller. So a run-as profile with `organizationId Eq {{context
+"OrganizationId"}}` keeps each caller to their own organization's records
+without the script checking it.
 Make the profile for the step with just the access it needs
 (`profiles/<Profile>.json` plus `access/<Profile>/`, the
 `bootstrapp-access` skill) and give it to no user, so a bug in the script

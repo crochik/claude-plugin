@@ -182,12 +182,16 @@ Besides the `system.*` modules, the platform provides optional plugins:
 modules under `plugin.<name>` an app adds when it needs them (rule
 book, "Optional plugins"). Look for one with `get_plugins` (pass a
 `query`) before writing an integration by hand, and read its functions
-with `get_plugin` (`declarations`, `settings`, `hosts`, `setup`). To use
+with `get_plugin` (`declarations`, `settings`, `hosts`, `setup`). Only
+plugins `enabled` for the account can be added: the platform owner
+enables them outside MCP, so for one that isn't, tell the developer to
+ask for it rather than working around it. To use
 one, write `plugins/<name>.json` (`{ "name": "<name>", "settings": { ... } }`,
 settings only when the plugin has them, never secrets), apply it
 (`add_plugin`), regenerate `generated/platform.d.ts`, then import it:
 `import * as github from "plugin.github";`. A script can import only
-plugins its app added; the server refuses to save it otherwise.
+plugins its app added and its account enabled; the server refuses to
+save it otherwise, and a run refuses it too.
 
 `add_plugin` (and `get_plugin` once added) returns the plugin's `setup`
 instructions and `pending`, what is still missing before it works for

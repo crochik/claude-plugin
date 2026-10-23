@@ -417,7 +417,9 @@ reference (`tools.md`, "Calculated claims") has the expression rules.
 ## `plugins/<name>.json`
 
 An optional plugin the app adds, so its scripts can import its module
-(`import * as sample from "plugin.sample"`). The file is
+(`import * as sample from "plugin.sample"`). Only a plugin enabled for
+the account (`get_plugins`' `enabled`, set by the platform owner outside
+MCP) can be added; `sample` always is. The file is
 `add_plugin`'s arguments without `appName`:
 
 ```json

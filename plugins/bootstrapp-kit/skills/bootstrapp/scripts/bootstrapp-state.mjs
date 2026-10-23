@@ -120,11 +120,11 @@ function strip(value) {
 
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
 
-// "elevated" and "runAsProfile" in an action manifest go to replace_action_script (elevated, profile), not
-// register_action, so they are part of the script's hash and not the action's.
+// "elevated" (as the account) and "runAsProfile" (as that profile; never both) in an action manifest go to
+// replace_action_script (elevated, profile), not register_action, so they are part of the script's hash and not the action's.
 const actionArgs = (data) => { const { elevated, runAsProfile, ...rest } = strip(data); return rest; };
-const scriptHash = (text, action) => hash(action?.elevated !== true ? text
-  : action.runAsProfile ? `${text}\n// elevated as ${action.runAsProfile}` : `${text}\n// elevated`);
+const scriptHash = (text, action) => hash(action?.runAsProfile ? `${text}\n// as ${action.runAsProfile}`
+  : action?.elevated === true ? `${text}\n// elevated` : text);
 // events/<name>.json (optional) holds what replace_class_event_script takes besides the script: runAsProfile
 const eventHash = (event) => hash(event.data?.runAsProfile ? `${event.text}\n// as ${event.data.runAsProfile}` : event.text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
@@ -310,8 +310,8 @@ function check(state) {
     if (basename(file) !== `${action.actionName}.json`) warn(where, `file name should be ${action.actionName}.json`);
     if (!CAMEL.test(action.actionName)) warn(where, "actionName should be camelCase");
     if (!SCOPES.includes(action.scope)) error(where, `scope must be one of ${SCOPES.join(", ")}`);
-    if (action.elevated === undefined) warn(where, "elevated is not set; the script runs with the caller's access. Decide and set true or false (bootstrapp-apiscript skill, Elevated scripts)");
-    else if (typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
+    if (action.elevated === undefined && !action.runAsProfile) warn(where, "elevated is not set; the script runs with the caller's access. Decide: false, true (as the account) or a runAsProfile (bootstrapp-apiscript skill, Elevated scripts)");
+    else if (action.elevated !== undefined && typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
     checkRunAsProfile(where, action.runAsProfile, action.elevated === true, profileNames, error, warn);
 
     const target = byName.get(action.fullObjectType);
@@ -348,7 +348,7 @@ function check(state) {
     if (event.data?.$error) error(`events/${event.name}.json`, event.data.$error);
     else if (event.data) {
       for (const key of Object.keys(event.data)) if (key !== "runAsProfile") warn(`events/${event.name}.json`, `${key} is not used (only runAsProfile)`);
-      checkRunAsProfile(`events/${event.name}.json`, event.data.runAsProfile, true, profileNames, error, warn);
+      checkRunAsProfile(`events/${event.name}.json`, event.data.runAsProfile, false, profileNames, error, warn);
     }
     if (!IDENTIFIER.test(event.scriptName)) error(where, `script name "${event.scriptName}" must be an identifier such as updateOrderTotal`);
     else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
@@ -419,11 +419,11 @@ function checkWebhooks(state, byName, error, warn) {
   }
 }
 
-// runAsProfile: the app profile an elevated script runs as (replace_action_script / replace_class_event_script "profile")
+// runAsProfile: the app profile a script runs as (replace_action_script / replace_class_event_script "profile"), never with elevated
 function checkRunAsProfile(where, value, elevated, profileNames, error, warn) {
   if (value === undefined || value === null) return;
   if (typeof value !== "string" || !value.trim()) { error(where, "runAsProfile must be the name of one of the app's profiles"); return; }
-  if (!elevated) error(where, "runAsProfile only applies to an elevated script: set elevated to true or remove it");
+  if (elevated) error(where, "set elevated (run as the account) or runAsProfile (run as that profile), not both");
   if (!profileNames.has(value) && value.toLowerCase() !== DEFAULT_PROFILE.toLowerCase()) warn(where, `runAsProfile ${value} has no local profile manifest; it must already exist on the server`);
 }
 
@@ -1046,7 +1046,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.elevated === true && action.runAsProfile ? { profile: action.runAsProfile } : {}) } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.runAsProfile ? { profile: action.runAsProfile } : {}) } });
   }
   // after the body classes, before the event scripts: replace_webhook makes the event class a script runs on
   for (const item of pending("webhook")) {

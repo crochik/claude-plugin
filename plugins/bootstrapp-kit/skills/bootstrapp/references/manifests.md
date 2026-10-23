@@ -164,20 +164,19 @@ every property holding ids, with `dictionaryPart` for a dictionary, see
   "scope": "Instance",
   "actionInputObjectType": "app.expense_tracker.actions.ApproveExpenseInput",
   "actionOutputObjectType": "app.expense_tracker.actions.ApproveExpenseOutput",
-  "elevated": true,
   "runAsProfile": "ExpenseApprover"
 }
 ```
 
 Maps 1:1 to `register_action`, except `elevated` and `runAsProfile`. `scope` is `Instance` |
 `Bulk` | `Class`. The script is `scripts/<actionName>.ts` by convention; no
-field needed. `elevated` (`true` | `false`) is sent with the script to
-`replace_action_script`: `false` runs it with the caller's access, `true`
-ignores the caller's profile (see the `bootstrapp-apiscript` skill). `check`
-warns when it is missing. `runAsProfile` (optional, only with `"elevated":
-true`) is sent as `profile`: the script then runs with that app profile's
-access instead of all of the app's data; leave it out for unrestricted
-elevation. Changing either re-pushes the script, not the action.
+field needed. Whose access the script runs with is sent with it to
+`replace_action_script` (see the `bootstrapp-apiscript` skill): the
+caller's (`"elevated": false`), the account's (`"elevated": true`, ignores
+the caller's profile) or an app profile's (`"runAsProfile"`, sent as
+`profile`). Set `elevated` or `runAsProfile`, never `elevated: true` with a
+profile; `check` warns when neither is set and fails on both. Changing them
+re-pushes the script, not the action.
 
 ## `scripts/<actionName>.ts`
 

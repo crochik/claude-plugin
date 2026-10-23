@@ -107,8 +107,10 @@ domain class when it returns records.
 
 ## Elevated or the caller's access
 
-Every action script is pushed with `elevated`, set in the action manifest
-(`"elevated": false` or `true`). Decide it for each action; don't copy it.
+Every action script is pushed with whose access it runs with, set in the
+action manifest: `"elevated": false` (the caller's), `"elevated": true`
+(the account's) or `"runAsProfile"` (a profile's, below; never with
+`elevated: true`). Decide it for each action; don't copy it.
 
 Pick `false` (the caller's access) unless the action needs what the
 caller's profile doesn't give: a total, count or uniqueness check over
@@ -132,8 +134,8 @@ claims from `auth.json`; it is the caller's in elevated scripts and `null`
 in class event scripts. Use only claims the token is known to carry. Rule
 book: "Reading the caller's claims".
 
-Prefer elevating to a profile over unrestricted elevation: add
-`"runAsProfile": "<Profile>"` to the action manifest (or
+Prefer running as a profile to `elevated` (which runs as the account): add
+`"runAsProfile": "<Profile>"` instead of `elevated` to the action manifest (or
 `events/<name>.json` for a class event script) and the script runs with
 that profile's access, still as the caller: its constraints (written with
 `{{context "UserId"}}`, `{{context "OrganizationId"}}` as for any profile)
@@ -145,7 +147,7 @@ Make the profile for the step with just the access it needs
 (`profiles/<Profile>.json` plus `access/<Profile>/`, the
 `bootstrapp-access` skill) and give it to no user, so a bug in the script
 can't reach beyond it. It can call only the actions and shared scripts
-that profile may run. Rule book: "Elevated to a profile".
+that profile may run. Rule book: "Running as a profile".
 
 ## Files
 

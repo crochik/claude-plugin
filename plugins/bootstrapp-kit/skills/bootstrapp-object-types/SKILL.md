@@ -93,6 +93,11 @@ Relationship shapes on the platform:
   reuses fields: each child has its own collection and the base's list
   never includes them. Use it for classes that share a shape but are never
   read together.
+- **Only your own app's classes.** The class, its `baseObjectType` and any
+  embedded `$ref` must all be under `app.<app_name>`: the server refuses to
+  extend, discriminate from or embed another app's or a `system.*` class.
+  To use another app's records, reference them with a foreign key and get
+  access granted (see the `bootstrapp-access` skill).
 - **Types.** Money as integer minor units (`amountCents`) or a decimal
   string. `integer` is 32-bit
   signed whatever `maximum` says; larger values (ARGB colors, byte counts)

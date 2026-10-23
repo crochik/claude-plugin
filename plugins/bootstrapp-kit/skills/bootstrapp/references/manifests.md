@@ -22,7 +22,9 @@ are stripped before a call. JSON Schema keywords (`$ref`, `$defs`, `$id`,
 
 - `name` → `init_app.appName`. snake_case: lowercase letters, digits,
   underscores. It is also the OIDC `client_id` and the namespace suffix
-  (`app.<name>`). Never rename it after `init_app`.
+  (`app.<name>`). Never rename it after `init_app`. `init_app` refuses a
+  name taken by another app, or whose namespace already holds classes no
+  app owns; pick another name then.
 - `title` → `init_app.appTitle` (shown on the login consent screen).
 - `description` → `init_app.appDescription`. A real paragraph.
 - `client` is optional and only used by the `bootstrapp-client` skill.

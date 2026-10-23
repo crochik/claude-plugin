@@ -159,6 +159,23 @@ keep them in a record only elevated scripts read, and call the API from
 an elevated action that checks the caller. Prefer the client calling a
 public API itself when nothing secret or server-side is involved.
 
+## Integrations
+
+`system.integration` stores credentials for one of the account's
+integrations on the user running the script (`"user"`) or their
+organization (`"organization"`, changed only by a manager or an elevated
+script) (rule book, "Integrations"). The integration is added to the
+account first with `create_integration`, and its `id` is random, so find
+it by name in the script, never from `input`:
+`integration.providers().find(x => x.name === "twilio")`. `values`
+integrations take `set(id, level, values)`; OAuth ones (`oauth2`, `oidc`)
+take `connect(id, level, { scopes?, offline?, returnUrl? })`, which returns
+a `url` the client sends the browser to within 10 minutes (`returnUrl`
+must be on one of the app client's origins). `get` and `list` say only
+whether each secret is set, so a script can't read a credential back, and
+nothing on the platform uses these credentials yet: a script calling the
+service with `system.http` still needs its key per "HTTP calls" above.
+
 ## Optional plugins
 
 Besides the `system.*` modules, the platform provides optional plugins:

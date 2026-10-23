@@ -29,7 +29,6 @@ const BUILTIN_TYPES = new Set(["number", "string", "boolean", "any", "Record"]);
 
 // Unsupported syntax, matched against code with comments and string contents removed.
 const FORBIDDEN = [
-  [/=>/, "arrow functions are not supported; declare a function"],
   [/\basync\b|\bawait\b/, "async/await is not supported; platform calls are synchronous"],
   [/\btry\b|\bcatch\b|\bfinally\b/, "try/catch is not supported; validate first and throw"],
   [/\bswitch\b|\bcase\b/, "switch is not in the published grammar; use if/else"],

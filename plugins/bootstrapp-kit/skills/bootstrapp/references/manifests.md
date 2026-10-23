@@ -337,6 +337,11 @@ Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 folder name must equal `profileName`. Leaving a key out removes what it had
 on the server: the file is the whole access.
 
+An embedded class (one a field holds by `$ref`, or an inline object's
+`<parent>.<property>` class) gets its own file in the same folder, e.g.
+`access/Member/app.expense_tracker.Receipt.json` with `["ReadWrite"]`:
+the profile reads and writes the object only through that grant.
+
 A row constraint can also follow a relation: `{ "fieldName": "Category",
 "operator": "Exists" }` (a relation name from a string foreign key: the
 referenced class without its namespace, or the field without `Id` when

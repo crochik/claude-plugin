@@ -74,7 +74,12 @@ The mistakes that matter most (the rule book has the rest):
   bigger). Rule book, "Update many".
 - A transaction still open when the script ends is aborted: commit before
   returning.
-- No string methods, no `try`/`catch`, no arrow functions, `++`, `===`,
+- Arrow functions work (`x => x * 2`, `(a, b) => { … }`, closures), and so
+  do the array methods that take one: `forEach`, `map`, `filter`, `find`,
+  `findIndex`, `some`, `every`, `flatMap`, `reduce`, `sort` (plus their
+  `findLast*` forms). Their parameters and results are typed from the
+  array, so `orders.map(o => o.total)` is a `number[]`.
+- No string methods, no `try`/`catch`, no `async`/`await`, `++`, `===`,
   `?.` or template literals.
 
 ## Where scripts live
@@ -99,16 +104,35 @@ domain class when it returns records.
   example one checked step the caller's profile can't do freely.
 - **Work that must follow every create or update** of a class, whichever
   client made it, is a class event script, one per behavior. It runs after
-  the write with access to all of the app's data, so it can't reject the
-  write; validation a client must not skip stays in an action.
+  the write with access to all of the app's data (or a profile's, with
+  `runAsProfile`), so it can't reject the write; validation a client must not skip stays in an action.
 - **Writes that must happen together** go in one `system.mongodb`
   transaction; to include a shared script's writes, pass it the transaction
   (rule book, "Shared scripts").
 
 ## Elevated or the caller's access
 
-Every action script is pushed with `elevated`, set in the action manifest
-(`"elevated": false` or `true`). Decide it for each action; don't copy it.
+A script always runs with the caller's access. The action manifest can
+grant it more: `"elevated": true` (the account's) or `"runAsProfile"` (a
+profile's, below; never with `elevated: true`); `"elevated": false` grants
+nothing. The grant is used only by the calls the script wraps in
+`session.elevated(() => …)` (`import * as session from "system.session";`),
+which returns what its function returns:
+
+```typescript
+const mine = app.filterOrder([...]);                          // the caller's access
+const total = session.elevated(() => app.filterOrder([...]).length); // the grant
+```
+
+Keep everything else, above all the reads that decide what the caller may
+do, outside it. A script calling `session.elevated` without a grant is
+rejected on save, and `bootstrapp-state.mjs check` flags it (and warns
+about a grant the script never uses). The save type checks the whole
+script with the grant's access, so a call outside `session.elevated` that
+only the grant allows saves fine and fails at run time. Shared scripts
+called inside it run elevated throughout; class event scripts are
+elevated throughout and don't need it. Decide the grant for each action;
+don't copy it.
 
 Pick `false` (the caller's access) unless the action needs what the
 caller's profile doesn't give: a total, count or uniqueness check over
@@ -118,7 +142,7 @@ to someone else's record (accepting an invite). A permission error a
 profile should allow is fixed with access (the `bootstrapp-access` skill),
 never by elevating.
 
-An elevated script is the only guard on what it touches: filter by
+Code inside `session.elevated` is the only guard on what it touches: filter by
 `system.session` (`getUserId()`, `getOrganizationId()`) wherever the
 profile has a constraint, check the record before changing it wherever it
 has an update or delete constraint, return only what the caller may see, and say in
@@ -131,6 +155,21 @@ scripts".
 claims from `auth.json`; it is the caller's in elevated scripts and `null`
 in class event scripts. Use only claims the token is known to carry. Rule
 book: "Reading the caller's claims".
+
+Prefer running as a profile to `elevated` (which runs as the account): add
+`"runAsProfile": "<Profile>"` instead of `elevated` to the action manifest (or
+`events/<name>.json` for a class event script) and the code inside
+`session.elevated` runs with that profile's access, still as the caller: its constraints (written with
+`{{context "UserId"}}`, `{{context "OrganizationId"}}` as for any profile)
+resolve to the caller's user and organization, and `system.session` is the
+caller. So a run-as profile with `organizationId Eq {{context
+"OrganizationId"}}` keeps each caller to their own organization's records
+without the script checking it.
+Make the profile for the step with just the access it needs
+(`profiles/<Profile>.json` plus `access/<Profile>/`, the
+`bootstrapp-access` skill) and give it to no user, so a bug in the script
+can't reach beyond it. It can call only the actions and shared scripts
+that profile may run. Rule book: "Running as a profile".
 
 ## Files
 

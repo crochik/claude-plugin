@@ -154,7 +154,7 @@ order whose stock was never taken.
 | `await db.orders.findOne({ id })` | `app.filterOrder([{ field: "_id", operator: "Eq", value: id }], [...fields])[0]` |
 | `where status in (...)` | `{ field: "status", operator: "In", value: [...] }` |
 | `ORDER BY createdOn DESC LIMIT 10` | `filterX(conds, fields, "createdOn", true, 10)` (field must be indexed) |
-| `orders.map(o => o.total)` | index loop pushing into an array |
+| `orders.map(o => o.total)` | the same; `filter`, `find`, `reduce`, `sort((a, b) => a - b)` too |
 | `` `Order ${id}` `` | `"Order " + id` |
 | `x?.y` | `x != null ? x.y : null` |
 | `i++`, `n += 2` | `i = i + 1`, `n = n + 2` |

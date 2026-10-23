@@ -29,9 +29,12 @@ matters, since **the server's copy wins**.
 The backend enforces all of it on every CRUD, filter and action call, so the
 client never needs actions "for security". The client should still hide
 controls a profile can't use. Action scripts follow the same rules, except a
-script saved `elevated`, which ignores the caller's profile and does its own
-checks; when a profile is denied something only so an action can do it in a
+script saved `elevated`, whose calls inside `session.elevated` ignore the
+caller's profile, so it does its own checks; when a profile is denied something only so an action can do it in a
 controlled way, that action is elevated (the `bootstrapp-apiscript` skill).
+Instead of elevating (running as the account), a script can run as a profile
+(`runAsProfile`): a profile no user gets, holding exactly the access the step
+needs, is the narrowest way to let an action do what the caller can't.
 
 ## Interview before writing anything
 
@@ -93,6 +96,20 @@ Rules worth knowing while writing them:
   `defaultFieldPermissions` changes the default for the unlisted ones.
 - **Base-class fields are set on the base class**: write a second access file
   for the base class.
+- **A field holding an embedded class needs that class granted too.** A
+  `$ref` to an embedded class, an array or dictionary of one, or an inline
+  object (stored as the embedded class `<parent>.<property>`, e.g.
+  `app.shop.Order.meta`) is read and written with the profile's access to
+  the embedded class, not only the field's. Without `Read` on it, reads
+  leave the field out; writes, on create *and* update, keep only the
+  embedded fields the profile can `SetOnCreate` and drop the rest, with no
+  error. So write `access/<Profile>/<embedded class>.json` as well, with
+  `ReadWrite` (its `Create` gives the fields `SetOnCreate`) wherever the
+  profile edits the object, `ReadOnly` where it only reads it, and the same
+  for embedded classes nested inside it. Field permissions hide or lock its
+  fields as usual; constraints don't apply to embedded classes. `check`
+  warns about a granted field whose embedded class the profile can't read
+  or set, and `replace_class_access` says so in its result.
 - **Constraints**: operators `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`; values are
   literals or `{{context "Key"}}` (`UserId`, `OrganizationId`, `AccountId`,
   `EntityId`, `ProfileId`, `ClientId`, the lists `AllProfileIds`,
@@ -157,7 +174,8 @@ Rules worth knowing while writing them:
   file for that class instead of relying on inheritance there.
 
 `bootstrapp-state.mjs check` validates all of this offline (unknown
-permissions, fields, operators, context keys, profiles; `Admin` misuse).
+permissions, fields, operators, context keys, profiles; `Admin` misuse;
+embedded classes a granted field needs).
 
 ## Applying
 

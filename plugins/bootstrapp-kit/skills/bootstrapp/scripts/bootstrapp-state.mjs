@@ -120,10 +120,14 @@ function strip(value) {
 
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
 
-// "elevated" in an action manifest goes to replace_action_script, not register_action,
-// so it is part of the script's hash and not the action's.
-const actionArgs = (data) => { const { elevated, ...rest } = strip(data); return rest; };
-const scriptHash = (text, action) => hash(action?.elevated === true ? `${text}\n// elevated` : text);
+const USES_ELEVATED = /\.elevated\s*\(/;
+// "elevated" (as the account) and "runAsProfile" (as that profile; never both) in an action manifest go to
+// replace_action_script (elevated, profile), not register_action, so they are part of the script's hash and not the action's.
+const actionArgs = (data) => { const { elevated, runAsProfile, ...rest } = strip(data); return rest; };
+const scriptHash = (text, action) => hash(action?.runAsProfile ? `${text}\n// as ${action.runAsProfile}`
+  : action?.elevated === true ? `${text}\n// elevated` : text);
+// events/<name>.json (optional) holds what replace_class_event_script takes besides the script: runAsProfile
+const eventHash = (event) => hash(event.data?.runAsProfile ? `${event.text}\n// as ${event.data.runAsProfile}` : event.text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
 // replace_script takes the manifest's fields and the script together, so both are one item
 const sharedHash = (shared) => hash(`${JSON.stringify(strip(shared.data ?? {}))}\n${shared.text ?? ""}`);
@@ -145,7 +149,9 @@ function load() {
   const events = listFiles("events", ".ts").map((file) => {
     const name = basename(file, ".ts");
     const match = EVENT_FILE.exec(name);
-    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, scriptName: match?.groups.script ?? null, text: readFileSync(file, "utf8") };
+    const json = join(dir, "events", `${name}.json`);
+    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, scriptName: match?.groups.script ?? null, text: readFileSync(file, "utf8"),
+      data: existsSync(json) ? readJson(json) : null };
   });
   const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
   // shared/<scriptName>.json (the replace_script arguments) next to shared/<scriptName>.ts (its script)
@@ -292,6 +298,7 @@ function check(state) {
     }
   }
 
+  const profileNames = new Set(state.profiles.map((p) => p.data?.profileName).filter(Boolean));
   const actionNames = new Set();
   for (const { file, data: action } of state.actions) {
     const where = `actions/${basename(file)}`;
@@ -304,8 +311,9 @@ function check(state) {
     if (basename(file) !== `${action.actionName}.json`) warn(where, `file name should be ${action.actionName}.json`);
     if (!CAMEL.test(action.actionName)) warn(where, "actionName should be camelCase");
     if (!SCOPES.includes(action.scope)) error(where, `scope must be one of ${SCOPES.join(", ")}`);
-    if (action.elevated === undefined) warn(where, "elevated is not set; the script runs with the caller's access. Decide and set true or false (bootstrapp-apiscript skill, Elevated scripts)");
-    else if (typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
+    if (action.elevated === undefined && !action.runAsProfile) warn(where, "elevated is not set; the script runs with the caller's access. Decide: false, true (as the account) or a runAsProfile (bootstrapp-apiscript skill, Elevated scripts)");
+    else if (action.elevated !== undefined && typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
+    checkRunAsProfile(where, action.runAsProfile, action.elevated === true, profileNames, error, warn);
 
     const target = byName.get(action.fullObjectType);
     if (!target) warn(where, `target ${action.fullObjectType} has no local manifest`);
@@ -327,7 +335,15 @@ function check(state) {
       if (action.scope === "Bulk" && !(props.ids?.type === "array" && required.includes("ids"))) error(where, "Bulk scope needs a required ids array on the input class");
       if (action.scope === "Class" && (props.id || props.ids)) error(where, "Class scope input must not declare id or ids");
     }
-    if (!state.scripts.some((s) => s.name === action.actionName)) warn(where, `no script yet (scripts/${action.actionName}.ts)`);
+    const script = state.scripts.find((s) => s.name === action.actionName);
+    if (!script) warn(where, `no script yet (scripts/${action.actionName}.ts)`);
+    else {
+      // the grant (elevated / runAsProfile) applies only inside session.elevated(() => ...)
+      const granted = action.elevated === true || !!action.runAsProfile;
+      const usesElevated = USES_ELEVATED.test(script.text ?? "");
+      if (usesElevated && !granted) error(`scripts/${script.name}.ts`, "session.elevated needs a grant: set elevated true (as the account) or a runAsProfile in the action manifest");
+      else if (granted && !usesElevated) warn(where, "the script never calls session.elevated, so it runs with the caller's access: wrap the calls that need the grant, or drop it");
+    }
   }
 
   for (const script of state.scripts) {
@@ -338,6 +354,11 @@ function check(state) {
   for (const event of state.events) {
     const where = `events/${event.name}.ts`;
     if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.<scriptName>.ts or <fullObjectType>.updated.<scriptName>.ts"); continue; }
+    if (event.data?.$error) error(`events/${event.name}.json`, event.data.$error);
+    else if (event.data) {
+      for (const key of Object.keys(event.data)) if (key !== "runAsProfile") warn(`events/${event.name}.json`, `${key} is not used (only runAsProfile)`);
+      checkRunAsProfile(`events/${event.name}.json`, event.data.runAsProfile, false, profileNames, error, warn);
+    }
     if (!IDENTIFIER.test(event.scriptName)) error(where, `script name "${event.scriptName}" must be an identifier such as updateOrderTotal`);
     else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
     const target = byName.get(event.fullObjectType);
@@ -405,6 +426,14 @@ function checkWebhooks(state, byName, error, warn) {
       warn(where, `nothing processes its events yet: add events/${webhookEventClass(appName, hook.name)}.created.<scriptName>.ts`);
     }
   }
+}
+
+// runAsProfile: the app profile a script runs as (replace_action_script / replace_class_event_script "profile"), never with elevated
+function checkRunAsProfile(where, value, elevated, profileNames, error, warn) {
+  if (value === undefined || value === null) return;
+  if (typeof value !== "string" || !value.trim()) { error(where, "runAsProfile must be the name of one of the app's profiles"); return; }
+  if (elevated) error(where, "set elevated (run as the account) or runAsProfile (run as that profile), not both");
+  if (!profileNames.has(value) && value.toLowerCase() !== DEFAULT_PROFILE.toLowerCase()) warn(where, `runAsProfile ${value} has no local profile manifest; it must already exist on the server`);
 }
 
 function checkShared(state, byName, error, warn) {
@@ -552,6 +581,10 @@ function checkAccess(state, byName, propsOf, error, warn) {
     return false;
   };
 
+  // inline objects are embedded classes without a manifest of their own (<parent>.<property>), granted like any other
+  const inlineClasses = new Set([...byName.values()].flatMap((c) => inlineClassNames(c.schema, c.fullObjectType)));
+  const accessFiles = new Map(state.access.filter((a) => !a.data.$error).map((a) => [`${a.data.profileName}/${a.data.fullObjectType}`, a.data]));
+
   for (const { file, folder, data } of state.access) {
     const where = `access/${folder}/${basename(file)}`;
     if (data.$error) { error(where, data.$error); continue; }
@@ -571,7 +604,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     }
 
     const cls = byName.get(data.fullObjectType);
-    if (!cls && own) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
+    if (!cls && own && !inlineClasses.has(data.fullObjectType)) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
     const ownFields = cls?.schema?.properties ?? {};
     const all = cls ? propsOf(cls) : {};
 
@@ -598,6 +631,28 @@ function checkAccess(state, byName, propsOf, error, warn) {
     const grants = (...names) => names.some((n) => granted.includes(n));
     if (data.updateConstraints?.length && !grants("Update", "Delete", "BulkDelete", "BulkTag")) error(where, "updateConstraints narrow Update and Delete, but permissions grant neither");
     if (data.deleteConstraints?.length && !grants("Delete", "BulkDelete")) error(where, "deleteConstraints narrow Delete, but permissions don't grant it");
+
+    // a field holding an embedded class is read and written with the profile's access to that class too: without Read the
+    // field is left out of reads, and writes keep only the embedded fields the profile can SetOnCreate (no error either way)
+    if (cls && own && !removing) {
+      const chain = [data.profileName, ...(profiles.get(data.profileName)?.inheritsFrom ?? [])];
+      const fieldDefault = data.defaultFieldPermissions ?? [grants("Read") && "Read", grants("Update") && "Update", grants("Create") && "SetOnCreate"].filter(Boolean);
+      for (const [field, target] of embeddedFields(cls)) {
+        const perms = data.fieldPermissions?.[field] ?? fieldDefault;
+        const reads = perms.includes("Read");
+        const writes = perms.includes("Update") || perms.includes("SetOnCreate");
+        if (!reads && !writes) continue;
+        // first match over [profile, ...inheritsFrom], like the server
+        const holder = chain.find((p) => accessFiles.has(`${p}/${target}`));
+        if (!holder) { warn(where, `${field} holds embedded class ${target}, which has no access file for ${data.profileName}${chain.length > 1 ? " or the profiles it inherits from" : ""}: reads leave ${field} out and writes drop it. Add access/${data.profileName}/${target}.json`); continue; }
+        const embedded = accessFiles.get(`${holder}/${target}`);
+        const embeddedGrants = (Array.isArray(embedded.permissions) ? embedded.permissions : []).flatMap((p) => shorthands[p] ?? [p]);
+        const embeddedSets = embeddedGrants.includes("Create") || (embedded.defaultFieldPermissions ?? []).includes("SetOnCreate") || Object.values(embedded.fieldPermissions ?? {}).some((v) => Array.isArray(v) && v.includes("SetOnCreate"));
+        const at = `access/${holder}/${target}.json`;
+        if (reads && !embeddedGrants.includes("Read")) warn(where, `${field} holds embedded class ${target}, which ${at} doesn't let ${data.profileName} read: reads leave ${field} out`);
+        else if (writes && !embeddedSets) warn(where, `${field} is writable but ${at} gives no SetOnCreate on ${target}'s fields (grant Create, e.g. ReadWrite): writes drop what is sent in ${field}, on update too`);
+      }
+    }
 
     for (const list of ["constraints", "updateConstraints", "deleteConstraints"]) {
       if (data[list] !== undefined && !Array.isArray(data[list])) { error(where, `${list} must be a list`); continue; }
@@ -693,6 +748,29 @@ function schemaRefs(node, path = "schema", out = []) {
   if (node.items && typeof node.items === "object") schemaRefs(node.items, `${path}.items`, out);
   if (node.additionalProperties && typeof node.additionalProperties === "object") schemaRefs(node.additionalProperties, `${path}.additionalProperties`, out);
   return out;
+}
+
+// The class' own properties that hold an embedded class (a $ref, an array or dictionary of one, or an inline object, which
+// add_object_class stores as <parent>.<property>), as [property, embedded class full name].
+function embeddedFields(cls) {
+  const out = [];
+  for (const [key, child] of Object.entries(cls?.schema?.properties ?? {})) {
+    const shape = child?.type === "array" ? child.items
+      : child?.type === "object" && !child.properties && typeof child.additionalProperties === "object" ? child.additionalProperties
+      : child;
+    if (typeof shape?.$ref === "string" && shape.$ref.startsWith(REF_PREFIX)) out.push([key, shape.$ref.slice(REF_PREFIX.length)]);
+    else if (shape?.type === "object" && shape.properties) out.push([key, `${cls.fullObjectType}.${key}`]);
+  }
+  return out;
+}
+
+// The manifest a class comes from: its own, or for an inline object's embedded class (<parent>.<property>) its parent's,
+// which is the one whose changes can add fields to it.
+function classOf(state, fullObjectType) {
+  for (const { data } of state.classes) {
+    if (data?.fullObjectType && inlineClassNames(data.schema, data.fullObjectType).includes(fullObjectType)) return data.fullObjectType;
+  }
+  return fullObjectType;
 }
 
 // add_object_class stores each inline object property as an embedded class named <parent>.<property>.
@@ -893,7 +971,7 @@ function diff(state) {
   for (const event of state.events) {
     if (!event.fullObjectType) continue;
     const prev = ledger.eventScripts[event.name];
-    const h = hash(event.text);
+    const h = eventHash(event);
     items.push({ kind: "event-script", name: event.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
   // a class event script whose file was deleted is removed from the server too
@@ -912,7 +990,8 @@ function diff(state) {
     if (data.$error || !data.profileName || !data.fullObjectType) continue;
     const prev = ledger.access[accessName(data)];
     const item = manifestItem("access", accessName(data), data, prev);
-    const classMoved = changedClasses.has(data.fullObjectType) || prev?.classHash !== ledger.classes[data.fullObjectType]?.hash;
+    const cls = classOf(state, data.fullObjectType);
+    const classMoved = changedClasses.has(cls) || prev?.classHash !== ledger.classes[cls]?.hash;
     if (item.state === "applied" && classMoved) item.state = "recheck";
     items.push(item);
   }
@@ -1031,7 +1110,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.runAsProfile ? { profile: action.runAsProfile } : {}) } });
   }
   // after the body classes, before the event scripts: replace_webhook makes the event class a script runs on
   for (const item of pending("webhook")) {
@@ -1055,7 +1134,8 @@ function plan(state) {
       calls.push({ tool: "remove_class_event_script", record: ["event-script", item.name], args });
       continue;
     }
-    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
+    const runAsProfile = state.events.find((e) => e.name === item.name)?.data?.runAsProfile;
+    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>`, ...(runAsProfile ? { profile: runAsProfile } : {}) } });
   }
   // after the scripts: removing a plugin is refused while a script still imports it
   for (const item of pending("plugin").filter((i) => i.state === "removed")) {
@@ -1156,7 +1236,7 @@ function record(state, kind, names) {
     if (!item) fail(`no local ${kind} named ${name}`);
     if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
     else if (item.state === "removed") delete ledger[KINDS[kind]][name];
-    else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
+    else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[classOf(state, name.slice(name.indexOf("/") + 1))]?.hash, appliedAt: now };
     else if (kind === "network-policy") {
       // the id can change: a change to an active policy is saved as a new one
       if (!recordedId) fail(`record network-policy ${name} --id <id replace_network_policy returned>`);

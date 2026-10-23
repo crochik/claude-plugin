@@ -164,21 +164,25 @@ every property holding ids, with `dictionaryPart` for a dictionary, see
   "scope": "Instance",
   "actionInputObjectType": "app.expense_tracker.actions.ApproveExpenseInput",
   "actionOutputObjectType": "app.expense_tracker.actions.ApproveExpenseOutput",
-  "elevated": true
+  "runAsProfile": "ExpenseApprover"
 }
 ```
 
-Maps 1:1 to `register_action`, except `elevated`. `scope` is `Instance` |
+Maps 1:1 to `register_action`, except `elevated` and `runAsProfile`. `scope` is `Instance` |
 `Bulk` | `Class`. The script is `scripts/<actionName>.ts` by convention; no
-field needed. `elevated` (`true` | `false`) is sent with the script to
-`replace_action_script`: `false` runs it with the caller's access, `true`
-ignores the caller's profile (see the `bootstrapp-apiscript` skill). `check`
-warns when it is missing; changing it re-pushes the script, not the action.
+field needed. The script's grant is sent with it to
+`replace_action_script` (see the `bootstrapp-apiscript` skill): none
+(`"elevated": false`), the account's (`"elevated": true`, ignores
+the caller's profile) or an app profile's (`"runAsProfile"`, sent as
+`profile`). The script runs with the caller's access except inside
+`session.elevated(() => …)`, which uses the grant. Set `elevated` or `runAsProfile`, never `elevated: true` with a
+profile; `check` warns when neither is set and fails on both. Changing them
+re-pushes the script, not the action.
 
 ## `scripts/<actionName>.ts`
 
 The ApiScript body sent verbatim as `replace_action_script.actionScript`, with
-`elevated` from the action manifest. See
+`elevated` (and `runAsProfile` as `profile`) from the action manifest. See
 the `bootstrapp-apiscript` skill.
 
 ## `shared/<scriptName>.json` and `shared/<scriptName>.ts`
@@ -217,7 +221,9 @@ gives `replace_class_event_script`'s `fullObjectType`, `classEvent`
 file is its `script`, verbatim. Only top-level classes directly in `app.<app>`,
 and webhook event classes (`app.<app>.webhook.<Name>WebhookEvent`, from
 `webhooks/`), can have one.
-Deleting the file makes `plan` list `remove_class_event_script`. See
+An optional `events/<same name>.json` holds `{ "runAsProfile": "OrderProcessor" }`,
+sent as `profile`: the script runs with that app profile's access instead of all
+of the app's data. Deleting the `.ts` makes `plan` list `remove_class_event_script`. See
 "Class event scripts" in the server's `api-script.md`.
 
 ## `webhooks/<name>.json`
@@ -330,6 +336,11 @@ Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 `deleteConstraints`. `permissions: []` removes the profile's access. The
 folder name must equal `profileName`. Leaving a key out removes what it had
 on the server: the file is the whole access.
+
+An embedded class (one a field holds by `$ref`, or an inline object's
+`<parent>.<property>` class) gets its own file in the same folder, e.g.
+`access/Member/app.expense_tracker.Receipt.json` with `["ReadWrite"]`:
+the profile reads and writes the object only through that grant.
 
 A row constraint can also follow a relation: `{ "fieldName": "Category",
 "operator": "Exists" }` (a relation name from a string foreign key: the

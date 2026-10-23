@@ -31,8 +31,9 @@ as unverified.
 
 ## Rules
 
-- Only the published grammar subset (see `api-script.md`). No arrow functions,
-  async/await, try/catch, switch, for…of, template literals, `new`, `?.`,
+- Only the published grammar subset (see `api-script.md`). Arrow functions
+  and the array callback methods (`map`, `filter`, `find`, `reduce`, …) are
+  fine. No async/await, try/catch, switch, for…of, template literals, `new`, `?.`,
   `===`, `++`, `+=`.
 - Import each namespace you use; bare type names resolve only through
   imports.
@@ -42,6 +43,8 @@ as unverified.
 - Validate everything before the first write; abort with
   `throw { code: "UPPER_SNAKE", message: "..." }`.
 - Return exactly the output class's shape.
+- With an `elevated` or `runAsProfile` grant, wrap only the calls that need
+  it in `session.elevated(() => …)`; everything else runs as the caller.
 - Logic two scripts need goes in a shared script
   (`bootstrapp/shared/<name>.ts` plus its `<name>.json` manifest) that both
   call; never copy it, and never register an action just to share code.

@@ -31,7 +31,7 @@ Use the `bootstrapp` skill's "Applying (sync)" section. Arguments:
    with `replace_action_script` and class event scripts with
    `replace_class_event_script` (or `remove_class_event_script` for a
    deleted one), in plan order (reading each file verbatim,
-   with `elevated` as `plan` lists it), and record them. If the server rejects a script, show its
+   with `elevated` and `profile` as `plan` lists them), and record them. If the server rejects a script, show its
    errors, fix the script, and push again.
 6. Before replacing a class, say what changes for records already stored
    (see "Changing things already applied" in the skill). Report blocked items.

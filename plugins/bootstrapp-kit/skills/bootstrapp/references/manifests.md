@@ -38,7 +38,7 @@ File name is the full class name, e.g.
   "type": "TopLevel",
   "indexedFields": ["_id", "submittedById", "categoryId", "status", "submittedOn"],
   "foreignKeys": [
-    { "localFieldName": "categoryId", "referenceObjectType": "app.expense_tracker.Category", "referenceFieldName": "_id" }
+    { "localFieldName": "categoryId", "referenceObjectType": "app.expense_tracker.Category", "referenceFieldName": "_id", "relationName": "Category" }
   ],
   "schema": {
     "title": "Expense",
@@ -149,7 +149,8 @@ Maps to `add_object_class` as: `appName` (from `app.json`),
 (optional), `discriminatorField` / `discriminatorValue` (optional, on
 variants),
 `indexedFields` (required; `[]` for embedded), `foreignKeys` (optional;
-every property holding ids, with `dictionaryPart` for a dictionary, see
+every property holding ids, with `dictionaryPart` for a dictionary, and
+`relationName` on a string one to name its relation, see
 `bootstrapp-object-types`),
 `schema`, `isFullTextSearchable` (optional, default `true`).
 
@@ -343,10 +344,10 @@ An embedded class (one a field holds by `$ref`, or an inline object's
 the profile reads and writes the object only through that grant.
 
 A row constraint can also follow a relation: `{ "fieldName": "Category",
-"operator": "Exists" }` (a relation name from a string foreign key: the
-referenced class without its namespace, or the field without `Id` when
-that repeats or is taken, since relation names never match a field; no
-value) shows a record only when its related record
+"operator": "Exists" }` (a relation name from a string foreign key: its
+`relationName`, or the generated one, the referenced class without its
+namespace or the field without `Id` when that repeats or is taken, since
+relation names never match a field; no value) shows a record only when its related record
 is one the profile can see.
 
 `updateConstraints` and `deleteConstraints` have the same shape as

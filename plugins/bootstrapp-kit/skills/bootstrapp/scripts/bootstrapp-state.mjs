@@ -578,6 +578,10 @@ function checkAccess(state, byName, propsOf, error, warn) {
     return false;
   };
 
+  // inline objects are embedded classes without a manifest of their own (<parent>.<property>), granted like any other
+  const inlineClasses = new Set([...byName.values()].flatMap((c) => inlineClassNames(c.schema, c.fullObjectType)));
+  const accessFiles = new Map(state.access.filter((a) => !a.data.$error).map((a) => [`${a.data.profileName}/${a.data.fullObjectType}`, a.data]));
+
   for (const { file, folder, data } of state.access) {
     const where = `access/${folder}/${basename(file)}`;
     if (data.$error) { error(where, data.$error); continue; }
@@ -597,7 +601,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     }
 
     const cls = byName.get(data.fullObjectType);
-    if (!cls && own) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
+    if (!cls && own && !inlineClasses.has(data.fullObjectType)) warn(where, `class ${data.fullObjectType} has no local manifest; fields and constraints can't be checked`);
     const ownFields = cls?.schema?.properties ?? {};
     const all = cls ? propsOf(cls) : {};
 
@@ -624,6 +628,28 @@ function checkAccess(state, byName, propsOf, error, warn) {
     const grants = (...names) => names.some((n) => granted.includes(n));
     if (data.updateConstraints?.length && !grants("Update", "Delete", "BulkDelete", "BulkTag")) error(where, "updateConstraints narrow Update and Delete, but permissions grant neither");
     if (data.deleteConstraints?.length && !grants("Delete", "BulkDelete")) error(where, "deleteConstraints narrow Delete, but permissions don't grant it");
+
+    // a field holding an embedded class is read and written with the profile's access to that class too: without Read the
+    // field is left out of reads, and writes keep only the embedded fields the profile can SetOnCreate (no error either way)
+    if (cls && own && !removing) {
+      const chain = [data.profileName, ...(profiles.get(data.profileName)?.inheritsFrom ?? [])];
+      const fieldDefault = data.defaultFieldPermissions ?? [grants("Read") && "Read", grants("Update") && "Update", grants("Create") && "SetOnCreate"].filter(Boolean);
+      for (const [field, target] of embeddedFields(cls)) {
+        const perms = data.fieldPermissions?.[field] ?? fieldDefault;
+        const reads = perms.includes("Read");
+        const writes = perms.includes("Update") || perms.includes("SetOnCreate");
+        if (!reads && !writes) continue;
+        // first match over [profile, ...inheritsFrom], like the server
+        const holder = chain.find((p) => accessFiles.has(`${p}/${target}`));
+        if (!holder) { warn(where, `${field} holds embedded class ${target}, which has no access file for ${data.profileName}${chain.length > 1 ? " or the profiles it inherits from" : ""}: reads leave ${field} out and writes drop it. Add access/${data.profileName}/${target}.json`); continue; }
+        const embedded = accessFiles.get(`${holder}/${target}`);
+        const embeddedGrants = (Array.isArray(embedded.permissions) ? embedded.permissions : []).flatMap((p) => shorthands[p] ?? [p]);
+        const embeddedSets = embeddedGrants.includes("Create") || (embedded.defaultFieldPermissions ?? []).includes("SetOnCreate") || Object.values(embedded.fieldPermissions ?? {}).some((v) => Array.isArray(v) && v.includes("SetOnCreate"));
+        const at = `access/${holder}/${target}.json`;
+        if (reads && !embeddedGrants.includes("Read")) warn(where, `${field} holds embedded class ${target}, which ${at} doesn't let ${data.profileName} read: reads leave ${field} out`);
+        else if (writes && !embeddedSets) warn(where, `${field} is writable but ${at} gives no SetOnCreate on ${target}'s fields (grant Create, e.g. ReadWrite): writes drop what is sent in ${field}, on update too`);
+      }
+    }
 
     for (const list of ["constraints", "updateConstraints", "deleteConstraints"]) {
       if (data[list] !== undefined && !Array.isArray(data[list])) { error(where, `${list} must be a list`); continue; }
@@ -719,6 +745,29 @@ function schemaRefs(node, path = "schema", out = []) {
   if (node.items && typeof node.items === "object") schemaRefs(node.items, `${path}.items`, out);
   if (node.additionalProperties && typeof node.additionalProperties === "object") schemaRefs(node.additionalProperties, `${path}.additionalProperties`, out);
   return out;
+}
+
+// The class' own properties that hold an embedded class (a $ref, an array or dictionary of one, or an inline object, which
+// add_object_class stores as <parent>.<property>), as [property, embedded class full name].
+function embeddedFields(cls) {
+  const out = [];
+  for (const [key, child] of Object.entries(cls?.schema?.properties ?? {})) {
+    const shape = child?.type === "array" ? child.items
+      : child?.type === "object" && !child.properties && typeof child.additionalProperties === "object" ? child.additionalProperties
+      : child;
+    if (typeof shape?.$ref === "string" && shape.$ref.startsWith(REF_PREFIX)) out.push([key, shape.$ref.slice(REF_PREFIX.length)]);
+    else if (shape?.type === "object" && shape.properties) out.push([key, `${cls.fullObjectType}.${key}`]);
+  }
+  return out;
+}
+
+// The manifest a class comes from: its own, or for an inline object's embedded class (<parent>.<property>) its parent's,
+// which is the one whose changes can add fields to it.
+function classOf(state, fullObjectType) {
+  for (const { data } of state.classes) {
+    if (data?.fullObjectType && inlineClassNames(data.schema, data.fullObjectType).includes(fullObjectType)) return data.fullObjectType;
+  }
+  return fullObjectType;
 }
 
 // add_object_class stores each inline object property as an embedded class named <parent>.<property>.
@@ -938,7 +987,8 @@ function diff(state) {
     if (data.$error || !data.profileName || !data.fullObjectType) continue;
     const prev = ledger.access[accessName(data)];
     const item = manifestItem("access", accessName(data), data, prev);
-    const classMoved = changedClasses.has(data.fullObjectType) || prev?.classHash !== ledger.classes[data.fullObjectType]?.hash;
+    const cls = classOf(state, data.fullObjectType);
+    const classMoved = changedClasses.has(cls) || prev?.classHash !== ledger.classes[cls]?.hash;
     if (item.state === "applied" && classMoved) item.state = "recheck";
     items.push(item);
   }
@@ -1181,7 +1231,7 @@ function record(state, kind, names) {
     if (!item) fail(`no local ${kind} named ${name}`);
     if (kind === "auth") ledger.auth = { hash: item.hash, appliedAt: now };
     else if (item.state === "removed") delete ledger[KINDS[kind]][name];
-    else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[name.slice(name.indexOf("/") + 1)]?.hash, appliedAt: now };
+    else if (kind === "access") ledger.access[name] = { hash: item.hash, classHash: ledger.classes[classOf(state, name.slice(name.indexOf("/") + 1))]?.hash, appliedAt: now };
     else if (kind === "network-policy") {
       // the id can change: a change to an active policy is saved as a new one
       if (!recordedId) fail(`record network-policy ${name} --id <id replace_network_policy returned>`);

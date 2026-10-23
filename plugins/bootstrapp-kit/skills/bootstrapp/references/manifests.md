@@ -432,11 +432,17 @@ An optional plugin the app adds, so its scripts can import its module
 `add_plugin`'s arguments without `appName`:
 
 ```json
-{ "name": "sample" }
+{ "name": "github", "settings": { "integration": "github-acme" } }
 ```
 
 `name` is the plugin's name from `get_plugins` (`sample`, not
-`plugin.sample`). `check` reports a script (action, shared or class
+`plugin.sample`). `settings` (optional) are the plugin's per-app
+settings that `get_plugin` lists, an object of strings, never secrets:
+credentials live in the account's integrations. Changing them changes
+the manifest's hash, so `plan` calls `add_plugin` again, which replaces
+them. `add_plugin` returns the plugin's `setup` and `pending` (what is
+still missing for this app): follow them; nothing of it goes in this
+file. `check` reports a script (action, shared or class
 event) that imports a plugin with no file here, since saving it would
 fail. `plan` adds plugins before the scripts and removes a deleted
 file's plugin after them (`remove_plugin`, refused while a script still

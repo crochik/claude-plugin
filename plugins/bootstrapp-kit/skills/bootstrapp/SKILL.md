@@ -114,7 +114,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `register_action` | Register one action. Refuses a name the class already has. |
 | `replace_action` | Change a registered action's input/output classes, scope, summary, description. |
 | `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
-| `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated`. Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
+| `replace_action_script` | Validate a script on the server, then store it and wire it to run, with the caller's access or `elevated` (optionally as an app `profile`). Rejects an invalid script with line/column errors. Safe to repeat. (`update_action_script` is the older name for the same call.) |
 | `get_action_script` | Read the script stored on an action (to pull one written elsewhere into `scripts/<actionName>.ts`). |
 | `get_scripts`, `get_script`, `replace_script`, `update_script`, `delete_script` | The app's shared scripts (`app.<app>.scripts`): list them, read one, validate and save one (safe to repeat), change part of one, delete one (its callers then fail). |
 | `get_class_event_scripts`, `get_class_event_script`, `replace_class_event_script`, `remove_class_event_script` | Scripts a class runs after one of its objects is created or updated (`classEvent` `Created` or `Updated`, several per event, each by `scriptName`): list them, read one, validate and save one (safe to repeat), remove one (the others stay). Nothing to register first. |
@@ -198,7 +198,7 @@ and you can grep them when needed.
 When the state helper reports something changed after it was applied, `plan`
 lists the replace call for it:
 
-- **Script changed**, or its action's `elevated` → `replace_action_script` again.
+- **Script changed**, or its action's `elevated` or `runAsProfile` → `replace_action_script` again.
 - **Class event script changed** → `replace_class_event_script` again;
   **deleted** → `remove_class_event_script`.
 - **Network policy changed** → `replace_network_policy` (with the

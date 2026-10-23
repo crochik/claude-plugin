@@ -32,6 +32,9 @@ controls a profile can't use. Action scripts follow the same rules, except a
 script saved `elevated`, which ignores the caller's profile and does its own
 checks; when a profile is denied something only so an action can do it in a
 controlled way, that action is elevated (the `bootstrapp-apiscript` skill).
+An elevated script can run as a profile (`runAsProfile`) instead of with all
+of the app's data: a profile no user gets, holding exactly the access the
+step needs, is the narrowest way to do that.
 
 ## Interview before writing anything
 

@@ -120,10 +120,13 @@ function strip(value) {
 
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
 
-// "elevated" in an action manifest goes to replace_action_script, not register_action,
-// so it is part of the script's hash and not the action's.
-const actionArgs = (data) => { const { elevated, ...rest } = strip(data); return rest; };
-const scriptHash = (text, action) => hash(action?.elevated === true ? `${text}\n// elevated` : text);
+// "elevated" and "runAsProfile" in an action manifest go to replace_action_script (elevated, profile), not
+// register_action, so they are part of the script's hash and not the action's.
+const actionArgs = (data) => { const { elevated, runAsProfile, ...rest } = strip(data); return rest; };
+const scriptHash = (text, action) => hash(action?.elevated !== true ? text
+  : action.runAsProfile ? `${text}\n// elevated as ${action.runAsProfile}` : `${text}\n// elevated`);
+// events/<name>.json (optional) holds what replace_class_event_script takes besides the script: runAsProfile
+const eventHash = (event) => hash(event.data?.runAsProfile ? `${event.text}\n// as ${event.data.runAsProfile}` : event.text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
 // replace_script takes the manifest's fields and the script together, so both are one item
 const sharedHash = (shared) => hash(`${JSON.stringify(strip(shared.data ?? {}))}\n${shared.text ?? ""}`);
@@ -145,7 +148,9 @@ function load() {
   const events = listFiles("events", ".ts").map((file) => {
     const name = basename(file, ".ts");
     const match = EVENT_FILE.exec(name);
-    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, scriptName: match?.groups.script ?? null, text: readFileSync(file, "utf8") };
+    const json = join(dir, "events", `${name}.json`);
+    return { file, name, fullObjectType: match?.groups.cls ?? null, classEvent: match ? CLASS_EVENTS[match.groups.event] : null, scriptName: match?.groups.script ?? null, text: readFileSync(file, "utf8"),
+      data: existsSync(json) ? readJson(json) : null };
   });
   const profiles = listFiles("profiles", ".json").map((file) => ({ file, data: readJson(file) }));
   // shared/<scriptName>.json (the replace_script arguments) next to shared/<scriptName>.ts (its script)
@@ -292,6 +297,7 @@ function check(state) {
     }
   }
 
+  const profileNames = new Set(state.profiles.map((p) => p.data?.profileName).filter(Boolean));
   const actionNames = new Set();
   for (const { file, data: action } of state.actions) {
     const where = `actions/${basename(file)}`;
@@ -306,6 +312,7 @@ function check(state) {
     if (!SCOPES.includes(action.scope)) error(where, `scope must be one of ${SCOPES.join(", ")}`);
     if (action.elevated === undefined) warn(where, "elevated is not set; the script runs with the caller's access. Decide and set true or false (bootstrapp-apiscript skill, Elevated scripts)");
     else if (typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
+    checkRunAsProfile(where, action.runAsProfile, action.elevated === true, profileNames, error, warn);
 
     const target = byName.get(action.fullObjectType);
     if (!target) warn(where, `target ${action.fullObjectType} has no local manifest`);
@@ -338,6 +345,11 @@ function check(state) {
   for (const event of state.events) {
     const where = `events/${event.name}.ts`;
     if (!event.fullObjectType) { error(where, "name it <fullObjectType>.created.<scriptName>.ts or <fullObjectType>.updated.<scriptName>.ts"); continue; }
+    if (event.data?.$error) error(`events/${event.name}.json`, event.data.$error);
+    else if (event.data) {
+      for (const key of Object.keys(event.data)) if (key !== "runAsProfile") warn(`events/${event.name}.json`, `${key} is not used (only runAsProfile)`);
+      checkRunAsProfile(`events/${event.name}.json`, event.data.runAsProfile, true, profileNames, error, warn);
+    }
     if (!IDENTIFIER.test(event.scriptName)) error(where, `script name "${event.scriptName}" must be an identifier such as updateOrderTotal`);
     else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
     const target = byName.get(event.fullObjectType);
@@ -405,6 +417,14 @@ function checkWebhooks(state, byName, error, warn) {
       warn(where, `nothing processes its events yet: add events/${webhookEventClass(appName, hook.name)}.created.<scriptName>.ts`);
     }
   }
+}
+
+// runAsProfile: the app profile an elevated script runs as (replace_action_script / replace_class_event_script "profile")
+function checkRunAsProfile(where, value, elevated, profileNames, error, warn) {
+  if (value === undefined || value === null) return;
+  if (typeof value !== "string" || !value.trim()) { error(where, "runAsProfile must be the name of one of the app's profiles"); return; }
+  if (!elevated) error(where, "runAsProfile only applies to an elevated script: set elevated to true or remove it");
+  if (!profileNames.has(value) && value.toLowerCase() !== DEFAULT_PROFILE.toLowerCase()) warn(where, `runAsProfile ${value} has no local profile manifest; it must already exist on the server`);
 }
 
 function checkShared(state, byName, error, warn) {
@@ -890,7 +910,7 @@ function diff(state) {
   for (const event of state.events) {
     if (!event.fullObjectType) continue;
     const prev = ledger.eventScripts[event.name];
-    const h = hash(event.text);
+    const h = eventHash(event);
     items.push({ kind: "event-script", name: event.name, hash: h, state: !prev ? "new" : prev.hash === h ? "applied" : "changed" });
   }
   // a class event script whose file was deleted is removed from the server too
@@ -1026,7 +1046,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.elevated === true && action.runAsProfile ? { profile: action.runAsProfile } : {}) } });
   }
   // after the body classes, before the event scripts: replace_webhook makes the event class a script runs on
   for (const item of pending("webhook")) {
@@ -1050,7 +1070,8 @@ function plan(state) {
       calls.push({ tool: "remove_class_event_script", record: ["event-script", item.name], args });
       continue;
     }
-    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>` } });
+    const runAsProfile = state.events.find((e) => e.name === item.name)?.data?.runAsProfile;
+    calls.push({ tool: "replace_class_event_script", record: ["event-script", item.name], args: { ...args, script: `<contents of ${join(dir, "events", `${item.name}.ts`)}>`, ...(runAsProfile ? { profile: runAsProfile } : {}) } });
   }
   // after the scripts: removing a plugin is refused while a script still imports it
   for (const item of pending("plugin").filter((i) => i.state === "removed")) {

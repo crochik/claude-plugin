@@ -99,8 +99,8 @@ domain class when it returns records.
   example one checked step the caller's profile can't do freely.
 - **Work that must follow every create or update** of a class, whichever
   client made it, is a class event script, one per behavior. It runs after
-  the write with access to all of the app's data, so it can't reject the
-  write; validation a client must not skip stays in an action.
+  the write with access to all of the app's data (or a profile's, with
+  `runAsProfile`), so it can't reject the write; validation a client must not skip stays in an action.
 - **Writes that must happen together** go in one `system.mongodb`
   transaction; to include a shared script's writes, pass it the transaction
   (rule book, "Shared scripts").
@@ -131,6 +131,17 @@ scripts".
 claims from `auth.json`; it is the caller's in elevated scripts and `null`
 in class event scripts. Use only claims the token is known to carry. Rule
 book: "Reading the caller's claims".
+
+Prefer elevating to a profile over unrestricted elevation: add
+`"runAsProfile": "<Profile>"` to the action manifest (or
+`events/<name>.json` for a class event script) and the script runs with
+that profile's access, still as the caller (constraints on the user and
+organization resolve to the caller's, `system.session` is the caller).
+Make the profile for the step with just the access it needs
+(`profiles/<Profile>.json` plus `access/<Profile>/`, the
+`bootstrapp-access` skill) and give it to no user, so a bug in the script
+can't reach beyond it. It can call only the actions and shared scripts
+that profile may run. Rule book: "Elevated to a profile".
 
 ## Files
 

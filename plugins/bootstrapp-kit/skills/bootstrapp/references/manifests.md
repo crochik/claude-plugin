@@ -170,11 +170,12 @@ every property holding ids, with `dictionaryPart` for a dictionary, see
 
 Maps 1:1 to `register_action`, except `elevated` and `runAsProfile`. `scope` is `Instance` |
 `Bulk` | `Class`. The script is `scripts/<actionName>.ts` by convention; no
-field needed. Whose access the script runs with is sent with it to
-`replace_action_script` (see the `bootstrapp-apiscript` skill): the
-caller's (`"elevated": false`), the account's (`"elevated": true`, ignores
+field needed. The script's grant is sent with it to
+`replace_action_script` (see the `bootstrapp-apiscript` skill): none
+(`"elevated": false`), the account's (`"elevated": true`, ignores
 the caller's profile) or an app profile's (`"runAsProfile"`, sent as
-`profile`). Set `elevated` or `runAsProfile`, never `elevated: true` with a
+`profile`). The script runs with the caller's access except inside
+`session.elevated(() => …)`, which uses the grant. Set `elevated` or `runAsProfile`, never `elevated: true` with a
 profile; `check` warns when neither is set and fails on both. Changing them
 re-pushes the script, not the action.
 

@@ -29,8 +29,8 @@ matters, since **the server's copy wins**.
 The backend enforces all of it on every CRUD, filter and action call, so the
 client never needs actions "for security". The client should still hide
 controls a profile can't use. Action scripts follow the same rules, except a
-script saved `elevated`, which ignores the caller's profile and does its own
-checks; when a profile is denied something only so an action can do it in a
+script saved `elevated`, whose calls inside `session.elevated` ignore the
+caller's profile, so it does its own checks; when a profile is denied something only so an action can do it in a
 controlled way, that action is elevated (the `bootstrapp-apiscript` skill).
 Instead of elevating (running as the account), a script can run as a profile
 (`runAsProfile`): a profile no user gets, holding exactly the access the step

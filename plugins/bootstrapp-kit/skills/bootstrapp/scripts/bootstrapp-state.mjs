@@ -120,6 +120,7 @@ function strip(value) {
 
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
 
+const USES_ELEVATED = /\.elevated\s*\(/;
 // "elevated" (as the account) and "runAsProfile" (as that profile; never both) in an action manifest go to
 // replace_action_script (elevated, profile), not register_action, so they are part of the script's hash and not the action's.
 const actionArgs = (data) => { const { elevated, runAsProfile, ...rest } = strip(data); return rest; };
@@ -334,7 +335,15 @@ function check(state) {
       if (action.scope === "Bulk" && !(props.ids?.type === "array" && required.includes("ids"))) error(where, "Bulk scope needs a required ids array on the input class");
       if (action.scope === "Class" && (props.id || props.ids)) error(where, "Class scope input must not declare id or ids");
     }
-    if (!state.scripts.some((s) => s.name === action.actionName)) warn(where, `no script yet (scripts/${action.actionName}.ts)`);
+    const script = state.scripts.find((s) => s.name === action.actionName);
+    if (!script) warn(where, `no script yet (scripts/${action.actionName}.ts)`);
+    else {
+      // the grant (elevated / runAsProfile) applies only inside session.elevated(() => ...)
+      const granted = action.elevated === true || !!action.runAsProfile;
+      const usesElevated = USES_ELEVATED.test(script.text ?? "");
+      if (usesElevated && !granted) error(`scripts/${script.name}.ts`, "session.elevated needs a grant: set elevated true (as the account) or a runAsProfile in the action manifest");
+      else if (granted && !usesElevated) warn(where, "the script never calls session.elevated, so it runs with the caller's access: wrap the calls that need the grant, or drop it");
+    }
   }
 
   for (const script of state.scripts) {

@@ -61,7 +61,7 @@ const KINDS = { app: null, profile: "profiles", class: "classes", access: "acces
 // (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
 // saved as a new policy with a new id
 const POLICY_ID = "<id replace_network_policy returned>";
-// plugins/<name>.json: an optional plugin the app adds (add_plugin), so its scripts can import plugin.<name>
+// plugins/<name>.json: an optional plugin the app adds (add_plugin, with its optional settings), so its scripts can import plugin.<name>
 const PLUGIN_PREFIX = "plugin.";
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
@@ -493,6 +493,9 @@ function checkPlugins(state, error, warn) {
     if (data.$error) { error(where, data.$error); continue; }
     if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not plugin.sample)"); continue; }
     if (basename(file) !== `${data.name}.json`) warn(where, `file name should be ${data.name}.json`);
+    if (data.settings !== undefined && (data.settings === null || typeof data.settings !== "object" || Array.isArray(data.settings) || Object.values(data.settings).some((v) => typeof v !== "string"))) {
+      error(where, "settings must be an object of setting names and strings (get_plugin lists the plugin's settings); never secrets");
+    }
     declared.add(data.name);
   }
   // saving a script that imports a plugin the app hasn't added fails
@@ -1002,8 +1005,10 @@ function plan(state) {
     calls.push({ tool: "replace_action_access", record: ["action-access", item.name], args: strip(data) });
   }
   // plugins before the scripts that import them: saving a script that imports a plugin the app hasn't added fails
+  // add_plugin returns the plugin's setup and what is still pending for the app: follow it
   for (const item of pending("plugin").filter((i) => i.state !== "removed")) {
-    calls.push({ tool: "add_plugin", record: ["plugin", item.name], args: { appName, name: item.name } });
+    const { data } = state.plugins.find((p) => p.data.name === item.name);
+    calls.push({ tool: "add_plugin", record: ["plugin", item.name], args: { appName, name: item.name, ...(data.settings ? { settings: data.settings } : {}) } });
   }
   // shared scripts before the scripts that call them: a script is checked against what the server has when it is saved
   for (const item of sharedOrder(pending("shared-script"), state)) {

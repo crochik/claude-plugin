@@ -182,12 +182,27 @@ Besides the `system.*` modules, the platform provides optional plugins:
 modules under `plugin.<name>` an app adds when it needs them (rule
 book, "Optional plugins"). Look for one with `get_plugins` (pass a
 `query`) before writing an integration by hand, and read its functions
-with `get_plugin` (`declarations`). To use one, write
-`plugins/<name>.json` (`{ "name": "<name>" }`), apply it (`add_plugin`),
-regenerate `generated/platform.d.ts`, then import it:
-`import * as sample from "plugin.sample";`. A script can import only
-plugins its app added; the server refuses to save it otherwise. Only
-`sample` (an example with no side effects) exists so far.
+with `get_plugin` (`declarations`, `settings`, `hosts`, `setup`). To use
+one, write `plugins/<name>.json` (`{ "name": "<name>", "settings": { ... } }`,
+settings only when the plugin has them, never secrets), apply it
+(`add_plugin`), regenerate `generated/platform.d.ts`, then import it:
+`import * as github from "plugin.github";`. A script can import only
+plugins its app added; the server refuses to save it otherwise.
+
+`add_plugin` (and `get_plugin` once added) returns the plugin's `setup`
+instructions and `pending`, what is still missing before it works for
+the app: an integration to create or connect, a setting, a network
+policy rule. Work through `pending` with the developer until it is
+empty; connecting credentials happens in the browser or through
+`set_account_integration`, never by pasting secrets into manifests.
+A plugin that calls an API makes script HTTP calls: the network policy
+of the scripts that use it (`network/<name>.json`) must allow its
+`hosts`, and someone activates the policy outside MCP.
+
+Plugins today: `sample` (an example with no side effects) and `github`
+(GitHub REST API with a token from the account's GitHub integration;
+rule book, "plugin.github"). In GitHub's JSON, `number` is a keyword in
+scripts: read it as `issue["number"]`.
 
 ## Workflow
 

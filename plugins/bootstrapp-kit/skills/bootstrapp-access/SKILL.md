@@ -17,11 +17,8 @@ matters, since **the server's copy wins**.
 - `init_app` creates the **`Admin`** profile. It always has full access to
   everything (every permission on the classes it adds) and can't be restricted; the app owner has it. Every other
   profile starts with **no access** until it is granted.
-- No profile gets more than `Admin` has on a class. New classes give
-  `Admin` every permission; on a class not replaced since that changed,
-  `Admin` lacks `Import`, `Export`, `BulkDelete`, `BulkTag`, `Customize`,
-  `DeepClone` and field `Reset`, `CreateOnDemand`, so the server refuses
-  them until `replace_object_class` re-applies the class.
+- No profile gets more than `Admin` has on a class; the server refuses
+  it. `Admin` has every class and field permission, so this only guards.
 - Per profile and class: class permissions (`Read`, `Create`, `Update`,
   `Delete`), field permissions (a field can be hidden or read-only),
   relation permissions, **constraints**: row filters such as

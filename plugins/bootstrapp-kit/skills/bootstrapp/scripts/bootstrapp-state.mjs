@@ -39,7 +39,7 @@ const SCOPES = ["Instance", "Bulk", "Class"];
 const DEFAULT_PROFILE = "Admin"; // created by init_app, always full access, can't be restricted
 const CLASS_PERMISSIONS = ["Read", "Create", "Update", "Delete", "Import", "Export", "BulkDelete", "BulkTag", "Customize", "DeepClone", "ReadOnly", "ReadWrite", "Full"];
 const FIELD_PERMISSIONS = ["Read", "Update", "SetOnCreate", "Reset", "CreateOnDemand"];
-// what the app's default profile has on its classes: the most any profile can be granted
+// what the app's default profile has on classes added before it got every permission: the most a profile can get there
 const DEFAULT_CLASS_PERMISSIONS = ["Read", "Create", "Update", "Delete"];
 const DEFAULT_FIELD_PERMISSIONS = ["Read", "Update", "SetOnCreate"];
 const RELATION_PERMISSIONS = ["Read"];
@@ -628,14 +628,15 @@ function checkAccess(state, byName, propsOf, error, warn) {
     const shorthands = { ReadOnly: ["Read"], ReadWrite: ["Read", "Create", "Update"], Full: ["Read", "Create", "Update", "Delete"] };
     const granted = (Array.isArray(data.permissions) ? data.permissions : []).flatMap((p) => shorthands[p] ?? [p]);
 
-    // no grant may exceed what the class app's default profile has (the server refuses it)
+    // no grant may exceed what the class app's default profile has: every permission on classes added or replaced since
+    // 2026-10-24, less on older ones (the server refuses it there until replace_object_class re-applies the class)
     if (own || data.fullObjectType.startsWith("app.")) {
       const beyond = granted.filter((p) => CLASS_PERMISSIONS.includes(p) && !DEFAULT_CLASS_PERMISSIONS.includes(p));
-      if (beyond.length) error(where, `permissions ${beyond.join(", ")} go beyond the default profile's (${DEFAULT_CLASS_PERMISSIONS.join(", ")}); the server refuses them`);
+      if (beyond.length) warn(where, `permissions ${beyond.join(", ")}: refused on a class whose default profile only has ${DEFAULT_CLASS_PERMISSIONS.join(", ")} (added before it got every permission); replace_object_class first`);
       const fieldGrants = [...Object.entries(data.fieldPermissions ?? {}), ...(data.defaultFieldPermissions ? [["defaultFieldPermissions", data.defaultFieldPermissions]] : [])];
       for (const [field, values] of fieldGrants) {
         const over = Array.isArray(values) ? values.filter((p) => FIELD_PERMISSIONS.includes(p) && !DEFAULT_FIELD_PERMISSIONS.includes(p)) : [];
-        if (over.length) error(where, `${field === "defaultFieldPermissions" ? field : `fieldPermissions.${field}`}: ${over.join(", ")} go beyond the default profile's (${DEFAULT_FIELD_PERMISSIONS.join(", ")}); the server refuses them`);
+        if (over.length) warn(where, `${field === "defaultFieldPermissions" ? field : `fieldPermissions.${field}`}: ${over.join(", ")} refused on a class whose default profile only has ${DEFAULT_FIELD_PERMISSIONS.join(", ")} on fields (added before it got every permission); replace_object_class first`);
       }
     }
     const grants = (...names) => names.some((n) => granted.includes(n));

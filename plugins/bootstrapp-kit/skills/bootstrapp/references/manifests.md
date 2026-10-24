@@ -338,10 +338,12 @@ Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 folder name must equal `profileName`. Leaving a key out removes what it had
 on the server: the file is the whole access.
 
-No grant may exceed the class app's default profile (`Admin`): class
-`Read`, `Create`, `Update`, `Delete`; field `Read`, `SetOnCreate`,
-`Update`; relation `Read`. The server refuses anything beyond that, and the
-check script flags it.
+No grant may exceed what the class app's default profile (`Admin`) has.
+New classes give it every permission. A class not replaced since then only
+gives it `Read`, `Create`, `Update`, `Delete` and field `Read`,
+`SetOnCreate`, `Update`, so the server refuses the extras there until
+`replace_object_class` re-applies the class; the check script warns about
+them.
 
 An embedded class (one a field holds by `$ref`, or an inline object's
 `<parent>.<property>` class) gets its own file in the same folder, e.g.

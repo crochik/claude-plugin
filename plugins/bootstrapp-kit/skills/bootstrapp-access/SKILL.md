@@ -244,6 +244,7 @@ share.
 | `assign_user_profile` | Change someone's profile |
 | `remove_user_access` | Take the app away (the user stays in the account) |
 | `get_organizations`, `add_organization`, `set_user_organization` | Group users, which `{{context "OrganizationId"}}` constraints use |
+| `set_organization_primary_user` | Pick one of an organization's users as its primary user (`get_organizations` shows it). Only when it has none yet, by the current primary user, or by an admin |
 
 One email can belong to several users: the developer's own admin user and
 a tenant user, or the same person in two organizations. `invite_user`
@@ -269,7 +270,9 @@ developer access (see the `bootstrapp` skill).
 When the app itself must do this (a sign-up action that creates the
 customer's organization and invites its first user), an action script can:
 `system.user` has `getOrganizations`, `createOrganization`,
-`updateOrganization` and `invite(email, profile, name?, organization?)`.
+`updateOrganization`, `setOrganizationPrimaryUser(organization, user?)`
+and `invite(email, profile, name?, organization?)`. The primary user rule
+is checked on the caller, even in an elevated script.
 They need the caller's permission on users and organizations, so they are
 usually elevated scripts that check the caller first (see the
 bootstrapp-apiscript skill).

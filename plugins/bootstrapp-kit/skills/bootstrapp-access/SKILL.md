@@ -11,14 +11,18 @@ publishes the authoritative reference as the `access-control.md` resource
 (`bootstrapp://reference/access-control.md`); read it when a detail below
 matters, since **the server's copy wins**.
 
-## The model in five lines
+## The model in six lines
 
 - An app has **profiles** (roles). Each user holds **one profile per app**.
 - `init_app` creates the **`Admin`** profile. It always has full access to
   everything and can't be restricted; the app owner has it. Every other
   profile starts with **no access** until it is granted.
+- No profile gets more than `Admin` has on a class: `Read`, `Create`,
+  `Update`, `Delete` on the class, `Read`, `SetOnCreate`, `Update` on its
+  fields. The server refuses the rest (`Import`, `Export`, `BulkDelete`,
+  `BulkTag`, `Customize`, `DeepClone`; field `Reset`, `CreateOnDemand`).
 - Per profile and class: class permissions (`Read`, `Create`, `Update`,
-  `Delete`, ...), field permissions (a field can be hidden or read-only),
+  `Delete`), field permissions (a field can be hidden or read-only),
   relation permissions, **constraints**: row filters such as
   `ownerId Eq {{context "UserId"}}`, and **update/delete constraints**,
   which narrow which of the visible records it may change or delete.

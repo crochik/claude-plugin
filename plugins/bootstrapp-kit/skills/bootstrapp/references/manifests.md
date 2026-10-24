@@ -338,6 +338,11 @@ Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 folder name must equal `profileName`. Leaving a key out removes what it had
 on the server: the file is the whole access.
 
+No grant may exceed the class app's default profile (`Admin`): class
+`Read`, `Create`, `Update`, `Delete`; field `Read`, `SetOnCreate`,
+`Update`; relation `Read`. The server refuses anything beyond that, and the
+check script flags it.
+
 An embedded class (one a field holds by `$ref`, or an inline object's
 `<parent>.<property>` class) gets its own file in the same folder, e.g.
 `access/Member/app.expense_tracker.Receipt.json` with `["ReadWrite"]`:

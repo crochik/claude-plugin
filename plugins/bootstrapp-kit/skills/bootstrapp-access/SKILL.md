@@ -17,8 +17,10 @@ matters, since **the server's copy wins**.
 - `init_app` creates the **`Admin`** profile. It always has full access to
   everything (every permission on the classes it adds) and can't be restricted; the app owner has it. Every other
   profile starts with **no access** until it is granted.
-- No profile gets more than `Admin` has on a class; the server refuses
-  it. `Admin` has every class and field permission, so this only guards.
+- No profile gets more than you (the developer) have on a class; the
+  server refuses it. Your apps' classes give you every permission; on any
+  other class, `system.*` included (granted with `profileApp`), it's your
+  own access there.
 - Per profile and class: class permissions (`Read`, `Create`, `Update`,
   `Delete`), field permissions (a field can be hidden or read-only),
   relation permissions, **constraints**: row filters such as

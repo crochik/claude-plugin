@@ -572,7 +572,6 @@ function checkAccess(state, byName, propsOf, error, warn) {
       if (data.profileApp !== undefined && data.profileApp !== appName) error(where, `profileApp must be ${appName} (this app) or left out for its own classes`);
       return true;
     }
-    if (data.fullObjectType.startsWith("system.")) error(where, "system.* classes are the platform's; their access isn't set per profile");
     if (data.profileApp !== appName) error(where, `${data.fullObjectType} isn't a class of ${appName}: set "profileApp": "${appName}" so the grant goes to this app's profile`);
     return false;
   };

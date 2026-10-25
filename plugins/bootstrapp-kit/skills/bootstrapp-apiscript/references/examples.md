@@ -121,7 +121,7 @@ return execute(input);
 ```ts
 import * as app from "app.shop";
 import * as actions from "app.shop.actions";
-import * as mongodb from "system.mongodb";
+import * as mongodb from "@system.mongodb";
 
 function execute(input: PlaceOrderInput): PlaceOrderOutput {
   const products = app.filterProduct([{ field: "_id", operator: "Eq", value: input.productId }], ["_id", "stock", "priceCents"]);

@@ -14,7 +14,7 @@ Only the rows where BootstrApp differs from a straight type mapping:
 | `bigint` | `number` or string: `integer` is 32-bit |
 | `timestamp` / `date` | `string` with `format: date-time` / `date` |
 | `json` / `jsonb` | an embedded class when the shape is known; avoid untyped blobs |
-| blob / file | uploaded through `system.files`; the class keeps the file id as a string |
+| blob / file | uploaded through `@system.files`; the class keeps the file id as a string |
 | `created_at`/`updated_at` set by DB | a class event script, the action script, or the client |
 
 ## Logic translation
@@ -27,7 +27,7 @@ Only the rows where BootstrApp differs from a straight type mapping:
 | batch operations | `Bulk` action |
 | `UPDATE … SET … WHERE …` (same change to many rows) | `updateMany<Class>(filter, operations)` in the action's script |
 | reports / aggregates | `Class` action returning a summary class |
-| DB transaction across tables | one action that validates everything, then writes in a `system.mongodb` transaction |
+| DB transaction across tables | one action that validates everything, then writes in a `@system.mongodb` transaction |
 | triggers | a class event script (runs after every create or update of the class), or fold into the action that causes the write |
 | cron jobs / queues / webhooks / emails | check `platform.d.ts` and the platform for support; otherwise keep on the old backend and list as a gap |
 | per-row permission checks | profile access; a rule that depends on data (owner-only, same organization) is a profile constraint (`ownerId Eq {{context "UserId"}}`), see `bootstrapp-access` |

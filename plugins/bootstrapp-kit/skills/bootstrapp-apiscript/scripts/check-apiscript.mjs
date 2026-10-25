@@ -153,7 +153,8 @@ for (const file of files) {
     const line = lineOf(im.index);
     if (!ok) { report("error", line, 'imports must look like: import * as alias from "namespace";'); continue; }
     const name = /from\s+["']([^"']+)["']/.exec(source.split("\n")[line - 1])?.[1] ?? ok[2];
-    aliases.set(ok[1], { module: name, line });
+    // @objects.<namespace> is another name for the class module <namespace>, which is how platform.d.ts declares it
+    aliases.set(ok[1], { module: name.startsWith("@objects.") ? name.slice("@objects.".length) : name, line });
   }
 
   // platform surface
@@ -163,7 +164,7 @@ for (const file of files) {
 
   if (dts) {
     for (const [alias, { module, line }] of aliases) {
-      if (!dts.modules.has(module) && module.startsWith("plugin.")) report("error", line, `module "${module}" is an optional plugin the app hasn't added (or platform.d.ts predates it): add plugins/${module.slice(7)}.json, apply it (add_plugin) and regenerate platform.d.ts`);
+      if (!dts.modules.has(module) && module.startsWith("@plugin.")) report("error", line, `module "${module}" is an optional plugin the app hasn't added (or platform.d.ts predates it): add plugins/${module.slice(8)}.json, apply it (add_plugin) and regenerate platform.d.ts`);
       else if (!dts.modules.has(module)) report("error", line, `module "${module}" is not declared in platform.d.ts (declared: ${[...dts.modules.keys()].join(", ") || "none"})`);
       if (alias === "input") report("error", line, "do not shadow the input global");
     }

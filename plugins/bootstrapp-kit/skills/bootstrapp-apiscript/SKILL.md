@@ -1,6 +1,6 @@
 ---
 name: bootstrapp-apiscript
-description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions, shared scripts and class event scripts (run when an object is created or updated) - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, updateManyX, shared scripts, other actions), reusable code in shared scripts, atomic multi-write scripts with system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
+description: Write and check ApiScripts, the small TypeScript dialect that implements BootstrApp actions, shared scripts and class event scripts (run when an object is created or updated) - the grammar, the execution model (input global, return value), the per-app function surface from platform.d.ts (filterX, createX, updateXById, updateManyX, shared scripts, other actions), reusable code in shared scripts, atomic multi-write scripts with @system.mongodb transactions, and whether a script runs elevated or with the caller's access. Use whenever writing, reviewing, fixing or porting server logic into a BootstrApp action script.
 license: Proprietary. Copyright (c) 2026 Crochik Software Solutions, LLC. Use requires agreement to its license terms and its prior written authorization; see LICENSE.
 ---
 
@@ -60,7 +60,10 @@ The mistakes that matter most (the rule book has the rest):
 
 - `execute` is not called for you: **end with `return execute(input);`**.
 - Import every namespace you use; bare type names resolve only through
-  imports.
+  imports. Platform modules are `@system.<name>`, plugins
+  `@plugin.<name>`, and class modules are named after their namespace
+  (`app.shop`; `@objects` for classes without one, and
+  `@objects.app.shop` works as another name for `app.shop`).
 - `filterX` conditions and `orderBy` use indexed fields only, and `fields`
   names everything you read.
 - `updateXById` is a patch: send only the changed fields.
@@ -106,7 +109,7 @@ domain class when it returns records.
   client made it, is a class event script, one per behavior. It runs after
   the write with access to all of the app's data (or a profile's, with
   `runAsProfile`), so it can't reject the write; validation a client must not skip stays in an action.
-- **Writes that must happen together** go in one `system.mongodb`
+- **Writes that must happen together** go in one `@system.mongodb`
   transaction; to include a shared script's writes, pass it the transaction
   (rule book, "Shared scripts").
 
@@ -116,7 +119,7 @@ A script always runs with the caller's access. The action manifest can
 grant it more: `"elevated": true` (the account's) or `"runAsProfile"` (a
 profile's, below; never with `elevated: true`); `"elevated": false` grants
 nothing. The grant is used only by the calls the script wraps in
-`session.elevated(() => …)` (`import * as session from "system.session";`),
+`session.elevated(() => …)` (`import * as session from "@system.session";`),
 which returns what its function returns:
 
 ```typescript
@@ -143,14 +146,14 @@ profile should allow is fixed with access (the `bootstrapp-access` skill),
 never by elevating.
 
 Code inside `session.elevated` is the only guard on what it touches: filter by
-`system.session` (`getUserId()`, `getOrganizationId()`) wherever the
+`@system.session` (`getUserId()`, `getOrganizationId()`) wherever the
 profile has a constraint, check the record before changing it wherever it
 has an update or delete constraint, return only what the caller may see, and say in
 the action's `actionDescription` what it checks. Elevated also reaches
 every record of classes shared from other apps. Rule book: "Elevated
 scripts".
 
-`system.session.getClaim(name)` reads any claim of the caller's token
+`@system.session.getClaim(name)` reads any claim of the caller's token
 (`getClaimValues`, `getClaimNames` too), such as the app's calculated
 claims from `auth.json`; it is the caller's in elevated scripts and `null`
 in class event scripts. Use only claims the token is known to carry. Rule
@@ -161,7 +164,7 @@ Prefer running as a profile to `elevated` (which runs as the account): add
 `events/<name>.json` for a class event script) and the code inside
 `session.elevated` runs with that profile's access, still as the caller: its constraints (written with
 `{{context "UserId"}}`, `{{context "OrganizationId"}}` as for any profile)
-resolve to the caller's user and organization, and `system.session` is the
+resolve to the caller's user and organization, and `@system.session` is the
 caller. So a run-as profile with `organizationId Eq {{context
 "OrganizationId"}}` keeps each caller to their own organization's records
 without the script checking it.
@@ -173,7 +176,7 @@ that profile may run. Rule book: "Running as a profile".
 
 ## Files
 
-Scripts never carry file contents: an action calls `system.files`
+Scripts never carry file contents: an action calls `@system.files`
 `create(...)` and returns the presigned `uploadUrl` the client `PUT`s to
 (rule book, "Uploading files" and "Downloading files"). Keep the bucket and
 path in the script, never from `input`; set up the bucket and folder with
@@ -183,7 +186,7 @@ never ask for bucket keys. Store the file id on the domain object
 
 ## HTTP calls
 
-A script calls another service with `system.http.fetch(url, init?)`,
+A script calls another service with `@system.http.fetch(url, init?)`,
 shaped like `fetch` but returning the finished response with the body in
 `res.text` and `res.json` (rule book, "Calling HTTP APIs"). Check
 `res.ok`; error statuses don't throw. A run can only call what the
@@ -200,7 +203,7 @@ public API itself when nothing secret or server-side is involved.
 
 ## Integrations
 
-`system.integration` stores credentials for one of the account's
+`@system.integration` stores credentials for one of the account's
 integrations on the user running the script (`"user"`) or their
 organization (`"organization"`, changed only by a manager or an elevated
 script) (rule book, "Integrations"). The integration is added to the
@@ -213,19 +216,19 @@ a `url` the client sends the browser to within 10 minutes (`returnUrl`
 must be on one of the app client's origins). `get` and `list` say only
 whether each secret is set, so a script can't read a credential back, and
 nothing on the platform uses these credentials yet: a script calling the
-service with `system.http` still needs its key per "HTTP calls" above.
+service with `@system.http` still needs its key per "HTTP calls" above.
 
 ## Optional plugins
 
 Besides the `system.*` modules, the platform provides optional plugins:
-modules under `plugin.<name>` an app adds when it needs them (rule
+modules under `@plugin.<name>` an app adds when it needs them (rule
 book, "Optional plugins"). Look for one with `get_plugins` (pass a
 `query`) before writing an integration by hand, and read its functions
 with `get_plugin` (`declarations`, `settings`, `hosts`, `setup`). To use
 one, write `plugins/<name>.json` (`{ "name": "<name>", "settings": { ... } }`,
 settings only when the plugin has them, never secrets), apply it
 (`add_plugin`), regenerate `generated/platform.d.ts`, then import it:
-`import * as github from "plugin.github";`. A script can import only
+`import * as github from "@plugin.github";`. A script can import only
 plugins its app added; the server refuses to save it otherwise.
 
 `add_plugin` (and `get_plugin` once added) returns the plugin's `setup`
@@ -240,7 +243,7 @@ of the scripts that use it (`network/<name>.json`) must allow its
 
 Plugins today: `sample` (an example with no side effects) and `github`
 (GitHub REST API with a token from the account's GitHub integration;
-rule book, "plugin.github"). In GitHub's JSON, `number` is a keyword in
+rule book, "@plugin.github"). In GitHub's JSON, `number` is a keyword in
 scripts: read it as `issue["number"]`.
 
 ## Workflow
@@ -274,6 +277,6 @@ scripts: read it as `issue["number"]`.
 Translate the logic, not the syntax: ORM queries become `filterX` calls on
 indexed fields, `async`/`await` plain calls (calls are synchronous),
 `try`/`catch` up-front checks and `throw`, database transactions a
-`system.mongodb` transaction passed to every write, helpers several
+`@system.mongodb` transaction passed to every write, helpers several
 handlers use shared scripts, model hooks and triggers class event scripts.
 Examples and a cheatsheet: [references/examples.md](references/examples.md).

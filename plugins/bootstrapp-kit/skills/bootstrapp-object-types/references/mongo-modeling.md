@@ -15,7 +15,7 @@ is shared) applies as usual; this is the BootstrApp side of it.
 | polymorphic rows read together (card or bank payment) | discriminated base (`kind`) + variants; or one flat class with a `kind` enum when variants differ by a field or two |
 | shared shape, never read together | `baseObjectType` without a discriminator (separate collections) |
 | users, organizations | plain uuid fields (`ownerId`, `organizationId`), no `foreignKeys` target in the app |
-| files | `system.files`; keep the file id as a string field |
+| files | `@system.files`; keep the file id as a string field |
 
 Platform limits that change the design:
 

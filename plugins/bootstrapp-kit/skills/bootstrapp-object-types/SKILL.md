@@ -109,7 +109,7 @@ Relationship shapes on the platform:
   signed whatever `maximum` says; larger values (ARGB colors, byte counts)
   go in a string. Dates as strings with
   `format: date` or `date-time`. Enums as `enum` on a string. No
-  `byte`/`binary`: files go to storage through `system.files` (see the
+  `byte`/`binary`: files go to storage through `@system.files` (see the
   `bootstrapp-apiscript` skill) and the class keeps the file id in a
   string field (`receiptFileId`).
 - **Users** are platform objects. Store `ownerId`, `assigneeId`, … as uuid

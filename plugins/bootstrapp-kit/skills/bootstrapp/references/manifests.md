@@ -262,7 +262,7 @@ call, not a manifest key. Deleting the file makes `plan` list
 
 ## `network/<name>.json`
 
-A network policy: the HTTP calls (`system.http.fetch`) a run started by
+A network policy: the HTTP calls (`@system.http.fetch`) a run started by
 one of the scripts it lists may make. The policy binds the whole run:
 the actions and shared scripts it calls make their calls under it, and
 their own policies don't apply. A run whose starting script no policy
@@ -432,7 +432,7 @@ reference (`tools.md`, "Calculated claims") has the expression rules.
 ## `plugins/<name>.json`
 
 An optional plugin the app adds, so its scripts can import its module
-(`import * as sample from "plugin.sample"`). The file is
+(`import * as sample from "@plugin.sample"`). The file is
 `add_plugin`'s arguments without `appName`:
 
 ```json
@@ -440,7 +440,7 @@ An optional plugin the app adds, so its scripts can import its module
 ```
 
 `name` is the plugin's name from `get_plugins` (`sample`, not
-`plugin.sample`). `settings` (optional) are the plugin's per-app
+`@plugin.sample`). `settings` (optional) are the plugin's per-app
 settings that `get_plugin` lists, an object of strings, never secrets:
 credentials live in the account's integrations. Changing them changes
 the manifest's hash, so `plan` calls `add_plugin` again, which replaces

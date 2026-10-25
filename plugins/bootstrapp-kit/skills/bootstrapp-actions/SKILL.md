@@ -18,7 +18,7 @@ Make it an action only when the client genuinely can't do it that way:
 
 - **Atomic multi-write**: several documents must change together or not at
   all (approve an expense and bump the monthly total). The script makes
-  this atomic with a `system.mongodb` transaction; an action is not atomic by
+  this atomic with a `@system.mongodb` transaction; an action is not atomic by
   itself (see the `bootstrapp-apiscript` skill).
 - **Server-side effects**: work that must not run in the client, such as
   enforcing an invariant against data the caller can't see, or using a

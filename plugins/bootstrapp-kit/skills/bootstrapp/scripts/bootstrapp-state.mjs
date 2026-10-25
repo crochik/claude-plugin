@@ -57,13 +57,13 @@ const CLAIM_PATH = /^(Objects\.(User|Organization|Account)(\..+)?|Object\.Profil
 const SCRIPT_RESERVED = new Set(["as", "from", "of", "number", "string", "boolean", "any", "Record", "import", "const", "let", "function", "if", "else", "for", "while", "return", "throw", "true", "false", "null"]);
 const INT32_MAX = 2147483647;
 const KINDS = { app: null, profile: "profiles", class: "classes", access: "access", action: "actions", "action-access": "actionAccess", plugin: "plugins", "shared-script": "sharedScripts", script: "scripts", "event-script": "eventScripts", "network-policy": "networkPolicies", webhook: "webhooks", auth: null };
-// network/<name>.json: the HTTP calls (system.http) a run started by one of the scripts it lists may make, the actions and
+// network/<name>.json: the HTTP calls (@system.http) a run started by one of the scripts it lists may make, the actions and
 // shared scripts it calls included (replace_network_policy + set_script_network_policy). The server keeps policies by id
 // (ledger) and saves them inactive: someone activates them outside the MCP server, and a change to an active one is
 // saved as a new policy with a new id
 const POLICY_ID = "<id replace_network_policy returned>";
-// plugins/<name>.json: an optional plugin the app adds (add_plugin, with its optional settings), so its scripts can import plugin.<name>
-const PLUGIN_PREFIX = "plugin.";
+// plugins/<name>.json: an optional plugin the app adds (add_plugin, with its optional settings), so its scripts can import @plugin.<name>
+const PLUGIN_PREFIX = "@plugin.";
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
@@ -137,7 +137,7 @@ const sharedHash = (shared) => hash(`${JSON.stringify(strip(shared.data ?? {}))}
 function sharedCalls(text, appName) {
   if (!text || !appName) return [];
   const module = `app.${appName}.scripts`;
-  const aliases = [...text.matchAll(/import\s+\*\s+as\s+([A-Za-z_]\w*)\s+from\s+["']([^"']+)["']/g)].filter((m) => m[2] === module).map((m) => m[1]);
+  const aliases = [...text.matchAll(/import\s+\*\s+as\s+([A-Za-z_]\w*)\s+from\s+["']([^"']+)["']/g)].filter((m) => m[2] === module || m[2] === `@objects.${module}`).map((m) => m[1]);
   return [...new Set(aliases.flatMap((alias) => [...text.matchAll(new RegExp(`\\b${alias}\\.([A-Za-z_]\\w*)\\s*\\(`, "g"))].map((m) => m[1])))];
 }
 
@@ -505,7 +505,7 @@ function checkNetwork(state, error, warn) {
   }
 }
 
-// The plugins a script imports (import * as x from "plugin.<name>")
+// The plugins a script imports (import * as x from "@plugin.<name>")
 function importedPlugins(text) {
   if (!text) return [];
   return [...new Set([...text.matchAll(/import\s+\*\s+as\s+[A-Za-z_]\w*\s+from\s+["']([^"']+)["']/g)].map((m) => m[1]).filter((m) => m.startsWith(PLUGIN_PREFIX)).map((m) => m.slice(PLUGIN_PREFIX.length)))];
@@ -516,7 +516,7 @@ function checkPlugins(state, error, warn) {
   for (const { file, data } of state.plugins) {
     const where = `plugins/${basename(file)}`;
     if (data.$error) { error(where, data.$error); continue; }
-    if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not plugin.sample)"); continue; }
+    if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not @plugin.sample)"); continue; }
     if (basename(file) !== `${data.name}.json`) warn(where, `file name should be ${data.name}.json`);
     if (data.settings !== undefined && (data.settings === null || typeof data.settings !== "object" || Array.isArray(data.settings) || Object.values(data.settings).some((v) => typeof v !== "string"))) {
       error(where, "settings must be an object of setting names and strings (get_plugin lists the plugin's settings); never secrets");

@@ -92,7 +92,7 @@ were never applied won't be in it.
 
 File bytes never go through an action. When the app uploads files:
 
-1. Call the app's upload action (a script using `system.files`, written
+1. Call the app's upload action (a script using `@system.files`, written
    with the `bootstrapp-apiscript` skill). It returns the file id and a
    presigned `uploadUrl`.
 2. `PUT` the raw bytes to `uploadUrl` with `fetch`, no `Authorization`

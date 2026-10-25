@@ -66,7 +66,7 @@ Ask, in plain words, and propose defaults:
    tenant profile the constraint on it, tenants never use the default
    profile, and onboarding creates the organization and invites the first
    user into it (the tools, or an elevated script with
-   `system.user.createOrganization` + `invite`). Read "Multi-tenant apps" in
+   `@system.user.createOrganization` + `invite`). Read "Multi-tenant apps" in
    the server's `access-control.md` for the limits.
 4. **Which actions** each profile may run.
 5. **How do people get in?** Providers (Microsoft, Google, Salesforce,
@@ -170,7 +170,7 @@ Rules worth knowing while writing them:
   `fieldPermissions` when that must not happen. With an update constraint
   on `ownerId` and no row constraint, nothing stamps the owner: the client
   sends it (`["Read", "SetOnCreate"]`) or a create action sets it from
-  `system.session`.
+  `@system.session`.
 - **Inheritance is first match, constraints are AND.** For a profile with
   `inheritsFrom: [A, B]`, each class, field and relation permission comes
   from the first of [profile, A, B] that has an entry, without merging; the
@@ -257,7 +257,7 @@ matches more than one user of the app, pass the `id` from `get_users` as
 `userId` to the other user tools.
 
 Admin users can't belong to an organization: `set_user_organization` and
-`system.user.invite(..., organization)` refuse them. To give an admin a
+`@system.user.invite(..., organization)` refuse them. To give an admin a
 tenant login, use `invite_user` with their email and the organization;
 that makes a separate user.
 
@@ -271,7 +271,7 @@ developer access (see the `bootstrapp` skill).
 
 When the app itself must do this (a sign-up action that creates the
 customer's organization and invites its first user), an action script can:
-`system.user` has `getOrganizations`, `createOrganization`,
+`@system.user` has `getOrganizations`, `createOrganization`,
 `updateOrganization`, `setOrganizationPrimaryUser(organization, user?)`
 and `invite(email, profile, name?, organization?)`. The primary user rule
 is checked on the caller, even in an elevated script.

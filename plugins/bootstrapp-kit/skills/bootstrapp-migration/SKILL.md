@@ -34,16 +34,16 @@ Produce a mapping table per area:
 | roles/permissions | profiles, class/field access and constraints (enforced server-side) | per `bootstrapp-access`; don't port ACL fields into schemas |
 | login | BootstrApp OIDC | per `bootstrapp-client` auth section |
 | work that follows every write (DB triggers, model hooks) | class event script | per `bootstrapp-apiscript` |
-| file storage | `system.files` uploads through an action | per "Files" in `bootstrapp-apiscript` |
-| calls to third-party APIs (payments, email services, webhooks it sends) | an action calling `system.http.fetch`, with a network policy for that host | per "HTTP calls" in `bootstrapp-apiscript`; keys stay out of the client |
-| per-user or per-organization connections to other services (API keys, OAuth sign-ins to Google, GitHub, ...) | an integration added with `create_integration`; scripts attach them with `system.integration` (`set`, `connect`) | per "Integrations" in `bootstrapp-apiscript`; nothing reads the stored credentials yet, so calls that use them stay a gap to raise |
+| file storage | `@system.files` uploads through an action | per "Files" in `bootstrapp-apiscript` |
+| calls to third-party APIs (payments, email services, webhooks it sends) | an action calling `@system.http.fetch`, with a network policy for that host | per "HTTP calls" in `bootstrapp-apiscript`; keys stay out of the client |
+| per-user or per-organization connections to other services (API keys, OAuth sign-ins to Google, GitHub, ...) | an integration added with `create_integration`; scripts attach them with `@system.integration` (`set`, `connect`) | per "Integrations" in `bootstrapp-apiscript`; nothing reads the stored credentials yet, so calls that use them stay a gap to raise |
 | background jobs, webhooks | out of scope unless the platform exposes them | list as open items |
 
 Mark anything that doesn't fit (OR queries, joins, aggregation pipelines,
 capabilities `platform.d.ts` lacks) and propose the workaround: client-side
 composition, denormalization, an action, or keeping that piece on the old
 backend for now. Full text search (`#text`), multi-document transactions
-(an action script with `system.mongodb`) and file storage (`system.files`)
+(an action script with `@system.mongodb`) and file storage (`@system.files`)
 do fit.
 
 ## 3. Plan the cutover

@@ -227,7 +227,7 @@ for (const file of files) {
   // so a call on an imported module's alias is not a string method
   for (const m of code.matchAll(/(\b[A-Za-z_]\w*)?\s*\.\s*(trim|trimStart|trimEnd|toLowerCase|toUpperCase|split|replace|replaceAll|substring|substr|startsWith|endsWith|padStart|padEnd|charAt|charCodeAt|localeCompare|normalize|repeat|match)\s*\(/g)) {
     if (m[1] && aliases.has(m[1])) continue;
-    const fn = ["substr", "localeCompare", "normalize", "match"].includes(m[2]) ? null : m[2];
+    const fn = ["substr", "localeCompare", "normalize"].includes(m[2]) ? null : m[2];
     report("error", lineOf(m.index), `${m[2]}() isn't available: strings have no methods in ApiScript. ` +
       (fn ? `Use the @system.string function: import * as str from "@system.string"; str.${fn}(s, ...)` : `@system.string has no ${m[2]}; see api-script.md, "Strings and property names"`));
   }

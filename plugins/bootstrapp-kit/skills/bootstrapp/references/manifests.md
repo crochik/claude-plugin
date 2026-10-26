@@ -31,6 +31,9 @@ are stripped before a call. JSON Schema keywords (`$ref`, `$defs`, `$id`,
 
 File name is the full class name, e.g.
 `classes/app.expense_tracker.Expense.json`.
+A class outside `app.<app_name>` (e.g. `classes/shared.crm.Contact.json`)
+has the same format, without `discriminatorField`/`discriminatorValue` or
+inline objects: `plan` sends it as a class draft the user applies.
 
 ```json
 {

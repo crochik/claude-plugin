@@ -215,10 +215,10 @@ public API itself when nothing secret or server-side is involved.
 `@system.integration` stores credentials for one of the account's
 integrations on the user running the script (`"user"`) or their
 organization (`"organization"`, changed only by a manager or an elevated
-script) (rule book, "Integrations"). The integration is added to the
-account first with `create_integration`, and its `id` is random, so find
-it by name in the script, never from `input`:
-`integration.providers().find(x => x.name === "twilio")`. `values`
+script) (rule book, "Integrations"). Providers are platform wide (the
+same `id` in every account) and the account adds the ones it uses first
+with `add_integration`. Calls take the `id` or the name, so name it in the
+script, never take it from `input`: `integration.set("twilio", ...)`. `values`
 integrations take `set(id, level, values)`; OAuth ones (`oauth2`, `oidc`)
 take `connect(id, level, { scopes?, offline?, returnUrl? })`, which returns
 a `url` the client sends the browser to within 10 minutes (`returnUrl`

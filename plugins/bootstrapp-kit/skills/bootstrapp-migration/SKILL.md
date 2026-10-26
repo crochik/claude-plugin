@@ -36,7 +36,7 @@ Produce a mapping table per area:
 | work that follows every write (DB triggers, model hooks) | class event script | per `bootstrapp-apiscript` |
 | file storage | `@system.files` uploads through an action | per "Files" in `bootstrapp-apiscript` |
 | calls to third-party APIs (payments, email services, webhooks it sends) | an action calling `@system.http.fetch`, with a network policy for that host | per "HTTP calls" in `bootstrapp-apiscript`; keys stay out of the client |
-| per-user or per-organization connections to other services (API keys, OAuth sign-ins to Google, GitHub, ...) | an integration added with `create_integration`; scripts attach them with `@system.integration` (`set`, `connect`) | per "Integrations" in `bootstrapp-apiscript`; nothing reads the stored credentials yet, so calls that use them stay a gap to raise |
+| per-user or per-organization connections to other services (API keys, OAuth sign-ins to Google, GitHub, ...) | a platform provider the account adds with `add_integration` (a service with no provider needs root to add one); scripts attach them with `@system.integration` (`set`, `connect`) | per "Integrations" in `bootstrapp-apiscript`; nothing reads the stored credentials yet, so calls that use them stay a gap to raise |
 | background jobs, webhooks | out of scope unless the platform exposes them | list as open items |
 
 Mark anything that doesn't fit (OR queries, joins, aggregation pipelines,

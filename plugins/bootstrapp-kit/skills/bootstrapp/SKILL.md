@@ -111,6 +111,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `init_app` | Create the app (once), before any other call for it. Provisions the OIDC client named after the app. If `applied.json` has no `app` entry, call it (with `app.json`'s name, title, description) and record it before the first other backend call. |
 | `add_object_class` | Register one class. Fails if it already exists. |
 | `replace_object_class` | Replace an existing class's definition (same arguments as `add_object_class`). Stored records are not migrated. |
+| `add_class_draft`, `replace_class_draft`, `get_class_drafts`, `remove_class_draft` | Classes outside `app.<app_name>` (a namespace several apps share, another app's class, one no app owns): propose a new class or a change as a draft (same arguments as `add_object_class`, no discriminators, no inline objects). Nothing changes until the user applies the draft in the BootstrApp designer, signed in as themselves; list your pending drafts, or discard one. |
 | `register_action` | Register one action. Refuses a name the class already has. |
 | `replace_action` | Change a registered action's input/output classes, scope, summary, description. |
 | `get_actions` | List a class's actions (input/output, scope, whether it has a script). |
@@ -184,7 +185,8 @@ and you can grep them when needed.
   layer unless an action needs a different payload.
 - **Namespaces are rooted at `app.<app_name>`.** Domain classes live directly
   in `app.<app_name>`; action input/output classes in `app.<app_name>.actions`.
-  Action payload classes are never domain classes.
+  Action payload classes are never domain classes. A class outside it (shared
+  by several apps, or another app's) is a class draft the user approves.
 - **Users and organizations are platform records.** Reference users with
   a `*Id` uuid field (`ownerId`) and organizations with `organizationId`;
   never define `User`, `Organization` or `Group` classes in the app
@@ -246,6 +248,13 @@ When the user wants local definitions pushed:
    twice: an `add_object_class` with `record: null` and a `note` (don't
    record it), then a `replace_object_class` with the foreign keys, which
    is recorded.
+   Classes outside `app.<app_name>` show up as `add_class_draft` /
+   `replace_class_draft` with `record: null` and `recordAfterApply`: they
+   only propose the class. Tell the user the draft is waiting for them in
+   the BootstrApp designer (Object Type Drafts, Design, Apply). Classes
+   that use a drafted class are `BLOCKED` until then. Once
+   `get_class_drafts` no longer lists the draft, record it
+   (`record class <name>`) and run `plan` again.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`
    (kinds: `app`, `profile`, `class`, `access`, `action`, `action-access`,
    `plugin`, `shared-script`, `script`, `event-script`, `network-policy`, `auth`; an access item's name is

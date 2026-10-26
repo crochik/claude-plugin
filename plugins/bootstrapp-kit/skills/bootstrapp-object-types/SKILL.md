@@ -132,6 +132,13 @@ Relationship shapes on the platform:
 - Domain classes go directly in `app.<app_name>`. Use sub-namespaces only for
   action payloads (`app.<app_name>.actions`) unless you have confirmed
   top-level classes elsewhere behave (see the server's `platform-notes.md`).
+- A class meant for several apps can live outside `app.<app_name>` (e.g.
+  `shared.crm.Contact`), and a change to another app's class is possible,
+  but both go to the user as **class drafts** (`add_class_draft` /
+  `replace_class_draft`): nothing changes until they apply the draft in the
+  designer. Drafts hold one class (no inline objects: `$ref` an embedded
+  class that exists) and can't be discriminated. Actions and class event
+  scripts don't run on top-level classes outside `app.<app_name>`.
 - Embed a named class with `{"$ref": "#/components/schemas/<full class
   name>"}` on a property, on array `items` (list) or on
   `additionalProperties` (string-keyed dictionary). The target must be an

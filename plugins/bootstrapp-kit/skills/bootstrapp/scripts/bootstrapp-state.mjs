@@ -236,7 +236,14 @@ function check(state) {
     const parts = name.split(".");
     const short = parts.at(-1);
     const ns = parts.slice(0, -1).join(".");
-    if (root && !(ns === root || ns.startsWith(`${root}.`))) error(where, `must live under ${root}`);
+    // a class outside the app's namespace is proposed as a draft (add_class_draft/replace_class_draft) the user applies
+    const draft = isDraftClass(root, name);
+    if (draft) {
+      if (parts.length < 2) error(where, "a class outside the app needs a namespace: <namespace>.<Class>");
+      if (parts[0] === "app" && parts.length > 2) warn(where, `outside ${root}: it goes to the user as a class draft, and the app that owns that namespace may change it too`);
+      if (cls.discriminatorField || cls.discriminatorValue) error(where, `class drafts (classes outside ${root}) can't be discriminated classes`);
+      if (inlineClassNames(cls.schema, name).length) error(where, `class drafts (classes outside ${root}) hold one class: replace the inline objects with a $ref to an embedded class that already exists`);
+    }
     for (const seg of parts.slice(0, -1)) if (!SNAKE.test(seg)) error(where, `namespace segment "${seg}" must be snake_case`);
     if (!PASCAL.test(short)) warn(where, `class name "${short}" should be PascalCase`);
     if (["User", "Group"].includes(short)) error(where, "User and Group are platform classes; reference them by a *Id field instead");
@@ -244,7 +251,7 @@ function check(state) {
 
     if (!["TopLevel", "Embedded"].includes(cls.type)) error(where, `type must be TopLevel or Embedded, got ${cls.type}`);
     if (!Array.isArray(cls.indexedFields)) error(where, "indexedFields is required (use [] for embedded classes)");
-    if (cls.baseObjectType && root && !cls.baseObjectType.startsWith(`${root}.`)) error(where, `baseObjectType must live under ${root}`);
+    if (!draft && cls.baseObjectType && root && !cls.baseObjectType.startsWith(`${root}.`)) error(where, `baseObjectType must live under ${root} (only a class draft, a class outside ${root}, may extend one outside it)`);
     if (cls.baseObjectType && !byName.has(cls.baseObjectType)) warn(where, `base class ${cls.baseObjectType} has no local manifest`);
     checkDiscriminator(cls, where, byName, error, warn);
 
@@ -267,7 +274,7 @@ function check(state) {
 
     const props = propsOf(cls);
     if (cls.type === "TopLevel") {
-      if (root && ns !== root) warn(where, `top-level class outside ${root}; actions on it may not run (see the server's platform-notes.md)`);
+      if (root && ns !== root) warn(where, `top-level class outside ${root}; actions and class event scripts on it don't run (see the server's platform-notes.md)`);
       const id = props._id;
       if (!id) error(where, "top-level classes need an _id property (string, format uuid)");
       else if (id.type !== "string" || id.format !== "uuid") error(where, "_id must be { type: string, format: uuid }");
@@ -768,6 +775,11 @@ function classOf(state, fullObjectType) {
   return fullObjectType;
 }
 
+// A class outside the app's namespace (app.<name> and below): the MCP class tools refuse it, so it goes as a class draft
+function isDraftClass(root, fullObjectType) {
+  return Boolean(root && fullObjectType && fullObjectType !== root && !fullObjectType.startsWith(`${root}.`));
+}
+
 // add_object_class stores each inline object property as an embedded class named <parent>.<property>.
 function inlineClassNames(node, parent, out = []) {
   for (const [key, child] of Object.entries(node?.properties ?? {})) {
@@ -1092,14 +1104,29 @@ function plan(state) {
   const newClasses = new Set(classItems.filter((i) => i.state === "new").map((i) => i.name));
   const onServer = new Set();
   const deferred = [];
+  // class drafts sent in this plan: the classes that use them wait until the user applies them
+  const drafted = new Set();
   for (const item of dependencyOrder(classItems, state)) {
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
+    const waitsFor = [...new Set([data.baseObjectType, ...(data.foreignKeys ?? []).map((fk) => fk.referenceObjectType), ...embeddedFields(data).map(([, target]) => target)])]
+      .filter((target) => target !== item.name && drafted.has(target));
+    if ((item.state === "new" || item.state === "changed") && waitsFor.length) {
+      if (isDraftClass(appName && `app.${appName}`, item.name)) drafted.add(item.name);
+      blocked.push({ kind: "class", name: item.name, reason: `uses ${waitsFor.join(", ")}, sent as class draft(s): run plan again once the user applied them` });
+      continue;
+    }
     if (item.state === "new" || item.state === "changed") {
       const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
       const args = (fks) => ({ appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(fks?.length ? { foreignKeys: fks } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) });
       const pendingTarget = (fk) => fk.referenceObjectType !== fullObjectType && newClasses.has(fk.referenceObjectType) && !onServer.has(fk.referenceObjectType);
       const waiting = (foreignKeys ?? []).filter(pendingTarget);
-      if (!waiting.length) {
+      if (isDraftClass(appName && `app.${appName}`, item.name)) {
+        // outside the app: only proposed, the class changes when the user applies the draft in the designer
+        const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = args(foreignKeys);
+        const note = `a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists it${waiting.length ? `; ${[...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ")} must exist first` : ""}`;
+        calls.push({ tool: item.state === "new" ? "add_class_draft" : "replace_class_draft", record: null, recordAfterApply: ["class", item.name], note, args: draftArgs });
+        drafted.add(item.name);
+      } else if (!waiting.length) {
         calls.push({ tool: item.state === "new" ? "add_object_class" : "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
       } else if (item.state === "new") {
         const targets = [...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ");

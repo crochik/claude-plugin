@@ -152,6 +152,7 @@ for (const file of files) {
     const ok = /^\s*import\s+\*\s+as\s+([A-Za-z_]\w*)\s+from\s+["']([^"']+)["']\s*;/.exec(im[0]);
     const line = lineOf(im.index);
     if (!ok) { report("error", line, 'imports must look like: import * as alias from "namespace";'); continue; }
+    if (BUILTIN_TYPES.has(ok[1])) report("error", line, `"${ok[1]}" is a type name and can't be an import alias (e.g. import * as str from "@system.string";)`);
     const name = /from\s+["']([^"']+)["']/.exec(source.split("\n")[line - 1])?.[1] ?? ok[2];
     // @objects.<namespace> is another name for the class module <namespace>, which is how platform.d.ts declares it
     aliases.set(ok[1], { module: name.startsWith("@objects.") ? name.slice("@objects.".length) : name, line });
@@ -222,9 +223,13 @@ for (const file of files) {
   for (const r of code.matchAll(new RegExp(`\\.\\s*(${reserved})\\b|[{,]\\s*(${reserved})\\s*:`, "g"))) {
     report("error", lineOf(r.index), `"${r[1] ?? r[2]}" is a reserved word in ApiScript and can't be used as a property name; rename the field (e.g. in the input class)`);
   }
-  // strings have no methods in the runtime
-  for (const m of code.matchAll(/\.\s*(trim|trimStart|trimEnd|toLowerCase|toUpperCase|split|replace|replaceAll|substring|substr|startsWith|endsWith|padStart|padEnd|charAt|charCodeAt|localeCompare|normalize|repeat|match)\s*\(/g)) {
-    report("error", lineOf(m.index), `${m[1]}() isn't available: strings have no methods in ApiScript. Normalize the value in the caller or store a normalized copy`);
+  // strings have no methods in the runtime; the helpers are @system.string functions (str.trim(s)),
+  // so a call on an imported module's alias is not a string method
+  for (const m of code.matchAll(/(\b[A-Za-z_]\w*)?\s*\.\s*(trim|trimStart|trimEnd|toLowerCase|toUpperCase|split|replace|replaceAll|substring|substr|startsWith|endsWith|padStart|padEnd|charAt|charCodeAt|localeCompare|normalize|repeat|match)\s*\(/g)) {
+    if (m[1] && aliases.has(m[1])) continue;
+    const fn = ["substr", "localeCompare", "normalize"].includes(m[2]) ? null : m[2];
+    report("error", lineOf(m.index), `${m[2]}() isn't available: strings have no methods in ApiScript. ` +
+      (fn ? `Use the @system.string function: import * as str from "@system.string"; str.${fn}(s, ...)` : `@system.string has no ${m[2]}; see api-script.md, "Strings and property names"`));
   }
 
   // transactions: an open one is aborted when the run ends, even on success

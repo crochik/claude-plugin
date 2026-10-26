@@ -82,8 +82,17 @@ The mistakes that matter most (the rule book has the rest):
   `findIndex`, `some`, `every`, `flatMap`, `reduce`, `sort` (plus their
   `findLast*` forms). Their parameters and results are typed from the
   array, so `orders.map(o => o.total)` is a `number[]`.
-- No string methods, no `try`/`catch`, no `async`/`await`, `++`, `===`,
-  `?.` or template literals.
+- Strings have `length` but no methods: the usual ones are functions of
+  `@system.string` that take the string first
+  (`import * as str from "@system.string";`, then `str.trim(s)`,
+  `str.toLowerCase(s)`, `str.startsWith(s, "x")`, `str.substring(s, 0, 3)`,
+  `str.split(s, ",")`, `str.padStart(s, 6, "0")`, …). Don't name the alias
+  `string`. Regular expressions are string patterns with doubled
+  backslashes (`str.test(s, "^INV-\\d+$", "i")`, `str.match`,
+  `str.matchAll`, `str.replaceRegex`, `str.splitRegex`), each match capped
+  at 100 ms. The list is in `api-script.md`, "Strings and property names".
+- No `try`/`catch`, no `async`/`await`, `++`, `===`, `?.` or template
+  literals.
 
 ## Where scripts live
 

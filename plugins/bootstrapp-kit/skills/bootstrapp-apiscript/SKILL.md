@@ -255,6 +255,17 @@ Plugins today: `sample` (an example with no side effects) and `github`
 rule book, "@plugin.github"). In GitHub's JSON, `number` is a keyword in
 scripts: read it as `issue["number"]`.
 
+Plugins with `source: "integration"` in `get_plugins` are defined by
+the platform owner from an API's operations rather than written in
+code; an app adds and imports them the same way. Every function takes
+`(params, body)`: `params` holds the operation's path, query and
+header parameters by name, `body` the JSON body (only for operations
+that take one), both typed in `platform.d.ts`. It returns the
+response's JSON and throws on a non-2xx status, which ends the run, so
+check inputs first when you need your own error (rule book,
+"Integration plugins"). Their `setup` usually asks to add and connect
+the plugin's integration and to allow its host in the network policy.
+
 ## Workflow
 
 1. Read the action manifest, its input/output class manifests, and the

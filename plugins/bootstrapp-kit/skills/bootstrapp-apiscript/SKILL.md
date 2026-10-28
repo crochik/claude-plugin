@@ -252,8 +252,12 @@ of the scripts that use it (`network/<name>.json`) must allow its
 
 Plugins today: `sample` (an example with no side effects) and `github`
 (GitHub REST API with a token from the account's GitHub integration;
-rule book, "@plugin.github"). In GitHub's JSON, `number` is a keyword in
-scripts: read it as `issue["number"]`.
+rule book, "@plugin.github"). With nobody connected, `github` calls go
+out as the integration's GitHub App (the bot) once the developer pastes
+the app's private key in the designer (`integration.github.Setup`); a
+connection always wins, and the bot can't call `github.user()`. In
+GitHub's JSON, `number` is a keyword in scripts: read it as
+`issue["number"]`.
 
 ## Workflow
 

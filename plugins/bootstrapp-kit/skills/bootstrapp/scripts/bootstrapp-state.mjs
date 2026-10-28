@@ -239,10 +239,18 @@ function check(state) {
     // a class outside the app's namespace is proposed as a draft (add_class_draft/replace_class_draft) the user applies
     const draft = isDraftClass(root, name);
     if (draft) {
-      if (parts.length < 2) error(where, "a class outside the app needs a namespace: <namespace>.<Class>");
       if (parts[0] === "app" && parts.length > 2) warn(where, `outside ${root}: it goes to the user as a class draft, and the app that owns that namespace may change it too`);
       if (cls.discriminatorField || cls.discriminatorValue) error(where, `class drafts (classes outside ${root}) can't be discriminated classes`);
       if (inlineClassNames(cls.schema, name).length) error(where, `class drafts (classes outside ${root}) hold one class: replace the inline objects with a $ref to an embedded class that already exists`);
+      if (cls.type === "Embedded" && (cls.collectionName != null || cls.databaseName != null)) error(where, "embedded classes have no collectionName or databaseName: their records are kept in the classes that embed them");
+    } else if (cls.collectionName != null || cls.databaseName != null) {
+      error(where, `collectionName and databaseName are only for class drafts (classes outside ${root}): app classes keep their records where the server puts them`);
+    }
+    if (cls.collectionName != null && (typeof cls.collectionName !== "string" || !cls.collectionName.trim() || /[$\0]/.test(cls.collectionName) || cls.collectionName.trim().startsWith("system."))) {
+      error(where, 'collectionName must be a MongoDB collection name: not empty, no $ or null character, not starting with "system."');
+    }
+    if (cls.databaseName != null && (typeof cls.databaseName !== "string" || cls.databaseName.trim().length >= 64 || /[\/\\. "$*<>:|?\0]/.test(cls.databaseName.trim()))) {
+      error(where, 'databaseName must be a MongoDB database name (under 64 characters, no /\\. "$*<>:|? or spaces), or "" for the main database');
     }
     for (const seg of parts.slice(0, -1)) if (!SNAKE.test(seg)) error(where, `namespace segment "${seg}" must be snake_case`);
     if (!PASCAL.test(short)) warn(where, `class name "${short}" should be PascalCase`);
@@ -1116,13 +1124,13 @@ function plan(state) {
       continue;
     }
     if (item.state === "new" || item.state === "changed") {
-      const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable } = strip(data);
+      const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable, collectionName, databaseName } = strip(data);
       const args = (fks) => ({ appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(fks?.length ? { foreignKeys: fks } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) });
       const pendingTarget = (fk) => fk.referenceObjectType !== fullObjectType && newClasses.has(fk.referenceObjectType) && !onServer.has(fk.referenceObjectType);
       const waiting = (foreignKeys ?? []).filter(pendingTarget);
       if (isDraftClass(appName && `app.${appName}`, item.name)) {
         // outside the app: only proposed, the class changes when the user applies the draft in the designer
-        const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = args(foreignKeys);
+        const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = { ...args(foreignKeys), ...(collectionName != null ? { collectionName } : {}), ...(databaseName != null ? { databaseName } : {}) };
         const note = `a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists it${waiting.length ? `; ${[...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ")} must exist first` : ""}`;
         calls.push({ tool: item.state === "new" ? "add_class_draft" : "replace_class_draft", record: null, recordAfterApply: ["class", item.name], note, args: draftArgs });
         drafted.add(item.name);

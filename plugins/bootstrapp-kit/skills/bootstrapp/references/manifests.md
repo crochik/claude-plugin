@@ -338,6 +338,8 @@ listed first are applied first). Never declare `Admin`, the default profile
 ```
 
 Maps 1:1 to `replace_class_access` (no `appName`; the class names the app).
+For a class no app owns (outside `app.*`, `system.*` included) `plan` sends
+it to `replace_class_access_draft` instead, a draft the user applies.
 Optional keys: `fieldPermissions`, `defaultFieldPermissions`,
 `relationPermissions`, `constraints`, `updateConstraints`,
 `deleteConstraints`. `permissions: []` removes the profile's access. The

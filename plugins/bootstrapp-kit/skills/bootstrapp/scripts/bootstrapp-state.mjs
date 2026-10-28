@@ -1149,6 +1149,12 @@ function plan(state) {
   calls.push(...deferred);
   for (const item of pending("access")) {
     const { data } = state.access.find((a) => accessName(a.data) === item.name);
+    if (!data.fullObjectType?.startsWith("app.")) {
+      // no app owns the class (system.* included): its access is only proposed, as a class draft the user applies in the designer
+      const note = `access to a class no app owns, proposed as a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists ${data.fullObjectType}; send it after any replace_class_draft for that class, which starts again from the stored class`;
+      calls.push({ tool: "replace_class_access_draft", record: null, recordAfterApply: ["access", item.name], note, args: strip(data) });
+      continue;
+    }
     calls.push({ tool: "replace_class_access", record: ["access", item.name], args: strip(data) });
   }
   const registered = new Set();

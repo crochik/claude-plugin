@@ -18,9 +18,13 @@ matters, since **the server's copy wins**.
   everything (every permission on the classes it adds) and can't be restricted; the app owner has it. Every other
   profile starts with **no access** until it is granted.
 - No profile gets more than you (the developer) have on a class; the
-  server refuses it. Your apps' classes give you every permission; on any
-  other class, `system.*` included (granted with `profileApp`), it's your
-  own access there.
+  server refuses it. Your apps' classes give you every permission; on a
+  class no app owns, `system.*` included (granted with `profileApp`), it's
+  your own access there.
+- `replace_class_access` only changes classes of apps you own. Access to a
+  class no app owns (outside `app.*`, `system.*` included) is proposed with
+  `replace_class_access_draft` (same arguments) as a class draft, which the
+  user applies in the BootstrApp designer.
 - Per profile and class: class permissions (`Read`, `Create`, `Update`,
   `Delete`), field permissions (a field can be hidden or read-only),
   relation permissions, **constraints**: row filters such as
@@ -204,9 +208,17 @@ and redirect URL (`add_oidc_client_redirect`).
 ## Classes from another app
 
 An app can use classes it doesn't own: another of the developer's apps'
-classes, or classes created outside the MCP server. The app that uses them
-holds the grant, in its own `access/` folder, with `"profileApp": "<this
-app>"` (format in [references/manifests.md](../bootstrapp/references/manifests.md)):
+classes, or classes no app owns (`system.*`, or created outside the MCP
+server). The app that uses them holds the grant, in its own `access/`
+folder, with `"profileApp": "<this app>"` (format in
+[references/manifests.md](../bootstrapp/references/manifests.md)):
+
+- A class no app owns only gets access through a class draft: `plan` sends
+  its access file as `replace_class_access_draft`, the user applies it in the
+  designer, and it's recorded once `get_class_drafts` no longer lists it.
+  The change is added to your pending draft for that class; a later
+  `replace_class_draft` for it starts again from the stored class, so draft
+  the class first and its access after.
 
 - Grant **`Admin` first**. `generate_platform_definitions`,
   `generate_openapi_spec` and script validation include every class the

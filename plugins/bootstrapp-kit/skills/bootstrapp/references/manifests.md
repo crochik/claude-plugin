@@ -33,7 +33,10 @@ File name is the full class name, e.g.
 `classes/app.expense_tracker.Expense.json`.
 A class outside `app.<app_name>` (e.g. `classes/shared.crm.Contact.json`)
 has the same format, without `discriminatorField`/`discriminatorValue` or
-inline objects: `plan` sends it as a class draft the user applies.
+inline objects: `plan` sends it as a class draft the user applies. Such a
+top-level class may also set `collectionName` and `databaseName` (where its
+records are kept; `""` is the platform's main database, where `system.*`
+classes live); app classes can't.
 
 ```json
 {

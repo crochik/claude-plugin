@@ -137,7 +137,11 @@ Relationship shapes on the platform:
   but both go to the user as **class drafts** (`add_class_draft` /
   `replace_class_draft`): nothing changes until they apply the draft in the
   designer. Drafts hold one class (no inline objects: `$ref` an embedded
-  class that exists) and can't be discriminated. Actions and class event
+  class that exists) and can't be discriminated. A draft can be any class,
+  `system.*` ones included, and may set the `collectionName` and
+  `databaseName` its records are kept in (`""` is the platform's main
+  database); left out, a new class gets its own collection in the app
+  classes' database and an existing one stays where it is. Actions and class event
   scripts don't run on top-level classes outside `app.<app_name>`.
 - Embed a named class with `{"$ref": "#/components/schemas/<full class
   name>"}` on a property, on array `items` (list) or on

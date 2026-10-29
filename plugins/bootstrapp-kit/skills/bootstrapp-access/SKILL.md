@@ -298,4 +298,8 @@ second address) and try one read and one write that should succeed and one
 that should fail. A spec generated with `generate_openapi_spec` reflects
 the default `Admin` profile's (full) access, not a restricted profile's.
 `invoke_action` with `profileName` tries an action with a restricted
-profile's access without signing in as someone else.
+profile's access without signing in as someone else. Users without
+developer access can list and run the actions their profile was granted
+with `list_object_actions` / `run_object_action`; through the MCP server
+that is the profile they were given for it (their `MCP` profile), not their
+app profile.

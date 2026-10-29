@@ -1,6 +1,6 @@
 {
   "name": "bootstrapp-kit",
-  "version": "0.14.1028",
+  "version": "0.14.1029",
   "description": "Build or migrate apps onto the BootstrApp PaaS backend at your own pace: design MongoDB-backed ObjectTypes, define typed actions, write ApiScripts against the platform's real function surface, and generate a strongly typed client from the OpenAPI spec. Works on new and existing codebases; no fixed flow.",
   "author": {
     "name": "Crochik Software Solutions, LLC"

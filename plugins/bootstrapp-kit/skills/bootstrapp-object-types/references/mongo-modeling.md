@@ -22,9 +22,10 @@ Platform limits that change the design:
 - Filters are AND-only over a class's own indexed fields, with no joins,
   OR or aggregation: those become several client calls, denormalized
   fields, or an action.
-- A reference's target must exist first and be top level; classes that
-  reference each other are added without the foreign key, then replaced
-  with it (`plan` does this).
+- A reference's target must be top level. It needn't exist yet: the
+  server saves a class whose base, embedded classes or foreign key targets
+  are missing and lists them, so classes that reference each other are
+  each added once, in any order. The class isn't usable until they exist.
 - `integer` is 32-bit; there is no `byte`/`binary`.
 - Writes that must change several documents together need an action with a
   transaction; work that must follow every write is a class event script.

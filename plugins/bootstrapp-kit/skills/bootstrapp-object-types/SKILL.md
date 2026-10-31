@@ -137,7 +137,7 @@ Relationship shapes on the platform:
   but both go to the user as **class drafts** (`add_class_draft` /
   `replace_class_draft`): nothing changes until they apply the draft in the
   designer. Drafts hold one class (no inline objects: `$ref` an embedded
-  class that exists) and can't be discriminated. A draft can be any class,
+  class, which may be another draft) and can't be discriminated. A draft can be any class,
   `system.*` ones included, and may set the `collectionName` and
   `databaseName` its records are kept in (`""` is the platform's main
   database); left out, a new class gets its own collection in the app
@@ -146,7 +146,8 @@ Relationship shapes on the platform:
 - Embed a named class with `{"$ref": "#/components/schemas/<full class
   name>"}` on a property, on array `items` (list) or on
   `additionalProperties` (string-keyed dictionary). The target must be an
-  `Embedded` class with its own manifest, registered first. `title` and
+  `Embedded` class with its own manifest (it may be added after, or in
+  parallel: the server lists it as a missing reference until it exists). `title` and
   `description` may sit next to the `$ref` to label the field. Never `$ref`
   a top-level class; use a `<name>Id` reference instead.
 - Inline nested objects also work and become embedded classes named

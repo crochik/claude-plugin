@@ -247,15 +247,19 @@ When the user wants local definitions pushed:
    event scripts, plugins to remove (after the scripts stop importing them),
    network policies (after the scripts they list), `auth.json`. Actions don't depend on each other and can go in
    parallel; so can access calls. Access shown as `recheck` is applied again
-   because its class changed. Classes that reference each other show up
-   twice: an `add_object_class` with `record: null` and a `note` (don't
-   record it), then a `replace_object_class` with the foreign keys, which
-   is recorded.
+   because its class changed. Each class is one call, recorded on
+   success: the server saves a class whose base, embedded classes or
+   foreign key targets don't exist yet and lists them as missing
+   references, so classes that reference each other need no second pass
+   and class calls can go in parallel. Make sure every listed class gets
+   added; the class isn't usable until they exist.
    Classes outside `app.<app_name>` show up as `add_class_draft` /
    `replace_class_draft` with `record: null` and `recordAfterApply`: they
    only propose the class. Tell the user the draft is waiting for them in
    the BootstrApp designer (Object Type Drafts, Design, Apply). Classes
-   that use a drafted class are `BLOCKED` until then. Once
+   and drafts that use a drafted class are sent too (their `note` says so)
+   but can't be used until it is applied; a draft that extends a drafted
+   base must be applied after it. Once
    `get_class_drafts` no longer lists the draft, record it
    (`record class <name>`) and run `plan` again.
 5. Record each success right away: `bootstrapp-state.mjs record <kind> <name>`

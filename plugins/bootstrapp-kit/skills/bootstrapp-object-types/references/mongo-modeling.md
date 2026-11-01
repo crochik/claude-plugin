@@ -25,7 +25,8 @@ Platform limits that change the design:
 - A reference's target must be top level. It needn't exist yet: the
   server saves a class whose base, embedded classes or foreign key targets
   are missing and lists them, so classes that reference each other are
-  each added once, in any order. The class isn't usable until they exist.
+  each added once, in any order. The class isn't usable until they exist;
+  `validate_object_class` lists what is still missing.
 - `integer` is 32-bit; there is no `byte`/`binary`.
 - Writes that must change several documents together need an action with a
   transaction; work that must follow every write is a class event script.

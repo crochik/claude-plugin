@@ -252,7 +252,10 @@ When the user wants local definitions pushed:
    foreign key targets don't exist yet and lists them as missing
    references, so classes that reference each other need no second pass
    and class calls can go in parallel. Make sure every listed class gets
-   added; the class isn't usable until they exist.
+   added; the class isn't usable until they exist. Once the class calls
+   are done, run `validate_object_class` on each class you sent (it walks
+   the classes they depend on too, pending drafts included) and fix what
+   it reports before moving on.
    Classes outside `app.<app_name>` show up as `add_class_draft` /
    `replace_class_draft` with `record: null` and `recordAfterApply`: they
    only propose the class. Tell the user the draft is waiting for them in

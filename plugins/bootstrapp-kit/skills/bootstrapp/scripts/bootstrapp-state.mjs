@@ -241,7 +241,7 @@ function check(state) {
     if (draft) {
       if (parts[0] === "app" && parts.length > 2) warn(where, `outside ${root}: it goes to the user as a class draft, and the app that owns that namespace may change it too`);
       if (cls.discriminatorField || cls.discriminatorValue) error(where, `class drafts (classes outside ${root}) can't be discriminated classes`);
-      if (inlineClassNames(cls.schema, name).length) error(where, `class drafts (classes outside ${root}) hold one class: replace the inline objects with a $ref to an embedded class that already exists`);
+      if (inlineClassNames(cls.schema, name).length) error(where, `class drafts (classes outside ${root}) hold one class: replace the inline objects with a $ref to an embedded class (it may be another class draft)`);
       if (cls.type === "Embedded" && (cls.collectionName != null || cls.databaseName != null)) error(where, "embedded classes have no collectionName or databaseName: their records are kept in the classes that embed them");
     } else if (cls.collectionName != null || cls.databaseName != null) {
       error(where, `collectionName and databaseName are only for class drafts (classes outside ${root}): app classes keep their records where the server puts them`);
@@ -273,7 +273,7 @@ function check(state) {
       const target = ref.slice(REF_PREFIX.length);
       const embedded = byName.get(target);
       if (target === name) error(where, `${path}: a class cannot embed itself`);
-      else if (!embedded) warn(where, `${path}: embedded class ${target} has no local manifest; it must already exist on the server`);
+      else if (!embedded) warn(where, `${path}: embedded class ${target} has no local manifest; it must exist on the server (or be added there) before the class is used`);
       else if (embedded.type !== "Embedded") error(where, `${path}: ${target} is top-level and cannot be embedded; store its _id in a <name>Id field with a foreign key`);
     }
     for (const nested of inlineClassNames(schema, name)) {
@@ -374,7 +374,7 @@ function check(state) {
     else if (!CAMEL.test(event.scriptName)) warn(where, `script name "${event.scriptName}" should be camelCase`);
     const target = byName.get(event.fullObjectType);
     const webhookClass = webhookClasses.has(event.fullObjectType);
-    if (!target && !webhookClass) warn(where, `class ${event.fullObjectType} has no local manifest; it must already exist on the server`);
+    if (!target && !webhookClass) warn(where, `class ${event.fullObjectType} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     else if (target && target.type !== "TopLevel") error(where, "only top-level classes fire created and updated events");
     if (root && !webhookClass && event.fullObjectType.split(".").slice(0, -1).join(".") !== root) error(where, `only classes directly in ${root} (and webhook event classes, from webhooks/*.json) have a flow to run it from`);
     if (!event.text.trim()) error(where, "the script is empty");
@@ -403,7 +403,7 @@ function checkWebhooks(state, byName, error, warn) {
     else {
       const body = byName.get(hook.bodyClass);
       if (appName && !hook.bodyClass.startsWith(`app.${appName}.`)) error(where, `bodyClass must live under app.${appName}`);
-      if (!body) warn(where, `body class ${hook.bodyClass} has no local manifest; it must already exist on the server`);
+      if (!body) warn(where, `body class ${hook.bodyClass} has no local manifest; it must exist on the server (or be added there) before the class is used`);
       else if (body.type !== "Embedded") error(where, `body class ${hook.bodyClass} must be Embedded`);
     }
 
@@ -464,12 +464,12 @@ function checkShared(state, byName, error, warn) {
     for (const key of ["inputObjectType", "outputObjectType"]) {
       if (data[key] === undefined || data[key] === "") continue;
       if (typeof data[key] !== "string") error(where, `${key} must be a class's full name`);
-      else if (!byName.has(data[key])) warn(where, `${key} ${data[key]} has no local manifest; it must already exist on the server`);
+      else if (!byName.has(data[key])) warn(where, `${key} ${data[key]} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     }
     if (data.profiles !== undefined && !Array.isArray(data.profiles)) { error(where, "profiles must be a list of profile names (leave it out to let every caller run it)"); continue; }
     for (const p of data.profiles ?? []) {
       if (p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} can always call it; no need to list it`);
-      else if (!profileNames.has(p)) warn(where, `profile ${p} has no local manifest; it must already exist on the server`);
+      else if (!profileNames.has(p)) warn(where, `profile ${p} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     }
   }
 
@@ -482,7 +482,7 @@ function checkShared(state, byName, error, warn) {
   ];
   for (const { where, text } of callers) {
     for (const name of sharedCalls(text, appName)) {
-      if (!sharedNames.has(name)) warn(where, `calls shared script ${name}, which has no local manifest; it must already exist on the server`);
+      if (!sharedNames.has(name)) warn(where, `calls shared script ${name}, which has no local manifest; it must exist on the server (or be added there) before the class is used`);
     }
   }
 }
@@ -573,7 +573,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     if (data.inheritsFrom !== undefined && !Array.isArray(data.inheritsFrom)) { error(where, "inheritsFrom must be a list of profile names"); continue; }
     for (const parent of data.inheritsFrom ?? []) {
       if (parent === name) error(where, "a profile can't inherit from itself");
-      else if (!knownProfile(parent)) warn(where, `inherits from ${parent}, which has no local manifest; it must already exist on the server`);
+      else if (!knownProfile(parent)) warn(where, `inherits from ${parent}, which has no local manifest; it must exist on the server (or be added there) before the class is used`);
     }
   }
 
@@ -603,7 +603,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     if (basename(file) !== `${data.fullObjectType}.json`) warn(where, `file name should be ${data.fullObjectType}.json`);
     const own = checkProfileApp(where, data);
     if (own && data.profileName.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) { error(where, `${DEFAULT_PROFILE} always has full access and can't be restricted`); continue; }
-    if (!knownProfile(data.profileName)) warn(where, `profile ${data.profileName} has no local manifest; it must already exist on the server`);
+    if (!knownProfile(data.profileName)) warn(where, `profile ${data.profileName} has no local manifest; it must exist on the server (or be added there) before the class is used`);
 
     const bad = badValues(data.permissions, CLASS_PERMISSIONS);
     if (!bad) error(where, "permissions is required (a list; [] removes the profile's access)");
@@ -709,7 +709,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     if (!Array.isArray(data.profiles)) { error(where, "profiles is required (a list; [] leaves only the default profile)"); continue; }
     for (const p of data.profiles) {
       if (own && p.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) warn(where, `${DEFAULT_PROFILE} always runs every action; no need to list it`);
-      else if (!knownProfile(p)) warn(where, `profile ${p} has no local manifest; it must already exist on the server`);
+      else if (!knownProfile(p)) warn(where, `profile ${p} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     }
   }
 
@@ -722,7 +722,7 @@ function checkAccess(state, byName, propsOf, error, warn) {
     else if (badProviders.length) error(where, `unknown providers ${badProviders.join(", ")}. Valid: ${PROVIDERS.join(", ")}`);
     if (!SIGNUP.includes(data.signup)) error(where, `signup must be ${SIGNUP.join(" or ")}`);
     if (!data.signupProfile) error(where, "signupProfile is required");
-    else if (!knownProfile(data.signupProfile)) warn(where, `signupProfile ${data.signupProfile} has no local manifest; it must already exist on the server`);
+    else if (!knownProfile(data.signupProfile)) warn(where, `signupProfile ${data.signupProfile} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     else if (data.signup === "open" && data.signupProfile.toLowerCase() === DEFAULT_PROFILE.toLowerCase()) {
       warn(where, `open sign-up with ${DEFAULT_PROFILE} gives anyone who signs in full access; use a restricted profile`);
     }
@@ -953,7 +953,7 @@ function checkForeignKeys(cls, propsOf, where, byName, error, warn) {
     const target = fk.referenceObjectType === cls.fullObjectType ? cls : byName.get(fk.referenceObjectType);
     if (!fk.referenceObjectType) continue;
     if (!target) {
-      if (fk.referenceObjectType.startsWith("app.")) warn(where, `foreign key target ${fk.referenceObjectType} has no local manifest; it must already exist on the server`);
+      if (fk.referenceObjectType.startsWith("app.")) warn(where, `foreign key target ${fk.referenceObjectType} has no local manifest; it must exist on the server (or be added there) before the class is used`);
     } else if (target.type === "Embedded") {
       error(where, `foreign key "${field}" points at ${fk.referenceObjectType}, an embedded class; only top-level classes can be referenced`);
     } else if (fk.referenceFieldName && fk.referenceFieldName !== "_id" && !propsOf(target)[fk.referenceFieldName]) {
@@ -1106,47 +1106,30 @@ function plan(state) {
     const { profileName, description, inheritsFrom } = strip(state.profiles.find((p) => p.data.profileName === item.name).data);
     calls.push({ tool: item.state === "new" ? "add_profile" : "replace_profile", record: ["profile", item.name], args: { appName, profileName, description, ...(inheritsFrom?.length ? { inheritsFrom } : {}) } });
   }
-  // a foreign key's target must exist on the server first; classes that point at each other are added
-  // without the foreign keys to the ones not added yet, and replaced with them once every class exists
+  // the server saves a class whose base, embedded classes or foreign key targets don't exist yet (it lists them as missing
+  // references), so every class goes in one call, in any order or in parallel; dependency order keeps the missing ones rare
   const classItems = items.filter((i) => i.kind === "class");
-  const newClasses = new Set(classItems.filter((i) => i.state === "new").map((i) => i.name));
-  const onServer = new Set();
-  const deferred = [];
-  // class drafts sent in this plan: the classes that use them wait until the user applies them
+  // class drafts sent in this plan: the classes that use them can be saved, but can't be used until the user applies them
   const drafted = new Set();
   for (const item of dependencyOrder(classItems, state)) {
+    if (item.state !== "new" && item.state !== "changed") continue;
     const { data } = state.classes.find((c) => c.data.fullObjectType === item.name);
-    const waitsFor = [...new Set([data.baseObjectType, ...(data.foreignKeys ?? []).map((fk) => fk.referenceObjectType), ...embeddedFields(data).map(([, target]) => target)])]
-      .filter((target) => target !== item.name && drafted.has(target));
-    if ((item.state === "new" || item.state === "changed") && waitsFor.length) {
-      if (isDraftClass(appName && `app.${appName}`, item.name)) drafted.add(item.name);
-      blocked.push({ kind: "class", name: item.name, reason: `uses ${waitsFor.join(", ")}, sent as class draft(s): run plan again once the user applied them` });
-      continue;
+    const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable, collectionName, databaseName } = strip(data);
+    const args = { appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(foreignKeys?.length ? { foreignKeys } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) };
+    const usesDrafts = [...new Set([baseObjectType, ...(foreignKeys ?? []).map((fk) => fk.referenceObjectType), ...embeddedFields(data).map(([, target]) => target)])]
+      .filter((target) => target && target !== item.name && drafted.has(target));
+    const waitNote = usesDrafts.length ? `uses ${usesDrafts.join(", ")}, sent as class draft(s): the server saves it with missing references, and it can't be used until the user applies them` : null;
+    if (isDraftClass(appName && `app.${appName}`, item.name)) {
+      // outside the app: only proposed, the class changes when the user applies the draft in the designer
+      const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = { ...args, ...(collectionName != null ? { collectionName } : {}), ...(databaseName != null ? { databaseName } : {}) };
+      const applyFirst = baseObjectType && drafted.has(baseObjectType) ? `; apply the ${baseObjectType} draft first (Apply refuses a base that doesn't exist)` : "";
+      const note = `a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists it${applyFirst}${waitNote ? `; it ${waitNote}` : ""}`;
+      calls.push({ tool: item.state === "new" ? "add_class_draft" : "replace_class_draft", record: null, recordAfterApply: ["class", item.name], note, args: draftArgs });
+      drafted.add(item.name);
+    } else {
+      calls.push({ tool: item.state === "new" ? "add_object_class" : "replace_object_class", record: ["class", item.name], ...(waitNote ? { note: `it ${waitNote}` } : {}), args });
     }
-    if (item.state === "new" || item.state === "changed") {
-      const { fullObjectType, type, baseObjectType, discriminatorField, discriminatorValue, indexedFields, foreignKeys, schema, isFullTextSearchable, collectionName, databaseName } = strip(data);
-      const args = (fks) => ({ appName, fullObjectType, type, ...(baseObjectType ? { baseObjectType } : {}), ...(discriminatorField ? { discriminatorField } : {}), ...(discriminatorValue ? { discriminatorValue } : {}), indexedFields, ...(fks?.length ? { foreignKeys: fks } : {}), schema, ...(typeof isFullTextSearchable === "boolean" ? { isFullTextSearchable } : {}) });
-      const pendingTarget = (fk) => fk.referenceObjectType !== fullObjectType && newClasses.has(fk.referenceObjectType) && !onServer.has(fk.referenceObjectType);
-      const waiting = (foreignKeys ?? []).filter(pendingTarget);
-      if (isDraftClass(appName && `app.${appName}`, item.name)) {
-        // outside the app: only proposed, the class changes when the user applies the draft in the designer
-        const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = { ...args(foreignKeys), ...(collectionName != null ? { collectionName } : {}), ...(databaseName != null ? { databaseName } : {}) };
-        const note = `a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists it${waiting.length ? `; ${[...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ")} must exist first` : ""}`;
-        calls.push({ tool: item.state === "new" ? "add_class_draft" : "replace_class_draft", record: null, recordAfterApply: ["class", item.name], note, args: draftArgs });
-        drafted.add(item.name);
-      } else if (!waiting.length) {
-        calls.push({ tool: item.state === "new" ? "add_object_class" : "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
-      } else if (item.state === "new") {
-        const targets = [...new Set(waiting.map((fk) => fk.referenceObjectType))].join(", ");
-        calls.push({ tool: "add_object_class", record: null, note: `without its foreign keys to ${targets} (not added yet); don't record it, the replace_object_class further down adds them and is recorded`, args: args((foreignKeys ?? []).filter((fk) => !pendingTarget(fk))) });
-        deferred.push({ tool: "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
-      } else {
-        deferred.push({ tool: "replace_object_class", record: ["class", item.name], args: args(foreignKeys) });
-      }
-    }
-    onServer.add(item.name);
   }
-  calls.push(...deferred);
   for (const item of pending("access")) {
     const { data } = state.access.find((a) => accessName(a.data) === item.name);
     if (!data.fullObjectType?.startsWith("app.")) {

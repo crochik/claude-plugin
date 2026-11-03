@@ -175,7 +175,7 @@ every property holding ids, with `dictionaryPart` for a dictionary, and
 }
 ```
 
-Maps 1:1 to `register_action`, except `elevated` and `runAsProfile`. `scope` is `Instance` |
+Maps 1:1 to `register_action`, except `elevated`, `runAsProfile` and `timeoutSeconds`. `scope` is `Instance` |
 `Bulk` | `Class`. The script is `scripts/<actionName>.ts` by convention; no
 field needed. The script's grant is sent with it to
 `replace_action_script` (see the `bootstrapp-apiscript` skill): none
@@ -183,13 +183,15 @@ field needed. The script's grant is sent with it to
 the caller's profile) or an app profile's (`"runAsProfile"`, sent as
 `profile`). The script runs with the caller's access except inside
 `session.elevated(() => …)`, which uses the grant. Set `elevated` or `runAsProfile`, never `elevated: true` with a
-profile; `check` warns when neither is set and fails on both. Changing them
-re-pushes the script, not the action.
+profile; `check` warns when neither is set and fails on both. Optional
+`timeoutSeconds` (1 to 600, or `0` for no limit; default 60) is sent with
+the script too: how long it may run when the action runs. Changing any of
+them re-pushes the script, not the action.
 
 ## `scripts/<actionName>.ts`
 
 The ApiScript body sent verbatim as `replace_action_script.actionScript`, with
-`elevated` (and `runAsProfile` as `profile`) from the action manifest. See
+`elevated`, `timeoutSeconds` (and `runAsProfile` as `profile`) from the action manifest. See
 the `bootstrapp-apiscript` skill.
 
 ## `shared/<scriptName>.json` and `shared/<scriptName>.ts`

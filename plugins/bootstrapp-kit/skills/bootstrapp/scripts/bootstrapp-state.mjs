@@ -122,11 +122,13 @@ function strip(value) {
 const hash = (text) => createHash("sha256").update(text).digest("hex").slice(0, 16);
 
 const USES_ELEVATED = /\.elevated\s*\(/;
-// "elevated" (as the account) and "runAsProfile" (as that profile; never both) in an action manifest go to
-// replace_action_script (elevated, profile), not register_action, so they are part of the script's hash and not the action's.
-const actionArgs = (data) => { const { elevated, runAsProfile, ...rest } = strip(data); return rest; };
-const scriptHash = (text, action) => hash(action?.runAsProfile ? `${text}\n// as ${action.runAsProfile}`
-  : action?.elevated === true ? `${text}\n// elevated` : text);
+// "elevated" (as the account), "runAsProfile" (as that profile; never both) and "timeoutSeconds" in an action manifest go to
+// replace_action_script (elevated, profile, timeoutSeconds), not register_action, so they are part of the script's hash and not the action's.
+const actionArgs = (data) => { const { elevated, runAsProfile, timeoutSeconds, ...rest } = strip(data); return rest; };
+const scriptHash = (text, action) => {
+  const grant = action?.runAsProfile ? `${text}\n// as ${action.runAsProfile}` : action?.elevated === true ? `${text}\n// elevated` : text;
+  return hash(action?.timeoutSeconds !== undefined ? `${grant}\n// timeout ${action.timeoutSeconds}` : grant);
+};
 // events/<name>.json (optional) holds what replace_class_event_script takes besides the script: runAsProfile
 const eventHash = (event) => hash(event.data?.runAsProfile ? `${event.text}\n// as ${event.data.runAsProfile}` : event.text);
 const hashJson = (value) => hash(JSON.stringify(strip(value)));
@@ -325,6 +327,9 @@ function check(state) {
     if (action.elevated === undefined && !action.runAsProfile) warn(where, "elevated is not set; the script runs with the caller's access. Decide: false, true (as the account) or a runAsProfile (bootstrapp-apiscript skill, Elevated scripts)");
     else if (action.elevated !== undefined && typeof action.elevated !== "boolean") error(where, "elevated must be true or false");
     checkRunAsProfile(where, action.runAsProfile, action.elevated === true, profileNames, error, warn);
+    if (action.timeoutSeconds !== undefined && !(Number.isInteger(action.timeoutSeconds) && action.timeoutSeconds >= 0 && action.timeoutSeconds <= 600)) {
+      error(where, "timeoutSeconds must be a whole number from 1 to 600, or 0 for no limit");
+    }
 
     const target = byName.get(action.fullObjectType);
     if (!target) warn(where, `target ${action.fullObjectType} has no local manifest`);
@@ -1179,7 +1184,7 @@ function plan(state) {
       blocked.push({ kind: "script", name: item.name, reason: "no action manifest for this script" });
       continue;
     }
-    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.runAsProfile ? { profile: action.runAsProfile } : {}) } });
+    calls.push({ tool: "replace_action_script", record: ["script", item.name], args: { fullObjectType: action.fullObjectType, actionName: item.name, actionScript: `<contents of ${join(dir, "scripts", `${item.name}.ts`)}>`, elevated: action.elevated === true, ...(action.runAsProfile ? { profile: action.runAsProfile } : {}), ...(action.timeoutSeconds !== undefined ? { timeoutSeconds: action.timeoutSeconds } : {}) } });
   }
   // after the body classes, before the event scripts: replace_webhook makes the event class a script runs on
   for (const item of pending("webhook")) {

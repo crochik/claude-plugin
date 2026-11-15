@@ -450,13 +450,15 @@ An optional plugin the app adds, so its scripts can import its module
 `add_plugin`'s arguments without `appName`:
 
 ```json
-{ "name": "github", "settings": { "integration": "github-acme" } }
+{ "name": "github", "settings": { "integration": "3f2b9c1e-…-integration-id" } }
 ```
 
 `name` is the plugin's name from `get_plugins` (`sample`, not
 `@plugin.sample`). `settings` (optional) are the plugin's per-app
 settings that `get_plugin` lists, an object of strings, never secrets:
-credentials live in the account's integrations. Changing them changes
+credentials live in the account's integrations. A setting that picks an
+integration (`github`'s `integration`) takes its id
+(`get_account_integrations`), not its name. Changing them changes
 the manifest's hash, so `plan` calls `add_plugin` again, which replaces
 them. `add_plugin` returns the plugin's `setup` and `pending` (what is
 still missing for this app): follow them; nothing of it goes in this

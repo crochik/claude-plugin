@@ -43,7 +43,8 @@ const CLASS_PERMISSIONS = ["Read", "Create", "Update", "Delete", "Import", "Expo
 const FIELD_PERMISSIONS = ["Read", "Update", "SetOnCreate", "Reset", "CreateOnDemand"];
 const RELATION_PERMISSIONS = ["Read"];
 const RELATION_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
-const OPERATORS = ["Eq", "Ne", "Gt", "Gte", "Lt", "Lte", "In", "Nin"];
+const BITWISE_OPERATORS = ["BitsAllSet", "BitsAnySet", "BitsAnyClear", "BitsAllClear"];
+const OPERATORS = ["Eq", "Ne", "Gt", "Gte", "Lt", "Lte", "In", "Nin", ...BITWISE_OPERATORS];
 const CONTEXT_KEYS = ["AccountId", "OrganizationId", "UserId", "EntityId", "ProfileId", "ClientId", "AllProfileIds", "AllUserIds", "AllOrganizationIds", "AllEntityIds"];
 const CONTEXT_VALUE = /^\{\{\s*context\s+"(?<key>[^"]+)"\s*\}\}$/;
 const PROVIDERS = ["Microsoft", "Google", "Salesforce", "GitHub"];
@@ -691,8 +692,20 @@ function checkAccess(state, byName, propsOf, error, warn) {
         if (!OPERATORS.includes(c.operator)) error(where, `${at}: operator must be one of ${OPERATORS.join(", ")}`);
         const values = Array.isArray(c.value) ? c.value : [c.value];
         const isList = Array.isArray(c.value) || (typeof c.value === "string" && /"All\w+Ids"/.test(c.value));
-        if (["In", "Nin"].includes(c.operator) && !isList) error(where, `${at}: ${c.operator} takes a list (or an All*Ids context value)`);
-        if (OPERATORS.includes(c.operator) && !["In", "Nin"].includes(c.operator) && isList) error(where, `${at}: ${c.operator} takes a single value; use In or Nin with a list`);
+        // a number field may be a flag field (BitwiseFlagField, made in the designer): Eq/Ne/In/Nin then take a set of flags
+        const fieldType = cls ? all[c.fieldName.split(".")[0]]?.type : undefined;
+        const maybeFlags = !cls || fieldType === "integer" || fieldType === "number";
+        if (BITWISE_OPERATORS.includes(c.operator)) {
+          const isMask = (v) => (Number.isInteger(v) && v >= 0) || (typeof v === "string" && v.trim() !== "");
+          if (c.value === undefined || !values.length || !values.every(isMask)) error(where, `${at}: ${c.operator} takes a mask: a number, a list of numbers or "1, 4" (flag names on a flag field)`);
+          if (cls && fieldType && !maybeFlags) error(where, `${at}: ${c.operator} needs a number field; ${c.fieldName} is ${fieldType}`);
+        } else if (["In", "Nin"].includes(c.operator) && !isList) {
+          if (maybeFlags && c.value !== undefined) warn(where, `${at}: ${c.operator} with a single value only works on a flag field (a set of flags, e.g. "Read, Update"); otherwise it takes a list (or an All*Ids context value)`);
+          else error(where, `${at}: ${c.operator} takes a list (or an All*Ids context value)`);
+        } else if (!["In", "Nin"].includes(c.operator) && isList) {
+          if (maybeFlags && ["Eq", "Ne"].includes(c.operator) && Array.isArray(c.value)) warn(where, `${at}: ${c.operator} with a list only works on a flag field (has all / not all of the flags); otherwise use In or Nin`);
+          else error(where, `${at}: ${c.operator} takes a single value; use In or Nin with a list`);
+        }
         for (const v of values) {
           if (typeof v !== "string" || !v.includes("{{")) continue;
           const key = CONTEXT_VALUE.exec(v)?.groups?.key;

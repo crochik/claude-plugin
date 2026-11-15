@@ -118,12 +118,18 @@ Rules worth knowing while writing them:
   fields as usual; constraints don't apply to embedded classes. `check`
   warns about a granted field whose embedded class the profile can't read
   or set, and `replace_class_access` says so in its result.
-- **Constraints**: operators `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`; values are
+- **Constraints**: operators `Eq, Ne, Gt, Gte, Lt, Lte, In, Nin`, and the
+  bitwise `BitsAllSet, BitsAnySet, BitsAnyClear, BitsAllClear` on a number
+  field (value: a mask, a number, numbers or `"1, 4"`); values are
   literals or `{{context "Key"}}` (`UserId`, `OrganizationId`, `AccountId`,
   `EntityId`, `ProfileId`, `ClientId`, the lists `AllProfileIds`,
   `AllUserIds`, `AllOrganizationIds`, `AllEntityIds`, and `Claims.<name>`
   from `auth.json`'s `calculatedClaims`). `In`/`Nin` take a list or an `All*`
-  key. Constraints apply to top-level classes only.
+  key. On a flag field (`BitwiseFlagField`, made in the designer) `Eq`,
+  `In`, `Ne`, `Nin` take a set of flags (a mask, flag names, a list or
+  `"Read, Update"`) and mean has all / any / not all / none of them; such
+  an `Eq` doesn't stamp the field on create. Constraints apply to top-level
+  classes only.
 - **Calculated claims** put values from the user's, their organization's or
   the account's record into the token (`{{Objects.Organization.Name}}`), for
   constraints (`Claims.<name>`) and scripts (`session.getClaim`). Only the
@@ -160,7 +166,9 @@ Rules worth knowing while writing them:
   {{context "UserId"}}` limits the profile to its records *and* fills
   `ownerId` on the records it creates. The client doesn't send it. The
   profile also can't change a field its row constraints test, so it can't
-  move a record to another owner or organization.
+  move a record to another owner or organization: an update (or CSV
+  import) that tries just drops that change, with no error, and saves the
+  rest; `updateMany` still refuses an operation on such a field.
 - **Update and delete constraints** (`updateConstraints`,
   `deleteConstraints`) narrow, within what the profile sees, which records it
   may update and delete. A delete must match the row, update *and* delete

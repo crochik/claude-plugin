@@ -33,6 +33,8 @@ const SNAKE = /^[a-z][a-z0-9_]*$/;
 const PASCAL = /^[A-Z][A-Za-z0-9]*$/;
 const CAMEL = /^[a-z][A-Za-z0-9]*$/;
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// init_app's clientId (OIDC client_id, unique across the platform); the app name when left out
+const CLIENT_ID = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/;
 const SCOPES = ["Instance", "Bulk", "Class"];
 
 // Access control (see the bootstrapp-access skill). Names as the MCP tools take them.
@@ -211,6 +213,7 @@ function check(state) {
     if (!SNAKE.test(app.name ?? "")) error("app.json", `name "${app.name}" must be snake_case (lowercase letters, digits, underscores)`);
     if (!app.title) error("app.json", "title is required");
     if (!app.description || app.description.length < 20) error("app.json", "description should be a real paragraph");
+    if (app.clientId !== undefined && !CLIENT_ID.test(app.clientId)) error("app.json", `clientId "${app.clientId}" must start with a letter and use only letters, digits, _ and - (up to 64)`);
   }
   const root = app?.name ? `app.${app.name}` : null;
 
@@ -1099,7 +1102,8 @@ function plan(state) {
   const blocked = [];
   const app = items.find((i) => i.kind === "app");
   if (app?.state === "new") {
-    calls.push({ tool: "init_app", record: ["app", appName], args: { appName, appTitle: state.app.title, appDescription: state.app.description } });
+    const clientId = state.app.clientId ? { clientId: state.app.clientId } : {};
+    calls.push({ tool: "init_app", record: ["app", appName], args: { appName, appTitle: state.app.title, appDescription: state.app.description, ...clientId } });
   }
   const pending = (kind) => items.filter((i) => i.kind === kind && i.state !== "applied");
   for (const item of profileOrder(pending("profile"), state)) {

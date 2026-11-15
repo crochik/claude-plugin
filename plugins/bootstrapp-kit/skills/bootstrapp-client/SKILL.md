@@ -43,8 +43,11 @@ were never applied won't be in it.
 ## What the API looks like
 
 - Per top-level class: filter, create, update, delete operations. Filter
-  takes `{ conditions: [{ field, operator, value? }], fields: [...] }`, AND
-  only, on indexed fields; the response contains only the listed fields plus
+  takes `{ conditions: [{ field, operator, value? }], fields: [...] }`,
+  ANDed, on indexed fields; for an either/or a condition can be a group,
+  `{ operator: "Or" | "And", conditions: [...] }` (nestable, no `#text` or
+  related-object fields inside), when the generated condition type has
+  `conditions`. The response contains only the listed fields plus
   `_id`, so always pass every field the screen shows. Operators and value
   rules: the server's filter-operators resource.
 - Update is a `PATCH`: send only the fields the user changed, not the

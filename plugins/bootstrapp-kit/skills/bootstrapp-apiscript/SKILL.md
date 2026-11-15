@@ -65,7 +65,10 @@ The mistakes that matter most (the rule book has the rest):
   (`app.shop`; `@objects` for classes without one, and
   `@objects.app.shop` works as another name for `app.shop`).
 - `filterX` conditions and `orderBy` use indexed fields only, and `fields`
-  names everything you read.
+  names everything you read. Conditions are ANDed; for an either/or use a
+  group, `{ operator: "Or", conditions: [...] }` (`"And"` to nest one
+  inside an `Or`), with no `#text` or related-object fields inside it.
+  `updateManyX`'s filter doesn't take groups.
 - `updateXById` is a patch: send only the changed fields.
 - The same change to every record matching a filter (archive all open
   tasks of a project, `Inc` a counter, `AddToSet` a tag) is one

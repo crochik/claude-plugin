@@ -204,7 +204,7 @@ and you can grep them when needed.
 When the state helper reports something changed after it was applied, `plan`
 lists the replace call for it:
 
-- **Script changed**, or its action's `elevated` or `runAsProfile` → `replace_action_script` again.
+- **Script changed**, or its action's `elevated`, `runAsProfile` or `timeoutSeconds` → `replace_action_script` again.
 - **Class event script changed** → `replace_class_event_script` again;
   **deleted** → `remove_class_event_script`.
 - **Network policy changed** → `replace_network_policy` (with the

@@ -96,6 +96,7 @@ reads and writes map to the generated endpoints; the rest become actions.
 | `actionDescription` | 1–3 sentences: what it does, side effects, invariants it enforces, errors it throws. |
 | `elevated` | `false` (the script runs with the caller's access) unless it must read or write what the caller's profile doesn't allow; then `true`, and say in `actionDescription` what the script checks instead. Sent with the script, not with `register_action`. |
 | `runAsProfile` | Optional, instead of `elevated: true`: an app profile made for this step; the script runs with its access instead of the caller's (never with `elevated: true`). Prefer it whenever the step's access can be written down as a profile. |
+| `timeoutSeconds` | Optional: how long the script may run, 1 to 600, or `0` for no limit (default 60). Only for a script that calls a slow service or an action whose flow takes long; a script called from another script also stops with its caller's run. Sent with the script. |
 
 Never reuse a domain class as an input or output. Payload classes describe a
 request/response, not a stored document.

@@ -127,8 +127,10 @@ under the same rules.
 
 Read the server's auth-config resource first; it is authoritative. In short:
 OIDC authorization code with PKCE on every platform, request only `openid`,
-read user info from the access token's claims, `client_id` is the app name
-for TypeScript web apps (from env elsewhere), tokens in platform-appropriate
+read user info from the access token's claims, `client_id` is the app's
+client id (`init_app`'s result or `get_app_auth`; the app name unless
+`app.json` sets `clientId`) loaded from env on every platform, so a copy of
+the app in another account can use its own, tokens in platform-appropriate
 secure storage, and always a user-initiated login entry point. Register every
 redirect URL (dev and deployed) with `add_oidc_client_redirect`, or login
 fails there. Surface authorization errors from the backend; don't re-implement

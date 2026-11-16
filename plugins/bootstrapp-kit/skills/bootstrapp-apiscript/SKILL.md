@@ -219,16 +219,17 @@ public API itself when nothing secret or server-side is involved.
 integrations on the user running the script (`"user"`) or their
 organization (`"organization"`, changed only by a manager or an elevated
 script) (rule book, "Integrations"). Providers are platform wide (the
-same `id` in every account) and the account adds the ones it uses first
-with `add_integration`. Calls take the `id` or the name, so name it in the
+same `id` in every account) or the account's own (`add_integration_provider`),
+and the account adds the ones it uses first with `add_integration`. Calls take the `id` or the name, so name it in the
 script, never take it from `input`: `integration.set("twilio", ...)`. `values`
 integrations take `set(id, level, values)`; OAuth ones (`oauth2`, `oidc`)
 take `connect(id, level, { scopes?, offline?, returnUrl? })`, which returns
 a `url` the client sends the browser to within 10 minutes (`returnUrl`
 must be on one of the app client's origins). `get` and `list` say only
-whether each secret is set, so a script can't read a credential back, and
-nothing on the platform uses these credentials yet: a script calling the
-service with `@system.http` still needs its key per "HTTP calls" above.
+whether each secret is set, so a script can't read a credential back.
+Plugins use them (below: `@plugin.github`, integration plugins); a
+script calling the service with `@system.http` itself still needs its
+key per "HTTP calls" above.
 
 ## Optional plugins
 
@@ -253,8 +254,24 @@ A plugin that calls an API makes script HTTP calls: the network policy
 of the scripts that use it (`network/<name>.json`) must allow its
 `hosts`, and someone activates the policy outside MCP.
 
-Plugins today: `sample` (an example with no side effects) and `github`
-(GitHub REST API with a token from the account's GitHub integration;
+Plugins with `source: "integration"` in `get_plugins` are defined from
+an API's operations rather than written in code, by the platform owner
+(`@plugin.<name>`) or by an account admin for the account's own apps
+(name `api.<name>`, so `plugins/api.<name>.json` and
+`import * as acme from "@api.acme"`); an app adds and imports them the
+same way. Every function takes `(params, body)`: `params` holds the
+operation's path, query and header parameters by name, `body` the JSON
+body (only for operations that take one), both typed in
+`platform.d.ts`. It returns the response's JSON and throws on a non-2xx
+status, which ends the run, so check inputs first when you need your
+own error (rule book, "Integration plugins"). Their `setup` usually
+asks to add and connect the plugin's integration and to allow its host
+in the network policy. An account's own plugins only use the account's
+own providers.
+
+Code plugins today: `sample` (an example with no side effects) and `github`
+(GitHub REST API with a token from the account's `github` integration,
+always that provider, so it has no settings;
 rule book, "@plugin.github"). With nobody connected, `github` calls go
 out as the integration's GitHub App (the bot) once the developer pastes
 the app's private key in the designer (`integration.github.Setup`). A

@@ -67,6 +67,10 @@ const KINDS = { app: null, profile: "profiles", class: "classes", access: "acces
 const POLICY_ID = "<id replace_network_policy returned>";
 // plugins/<name>.json: an optional plugin the app adds (add_plugin, with its optional settings), so its scripts can import @plugin.<name>
 const PLUGIN_PREFIX = "@plugin.";
+// an account's own API plugins: module @api.<name>, plugin name api.<name>
+const API_PREFIX = "@api.";
+const PLUGIN_NAME = /^(api\.)?[A-Za-z_][A-Za-z0-9_]*$/;
+const pluginModule = (name) => name.startsWith("api.") ? `@${name}` : `${PLUGIN_PREFIX}${name}`;
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 // events/<fullObjectType>.<created|updated>.<scriptName>.ts: one of the scripts a class runs after one of its objects
@@ -532,7 +536,7 @@ function checkNetwork(state, error, warn) {
 // The plugins a script imports (import * as x from "@plugin.<name>")
 function importedPlugins(text) {
   if (!text) return [];
-  return [...new Set([...text.matchAll(/import\s+\*\s+as\s+[A-Za-z_]\w*\s+from\s+["']([^"']+)["']/g)].map((m) => m[1]).filter((m) => m.startsWith(PLUGIN_PREFIX)).map((m) => m.slice(PLUGIN_PREFIX.length)))];
+  return [...new Set([...text.matchAll(/import\s+\*\s+as\s+[A-Za-z_]\w*\s+from\s+["']([^"']+)["']/g)].map((m) => m[1]).flatMap((m) => m.startsWith(PLUGIN_PREFIX) ? [m.slice(PLUGIN_PREFIX.length)] : m.startsWith(API_PREFIX) ? [m.slice(1)] : []))];
 }
 
 function checkPlugins(state, error, warn) {
@@ -540,7 +544,7 @@ function checkPlugins(state, error, warn) {
   for (const { file, data } of state.plugins) {
     const where = `plugins/${basename(file)}`;
     if (data.$error) { error(where, data.$error); continue; }
-    if (!IDENTIFIER.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not @plugin.sample)"); continue; }
+    if (!PLUGIN_NAME.test(data.name ?? "")) { error(where, "name is required: the plugin's name from get_plugins (sample, not @plugin.sample; api.<name> for an account's @api.<name>)"); continue; }
     if (basename(file) !== `${data.name}.json`) warn(where, `file name should be ${data.name}.json`);
     if (data.settings !== undefined && (data.settings === null || typeof data.settings !== "object" || Array.isArray(data.settings) || Object.values(data.settings).some((v) => typeof v !== "string"))) {
       error(where, "settings must be an object of setting names and strings (get_plugin lists the plugin's settings); never secrets");
@@ -555,7 +559,7 @@ function checkPlugins(state, error, warn) {
   ];
   for (const [where, text] of sources) {
     for (const name of importedPlugins(text)) {
-      if (!declared.has(name)) error(where, `imports ${PLUGIN_PREFIX}${name}: add plugins/${name}.json ({ "name": "${name}" }) so the app adds it first`);
+      if (!declared.has(name)) error(where, `imports ${pluginModule(name)}: add plugins/${name}.json ({ "name": "${name}" }) so the app adds it first`);
     }
   }
 }

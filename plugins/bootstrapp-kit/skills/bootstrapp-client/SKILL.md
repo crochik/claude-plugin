@@ -129,8 +129,10 @@ under the same rules.
 ## Auth
 
 Read the server's auth-config resource first; it is authoritative. In short:
-OIDC authorization code with PKCE on every platform, request only `openid`,
-read user info from the access token's claims, `client_id` is the app's
+OIDC authorization code with PKCE on every platform, request `openid`, plus
+`offline_access` for a refresh token so the user stays signed in past the
+one-hour access token (`init_app`'s clients allow it), no `email` or
+`profile`: read user info from the access token's claims, `client_id` is the app's
 client id (`init_app`'s result or `get_app_auth`; the app name unless
 `app.json` sets `clientId`) loaded from env on every platform, so a copy of
 the app in another account can use its own, tokens in platform-appropriate

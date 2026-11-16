@@ -130,6 +130,21 @@ Rules worth knowing while writing them:
   `"Read, Update"`) and mean has all / any / not all / none of them; such
   an `Eq` doesn't stamp the field on create. Constraints apply to top-level
   classes only.
+- **Or / And groups**: a profile's constraints are ANDed; for "any of
+  these" use `{ "operator": "Or", "conditions": [...] }` (`"And"` to nest
+  inside an `Or`), no `fieldName` or `value`, at most 4 deep and 50
+  conditions. Record sharing, for example: `readerUsers In {{context
+  "AllEntityIds"}}` or `readerProfiles In {{context "AllProfileIds"}}` or
+  `readerUsers Null` (public). Inside a group, conditions are on the class's
+  own fields, with `Null` (empty or missing) and `Exists` (set) on a field;
+  `Exists` on a relation can't be inside one. Every field in a group counts
+  as constrained, so the profile can't change it (a reader can't add itself
+  to `readerUsers`): share through another profile or an action. A group
+  stamps nothing on create and a new record isn't checked against it, so set
+  the fields (e.g. `readerUsers` to the creator) when creating. It only
+  offers alternatives within one profile: the constraints of the profiles it
+  inherits from still apply too. Update and delete constraints take groups
+  as well.
 - **Calculated claims** put values from the user's, their organization's or
   the account's record into the token (`{{Objects.Organization.Name}}`), for
   constraints (`Claims.<name>`) and scripts (`session.getClaim`). Only the

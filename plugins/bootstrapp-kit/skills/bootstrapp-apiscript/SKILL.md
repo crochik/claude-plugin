@@ -68,7 +68,7 @@ The mistakes that matter most (the rule book has the rest):
   names everything you read. Conditions are ANDed; for an either/or use a
   group, `{ operator: "Or", conditions: [...] }` (`"And"` to nest one
   inside an `Or`), with no `#text` or related-object fields inside it.
-  `updateManyX`'s filter doesn't take groups.
+  `updateManyX`'s filter takes groups too.
 - `updateXById` is a patch: send only the changed fields.
 - The same change to every record matching a filter (archive all open
   tasks of a project, `Inc` a counter, `AddToSet` a tag) is one

@@ -676,16 +676,36 @@ function checkAccess(state, byName, propsOf, error, warn) {
     for (const list of ["constraints", "updateConstraints", "deleteConstraints"]) {
       if (data[list] !== undefined && !Array.isArray(data[list])) { error(where, `${list} must be a list`); continue; }
       if (data[list]?.length && cls?.type === "Embedded") error(where, `${list} only apply to top-level classes`);
-      for (const [i, c] of (data[list] ?? []).entries()) {
-        const at = `${list}[${i}]`;
-        if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required`); continue; }
+      let leafCount = 0;
+      const checkCondition = (c, at, depth, inGroup) => {
+        if (c && ["Or", "And"].includes(c.operator)) {
+          if (c.fieldName !== undefined || c.value !== undefined) error(where, `${at}: an ${c.operator} group takes only operator and conditions, no fieldName or value`);
+          if (!Array.isArray(c.conditions) || !c.conditions.length) { error(where, `${at}: an ${c.operator} group needs a non-empty conditions list`); return; }
+          if (depth >= 4) error(where, `${at}: groups nest at most 4 deep`);
+          for (const [j, g] of c.conditions.entries()) checkCondition(g, `${at}.conditions[${j}]`, depth + 1, true);
+          return;
+        }
+        if (inGroup) leafCount++;
+        if (!c?.fieldName || !c.operator) { error(where, `${at}: fieldName and operator are required (or an Or/And group with conditions)`); return; }
+        if (inGroup && ["Exists", "Null"].includes(c.operator)) {
+          // inside a group Exists/Null test a field of the class; a relation (a join) can't be part of an Or
+          if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${c.operator} inside a group takes a field of ${data.fullObjectType}${relationsOf(cls, byName).includes(c.fieldName) ? `; ${c.fieldName} is a relation, and Exists on a relation can't be inside a group` : ""}`);
+          if (list !== "constraints" && c.fieldName.includes(".")) error(where, `${at}: update and delete constraints take top-level fields only, not ${c.fieldName}`);
+          if (c.value !== undefined && c.value !== true) error(where, `${at}: ${c.operator} takes no value`);
+          return;
+        }
+        if (c.operator === "Null") {
+          if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}`);
+          if (c.value !== undefined) error(where, `${at}: Null takes no value`);
+          return;
+        }
         if (c.operator === "Exists") {
           const relations = cls ? relationsOf(cls, byName) : null;
           if (relations && !relations.includes(c.fieldName)) error(where, `${at}: Exists takes a relation name; ${data.fullObjectType}'s relations: ${relations.join(", ") || "none (add a string foreign key)"}`);
           if (c.value !== undefined && c.value !== true) error(where, `${at}: Exists takes no value`);
           const relationPerm = data.relationPermissions?.[c.fieldName];
           if (Array.isArray(relationPerm) && !relationPerm.includes("Read")) error(where, `${at}: the relation ${c.fieldName} must stay readable`);
-          continue;
+          return;
         }
         if (list !== "constraints" && c.fieldName.includes(".")) error(where, `${at}: update and delete constraints take top-level fields only, not ${c.fieldName}`);
         if (cls && !all[c.fieldName.split(".")[0]]) error(where, `${at}: ${data.fullObjectType} has no field ${c.fieldName}; add it to the class (e.g. ownerId, organizationId) first`);
@@ -713,7 +733,9 @@ function checkAccess(state, byName, propsOf, error, warn) {
           else if (!CONTEXT_KEYS.includes(key) && !key.startsWith("Claims.")) error(where, `${at}: unknown context key ${key}. Valid: ${CONTEXT_KEYS.join(", ")}, Claims.<name>`);
           else if (key.startsWith("Claims.") && !(key.slice(7) in (state.auth?.data?.calculatedClaims ?? {}))) warn(where, `${at}: claim ${key.slice(7)} isn't in auth.json calculatedClaims; it must be a claim the token already has`);
         }
-      }
+      };
+      for (const [i, c] of (data[list] ?? []).entries()) checkCondition(c, `${list}[${i}]`, 0, false);
+      if (leafCount > 50) error(where, `${list}: groups hold at most 50 conditions in all (${leafCount})`);
     }
   }
 

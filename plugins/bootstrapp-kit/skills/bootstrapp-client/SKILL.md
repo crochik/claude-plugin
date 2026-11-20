@@ -141,6 +141,11 @@ redirect URL (dev and deployed) with `add_oidc_client_redirect`, or login
 fails there. Surface authorization errors from the backend; don't re-implement
 access rules on the client.
 
+A screen or page that people use without signing in (a contact, lead or
+waitlist form) doesn't go through the client or a token: it posts to a public
+webhook's `url`, with a Firebase App Check token (Flutter) or a captcha token
+(web). Set it up per "public webhook" in `bootstrapp-actions`.
+
 ## New frontends
 
 For an app with no UI yet, use the stack's own scaffolder in the

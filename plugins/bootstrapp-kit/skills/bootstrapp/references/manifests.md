@@ -258,8 +258,36 @@ An inbound webhook: the `replace_webhook` arguments without `appName`.
 the base `app.<app>.webhook.WebhookEvent`); don't write class manifests for
 them. `bodyClass` is an Embedded class with a manifest of its own, applied
 first. Optional: `methods` (default `["POST"]`), `format` (`json`, `form`,
-`xml`, `raw`), `registration`, `response`, `dedupeKey`, `keepRawBody`,
-`enabled`. Auth step types and fields are in the server's `tools.md`.
+`xml`, `raw`), `registration`, `response` (with `redirect` and
+`failureRedirect` for an HTML form post), `dedupeKey`, `keepRawBody`,
+`rateLimit` (`{ perIp, perWebhook, windowSeconds }` or `"default"`),
+`maxBodyBytes`, `allowedOrigins` (web pages only), `enabled`. Auth step types
+and fields are in the server's `tools.md`.
+
+A webhook whose `auth` is only `none`, `appCheck`, `captcha` and `honeypot`
+is public: an app or a web page posts to it without a signed-in user, and it
+gets a default rate limit and a 64 KB body cap. A web form posting leads:
+
+```json
+{
+  "name": "leads",
+  "description": "Contact form on the marketing site",
+  "bodyClass": "app.shop.webhook.LeadBody",
+  "format": "form",
+  "auth": [
+    { "type": "captcha", "provider": "turnstile", "secret": "${env:TURNSTILE_SECRET}" },
+    { "type": "honeypot", "field": "website" }
+  ],
+  "allowedOrigins": ["https://shop.example.com"],
+  "response": {
+    "redirect": "https://shop.example.com/thanks?id={{eventId}}",
+    "failureRedirect": "https://shop.example.com/contact?error=1"
+  }
+}
+```
+
+A Flutter app uses `{ "type": "appCheck", "projectNumber": "<Firebase
+project number>" }` instead, with no `allowedOrigins` (apps send no Origin).
 
 Secrets (`secret`, `token`, `password`) are written `${env:NAME}`, and
 the values live in `.env` (list the names in `.env.example`). `plan` keeps

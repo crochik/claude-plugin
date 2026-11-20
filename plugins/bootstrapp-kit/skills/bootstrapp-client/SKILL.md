@@ -15,7 +15,10 @@ were never applied won't be in it.
 1. **Spec.** Call `generate_openapi_spec` with the app name. Download the URL
    straight to disk: `curl -fsSL -o bootstrapp/generated/openapi.yaml "<url>"`
    (single-use URL; don't print the file, it is large). Confirm it is
-   non-empty and starts with `openapi:`.
+   non-empty and starts with `openapi:`. The spec covers what the app's
+   default profile can reach; for a client used by one kind of user only,
+   pass `profileId` (that profile's id or name) to build it from that
+   profile's grants instead.
 2. **Settings.** Read `client` in `bootstrapp/app.json`; if missing, pick
    defaults from the app's stack and write them back:
    - `language`: `typescript` for web/Node, `flutter` for Dart, otherwise the

@@ -78,6 +78,31 @@ one up:
 5. When deliveries don't show up, `get_webhook` lists the latest requests and
    why each was refused.
 
+The same goes for submissions from the app's own users who aren't signed in,
+like a lead or waitlist form on a web page or a "contact us" screen in a
+Flutter app: a **public webhook** (`auth` only of `none`, `appCheck`,
+`captcha` and `honeypot`), not an anonymous profile or an action. Anyone can
+call it, since an app or a page can't keep a secret, so:
+
+- Prove the caller: `appCheck` for Flutter/mobile apps with Firebase App
+  Check (the app sends its token in `X-Firebase-AppCheck`; not on Windows or
+  Linux), `captcha` (Turnstile, hCaptcha or reCAPTCHA) for web pages, plus a
+  `honeypot` field on web forms. `none` alone works but `check` and the tools
+  warn.
+- Keep the default rate limit (10 a minute per IP, 300 per webhook) unless
+  the user wants another `rateLimit`. For a web form, set `allowedOrigins`
+  and `response.redirect` to a thank-you page; leave `allowedOrigins` out for
+  apps.
+- Treat the event as quarantine: the Created script copies only the fields it
+  expects into the target object (never the whole body: owner, status or
+  organization fields would be the caller's to set), validates and dedupes
+  (e.g. by email), and sets `status` to `ignored` for junk. It doesn't email
+  or text an address from the body unchecked, or strangers could use the app
+  to message anyone.
+
+The client posts to the webhook's `url` directly, outside the generated API
+client and without a token.
+
 See "Webhooks" in the server's `platform-notes.md`.
 
 When migrating, each custom endpoint of the old backend gets this test. Plain

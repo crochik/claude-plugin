@@ -84,7 +84,11 @@ const WEBHOOK_FORMATS = ["json", "form", "xml", "raw"];
 const WEBHOOK_AUTH = {
   none: [], hmac: ["header", "secret"], bearer: ["token"], apikey: ["token"], basic: ["username", "password"], ipAllowlist: ["ranges"],
   twilio: ["token"], ecdsa: ["publicKey"], stripe: ["secret"], docuseal: ["secret"], openphone: ["secret"], clientCert: ["thumbprints|subject"], bodyField: ["path", "value"],
+  appCheck: ["projectNumber"], captcha: ["provider", "secret"], honeypot: ["field"],
 };
+// steps that need no secret only the caller has: a webhook made only of these is public (anyone can call it)
+const WEBHOOK_PUBLIC_AUTH = ["none", "appCheck", "captcha", "honeypot"];
+const CAPTCHA_PROVIDERS = ["turnstile", "hcaptcha", "recaptcha"];
 const WEBHOOK_SECRETS = ["secret", "token", "password"];
 const ENV_VALUE = /^\$\{env:(?<name>[A-Za-z_][A-Za-z0-9_]*)\}$/;
 const webhookEventClass = (appName, name) => `app.${appName}.webhook.${name.charAt(0).toUpperCase()}${name.slice(1)}WebhookEvent`;
@@ -429,6 +433,9 @@ function checkWebhooks(state, byName, error, warn) {
         for (const field of required) {
           if (!field.split("|").some((f) => step[f] !== undefined && step[f] !== "" && !(Array.isArray(step[f]) && !step[f].length))) error(where, `auth[${i}] (${step.type}) needs ${field.replace("|", " or ")}`);
         }
+        if (step.type === "captcha" && step.provider && !CAPTCHA_PROVIDERS.includes(step.provider)) error(where, `auth[${i}] (captcha): provider must be one of ${CAPTCHA_PROVIDERS.join(", ")}`);
+        if (step.type === "captcha" && step.minScore !== undefined && !(step.minScore >= 0 && step.minScore <= 1)) error(where, `auth[${i}]: minScore must be between 0 and 1`);
+        if (step.type === "appCheck" && step.projectNumber !== undefined && !/^\d+$/.test(String(step.projectNumber))) error(where, `auth[${i}] (appCheck): projectNumber is the Firebase project's number (digits), not its id`);
         for (const field of WEBHOOK_SECRETS) {
           const value = step[field];
           if (typeof value !== "string" || ENV_VALUE.test(value)) continue;
@@ -441,6 +448,27 @@ function checkWebhooks(state, byName, error, warn) {
       });
     }
 
+    if (Array.isArray(hook.auth) && hook.auth.length && hook.auth.every((a) => WEBHOOK_PUBLIC_AUTH.includes(a?.type))) {
+      if (!hook.auth.some((a) => a?.type === "appCheck" || a?.type === "captcha")) {
+        warn(where, "public webhook with nothing that tells real callers from scripts: add an appCheck step (apps) or a captcha step (web pages), unless it's a provider you can't verify; the Created script copies only the fields it expects and sends no email or SMS to addresses from the body");
+      }
+    }
+    if (hook.rateLimit !== undefined && hook.rateLimit !== "default") {
+      const r = hook.rateLimit;
+      if (typeof r !== "object" || r === null || Array.isArray(r)) error(where, 'rateLimit must be { perIp, perWebhook, windowSeconds } or "default"');
+      else {
+        if ((r.perIp ?? 0) < 0 || (r.perWebhook ?? 0) < 0) error(where, "rateLimit counts can't be negative (0 = no limit on that count)");
+        if (r.windowSeconds !== undefined && !(r.windowSeconds >= 1 && r.windowSeconds <= 86400)) error(where, "rateLimit windowSeconds must be between 1 and 86400");
+      }
+    }
+    if (hook.maxBodyBytes !== undefined && !(Number.isInteger(hook.maxBodyBytes) && hook.maxBodyBytes >= 0)) error(where, "maxBodyBytes must be a whole number of bytes (0 = the default)");
+    for (const origin of hook.allowedOrigins ?? []) {
+      if (!/^https?:\/\/[^/?#\s]+\/?$/i.test(origin)) error(where, `allowedOrigins: ${origin} is not an origin; use https://host[:port], no path`);
+    }
+    for (const key of ["redirect", "failureRedirect"]) {
+      const url = hook.response?.[key];
+      if (url !== undefined && url !== null && url !== "" && !/^https?:\/\/\S+$/i.test(String(url).replace(/{{[^}]*}}/g, "x"))) error(where, `response.${key} must be an absolute http(s) URL`);
+    }
     for (const method of hook.methods ?? []) if (!WEBHOOK_METHODS.includes(method)) error(where, `methods: ${method} is not one of ${WEBHOOK_METHODS.join(", ")}`);
     if (hook.methods && !hook.methods.length) error(where, "methods can't be empty (leave it out for POST)");
     if (hook.format !== undefined && !WEBHOOK_FORMATS.includes(hook.format)) error(where, `format must be one of ${WEBHOOK_FORMATS.join(", ")}`);

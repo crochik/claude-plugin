@@ -319,7 +319,8 @@ bootstrapp-apiscript skill).
 Sign in to the client as a test user with each restricted profile (invite a
 second address) and try one read and one write that should succeed and one
 that should fail. A spec generated with `generate_openapi_spec` reflects
-the default `Admin` profile's (full) access, not a restricted profile's.
+the default `Admin` profile's (full) access unless `profileId` names a
+restricted profile (its own grants only, not what it `inheritsFrom`).
 `invoke_action` with `profileName` tries an action with a restricted
 profile's access without signing in as someone else. Users without
 developer access can list and run the actions their profile was granted

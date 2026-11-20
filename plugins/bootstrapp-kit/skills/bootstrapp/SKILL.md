@@ -127,7 +127,7 @@ behavior: the server's `bootstrapp://reference/tools.md` resource.
 | `set_class_full_text_search` | Turn a class's `#text` search on or off without sending the class again. |
 | `get_namespaces`, `get_object_classes` | List what exists (names only). |
 | `generate_platform_definitions` | URL of the `.d.ts` describing every function a script may call. |
-| `generate_openapi_spec` | URL of the OpenAPI spec for client generation. |
+| `generate_openapi_spec` | URL of the OpenAPI spec for client generation; `profileId` builds it for another profile of the app than the default. |
 | `add_oidc_client_redirect` | Allow a login redirect URL. |
 | `get_profiles`, `add_profile`, `replace_profile`, `remove_profile` | Profiles (roles). |
 | `get_class_access`, `replace_class_access`, `remove_class_access`, `replace_action_access` | What a profile may do and see, on classes of apps you own. |

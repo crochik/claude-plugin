@@ -97,7 +97,10 @@ Relationship shapes on the platform:
   adds values for plain base records. Top-level variants share the base's
   collection, so one list or filter on the base covers them all, and each
   variant's endpoint covers just its records. The same works for embedded
-  classes. Prefer a flat class with an enum and optional fields when the
+  classes. A base can also be split by `_t` (`discriminatorField: "_t"`,
+  the type field the base needn't declare; it becomes required with the
+  first variant): use it for records written by C# models, with the values
+  they store. Prefer a flat class with an enum and optional fields when the
   variants differ by a field or two. See the server's `platform-notes.md` for the exact
   behavior.
 - **Plain inheritance** (`baseObjectType` without a discriminator) only
@@ -137,7 +140,9 @@ Relationship shapes on the platform:
   but both go to the user as **class drafts** (`add_class_draft` /
   `replace_class_draft`): nothing changes until they apply the draft in the
   designer. Drafts hold one class (no inline objects: `$ref` an embedded
-  class, which may be another draft) and can't be discriminated. A draft can be any class,
+  class, which may be another draft). A draft may join or start its base's
+  discriminator (the base may be another pending draft, applied first), but
+  can't turn an existing class into a discriminated one. A draft can be any class,
   `system.*` ones included, and may set the `collectionName` and
   `databaseName` its records are kept in (`""` is the platform's main
   database); left out, a new class gets its own collection in the app

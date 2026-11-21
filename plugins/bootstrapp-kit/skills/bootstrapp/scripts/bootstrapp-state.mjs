@@ -254,7 +254,7 @@ function check(state) {
     const draft = isDraftClass(root, name);
     if (draft) {
       if (parts[0] === "app" && parts.length > 2) warn(where, `outside ${root}: it goes to the user as a class draft, and the app that owns that namespace may change it too`);
-      if (cls.discriminatorField || cls.discriminatorValue) error(where, `class drafts (classes outside ${root}) can't be discriminated classes`);
+      if (cls.discriminatorValue && (cls.collectionName != null || cls.databaseName != null)) warn(where, "a discriminated class keeps its records in its base's collection and database: leave collectionName and databaseName out");
       if (inlineClassNames(cls.schema, name).length) error(where, `class drafts (classes outside ${root}) hold one class: replace the inline objects with a $ref to an embedded class (it may be another class draft)`);
       if (cls.type === "Embedded" && (cls.collectionName != null || cls.databaseName != null)) error(where, "embedded classes have no collectionName or databaseName: their records are kept in the classes that embed them");
     } else if (cls.collectionName != null || cls.databaseName != null) {
@@ -878,7 +878,8 @@ function inlineClassNames(node, parent, out = []) {
 }
 
 // A discriminated class extends a base with a value of one of the base's own required string properties (discriminatorField,
-// the same for every class of the base; the server infers it after the first one and adds the values to the field's enum).
+// the same for every class of the base; the server infers it after the first one and adds the values to the field's enum),
+// or of _t, the type field, which the base needn't declare (it gets it, required, with its first class).
 function checkDiscriminator(cls, where, byName, error, warn) {
   const siblings = [...byName.values()].filter((other) => other !== cls && other.baseObjectType && other.baseObjectType === cls.baseObjectType);
   const field = cls.discriminatorField;
@@ -900,10 +901,14 @@ function checkDiscriminator(cls, where, byName, error, warn) {
   if (!base) return; // the base exists only on the server, which checks the rest
   if (base.type !== cls.type) error(where, `${base.fullObjectType} is ${base.type}: a discriminated class must have its base's type`);
   const prop = base.schema?.properties?.[field];
-  if (!prop) error(where, `discriminatorField "${field}" must be one of ${base.fullObjectType}'s own properties`);
+  const typeField = field === "_t";
+  if (!prop) { if (!typeField) error(where, `discriminatorField "${field}" must be one of ${base.fullObjectType}'s own properties (or _t, the type field)`); }
   else {
     if (field === "_id" || prop.type !== "string") error(where, `discriminatorField "${field}" must be a string property of ${base.fullObjectType}`);
-    if (!(base.schema.required ?? []).includes(field)) error(where, `discriminatorField "${field}" must be listed in ${base.fullObjectType}'s required`);
+    if (!(base.schema.required ?? []).includes(field)) {
+      if (!typeField) error(where, `discriminatorField "${field}" must be listed in ${base.fullObjectType}'s required`);
+      else warn(where, `${base.fullObjectType} declares _t without listing it in required, so it stays optional (refused if the base is abstract)`);
+    }
     if (base.type === "TopLevel" && !(base.indexedFields ?? []).includes(field)) warn(where, `${base.fullObjectType}'s "${field}" is usually worth indexing`);
   }
 }
@@ -1197,7 +1202,9 @@ function plan(state) {
     const waitNote = usesDrafts.length ? `uses ${usesDrafts.join(", ")}, sent as class draft(s): the server saves it with missing references, and it can't be used until the user applies them` : null;
     if (isDraftClass(appName && `app.${appName}`, item.name)) {
       // outside the app: only proposed, the class changes when the user applies the draft in the designer
-      const { discriminatorField: _f, discriminatorValue: _v, ...draftArgs } = { ...args, ...(collectionName != null ? { collectionName } : {}), ...(databaseName != null ? { databaseName } : {}) };
+      // a draft may start or join its base's discriminator (the base may be another draft); replace_class_draft needs the
+      // stored base and value again, since drafts can't change them
+      const draftArgs = { ...args, ...(collectionName != null ? { collectionName } : {}), ...(databaseName != null ? { databaseName } : {}) };
       const applyFirst = baseObjectType && drafted.has(baseObjectType) ? `; apply the ${baseObjectType} draft first (Apply refuses a base that doesn't exist)` : "";
       const note = `a class draft: nothing changes until the user applies it in the BootstrApp designer (Object Type Drafts, Design, Apply). Record it only once get_class_drafts no longer lists it${applyFirst}${waitNote ? `; it ${waitNote}` : ""}`;
       calls.push({ tool: item.state === "new" ? "add_class_draft" : "replace_class_draft", record: null, recordAfterApply: ["class", item.name], note, args: draftArgs });

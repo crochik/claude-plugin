@@ -1006,6 +1006,22 @@ function foreignKeyShape(prop) {
   return null;
 }
 
+// A foreign key's optional criteria limit the records the field can pick: conditions on the referenced class' fields,
+// ANDed, no groups. The server doesn't check the field names (the target may be a platform class), so neither does this.
+const FOREIGN_KEY_CRITERIA_OPERATORS = ["Eq", "Ne", "Gt", "Gte", "Lt", "Lte", "In", "Nin", "Exists", "Null"];
+function checkForeignKeyCriteria(fk, field, where, error) {
+  if (fk.criteria === undefined || fk.criteria === null) return;
+  const at = `foreign key "${field}" criteria`;
+  if (!Array.isArray(fk.criteria)) { error(where, `${at} must be a list of { fieldName, operator, value }`); return; }
+  fk.criteria.forEach((c, i) => {
+    if (!c || typeof c !== "object" || Array.isArray(c)) { error(where, `${at}[${i}] must be { fieldName, operator, value }`); return; }
+    if (["Or", "And"].includes(c.operator) || c.conditions) { error(where, `${at}[${i}]: foreign key criteria have no Or/And groups, only conditions (ANDed)`); return; }
+    if (typeof c.fieldName !== "string" || !c.fieldName) error(where, `${at}[${i}]: fieldName is required (a field of ${fk.referenceObjectType}, case sensitive)`);
+    if (!FOREIGN_KEY_CRITERIA_OPERATORS.includes(c.operator)) error(where, `${at}[${i}]: operator must be one of ${FOREIGN_KEY_CRITERIA_OPERATORS.join(", ")}`);
+    else if (["In", "Nin"].includes(c.operator) && !Array.isArray(c.value)) error(where, `${at}[${i}]: ${c.operator} takes a list value`);
+  });
+}
+
 // Mirrors add_object_class: every property that holds ids of other records is a foreign key of the right shape,
 // pointing at a top-level class and at _id or one of its fields.
 function checkForeignKeys(cls, propsOf, where, byName, error, warn) {
@@ -1021,6 +1037,7 @@ function checkForeignKeys(cls, propsOf, where, byName, error, warn) {
     seen.add(`${field}|${part ?? ""}`);
     if (part !== undefined && part !== null && !["key", "value"].includes(part)) error(where, `foreign key "${field}": dictionaryPart must be "key" or "value"`);
     if (!fk.referenceObjectType || !fk.referenceFieldName) error(where, "foreign keys need referenceObjectType and referenceFieldName");
+    checkForeignKeyCriteria(fk, field, where, error);
 
     const prop = props[field];
     if (!prop) { error(where, `foreign key field "${field}" is not one of the class' own properties`); continue; }

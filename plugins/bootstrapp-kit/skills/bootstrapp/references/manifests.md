@@ -162,8 +162,8 @@ Maps to `add_object_class` as: `appName` (from `app.json`),
 variants),
 `indexedFields` (required; `[]` for embedded), `foreignKeys` (optional;
 every property holding ids, with `dictionaryPart` for a dictionary, and
-`relationName` on a string one to name its relation, see
-`bootstrapp-object-types`),
+`relationName` on a string one to name its relation, and optional
+`criteria` limiting the records it can pick, see `bootstrapp-object-types`),
 `schema`, `isFullTextSearchable` (optional, default `true`).
 
 ## `actions/<actionName>.json`

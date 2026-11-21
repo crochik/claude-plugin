@@ -77,7 +77,12 @@ Relationship shapes on the platform:
   relation keeps its name on replace; record it in the manifest
   (`get_object_class` returns it), and only change it on purpose:
   renaming moves its access and constraints but changes the API paths, so
-  regenerate the client. Many-to-many: an array of ids on the side that is read more,
+  regenerate the client. A foreign key's optional `criteria`
+  (`[{ fieldName, operator, value }]` on the referenced class' fields,
+  ANDed, no groups) limits the records the field can pick, e.g. an
+  `ObjectStatus` id meant for one class takes `ObjectType Eq <class>`; see
+  the server's `schema-conventions.md`. Keep it in the manifest: an entry
+  without it clears it. Many-to-many: an array of ids on the side that is read more,
   or a top-level link class when the link carries data. User ids
   (`ownerId`, `assigneeId`) point at platform users, not app classes, and
   stay plain uuid strings.

@@ -36,8 +36,9 @@ are stripped before a call. JSON Schema keywords (`$ref`, `$defs`, `$id`,
 File name is the full class name, e.g.
 `classes/app.expense_tracker.Expense.json`.
 A class outside `app.<app_name>` (e.g. `classes/shared.crm.Contact.json`)
-has the same format, without `discriminatorField`/`discriminatorValue` or
-inline objects: `plan` sends it as a class draft the user applies. Such a
+has the same format, without inline objects: `plan` sends it as a class
+draft the user applies (a discriminated one joins or starts its base's
+discriminator, and its base may be another draft, applied first). Such a
 top-level class may also set `collectionName` and `databaseName` (where its
 records are kept; `""` is the platform's main database, where `system.*`
 classes live); app classes can't.
@@ -128,7 +129,8 @@ An embedded class used by others is its own manifest
 A string-keyed dictionary uses `"type": "object", "additionalProperties":
 { "$ref": ... }`. `plan` registers referenced classes first.
 
-A discriminated base has a required string property (`kind`). Each variant
+A discriminated base has a required string property (`kind`), or is split
+by `_t`, which it needn't declare. Each variant
 names that property and gives its value, and leaves the property out of
 its own schema (properties abbreviated):
 

@@ -307,10 +307,18 @@ not a template there, so build the text in the script.
   `sendToUser(userId, n)`, `sendToUserClient(userId, clientId, n)`,
   `sendToToken(token, n)` send a push notification (Firebase) and record
   it for the user, `n = { title, body, url, action, category, data,
-  objectType, objectId, firebaseApp }`. They return `{ status: "sent" |
-  "notSent", notificationId, successCount, failureCount, runId }`; an
-  unknown token, inactive user or missing title and body throws. Any
-  script of the account can notify any active user of the account.
+  objectType, objectId, firebaseApp, silent, channel, sound, badge,
+  timeToLive }`. They return `{ status: "sent" | "notSent", notificationId,
+  successCount, failureCount, runId }`; an unknown token, inactive user or
+  missing title and body throws. `silent: true` sends data only: nothing is
+  shown or recorded (no `notificationId`), title and body are optional and
+  go in the data, and `channel`, `sound` and `badge` are refused.
+  `channel` (an Android channel the app created), `sound` (`default` or a
+  bundled file), `badge` (iOS) and `timeToLive` (seconds, 0 = now or never)
+  tune a shown one. Any script of the account can notify any active user of
+  the account. The app's side (Firebase project, token registration on
+  sign-in, sign-out, message handlers) is in `bootstrapp-client`'s
+  `references/push-notifications.md`.
 
 Read the exact types with `get_plugin` (`declarations`) or in
 `platform.d.ts` once added.

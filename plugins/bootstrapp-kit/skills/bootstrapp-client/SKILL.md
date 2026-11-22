@@ -118,6 +118,15 @@ uploader and the profiles the upload action listed in `downloadProfiles`
 may read it. These file routes are platform endpoints, not in the app's
 generated spec, so call them through the wrapper with the same token.
 
+## Push notifications
+
+For an app that receives push notifications (Firebase), follow
+[references/push-notifications.md](references/push-notifications.md):
+the Firebase project and the account's `firebase` integration, then
+registering the device token after sign-in, refreshing it, unregistering
+it on sign-out, and handling foreground, background, tapped and silent
+messages. The scripts that register and send are in `bootstrapp-apiscript`.
+
 ## Named views
 
 A query the app runs again and again (open orders, my tasks) is a **named

@@ -222,7 +222,7 @@ script) (rule book, "Integrations"). Providers are platform wide (the
 same `id` in every account) or the account's own (`add_integration_provider`),
 and the account adds the ones it uses first with `add_integration`. Calls take the `id` or the name, so name it in the
 script, never take it from `input`: `integration.set("twilio", ...)`. `values`
-integrations take `set(id, level, values)`; OAuth ones (`oauth2`, `oidc`)
+integrations take `set(id, level, values)` (a list field takes an array of strings); OAuth ones (`oauth2`, `oidc`)
 take `connect(id, level, { scopes?, offline?, returnUrl? })`, which returns
 a `url` the client sends the browser to within 10 minutes (`returnUrl`
 must be on one of the app client's origins). `get` and `list` say only
@@ -311,6 +311,13 @@ not a template there, so build the text in the script.
   "notSent", notificationId, successCount, failureCount, runId }`; an
   unknown token, inactive user or missing title and body throws. Any
   script of the account can notify any active user of the account.
+  Devices go through the platform's Firebase apps unless the account's
+  apps use their own Firebase project: then the account adds the
+  `firebase` integration (`add_integration firebase`,
+  `set_account_integration` with `projectId` and `clientIds`, the app
+  clients whose devices use it, none = every device), and the developer
+  types `serviceAccountJson` in the designer (`integration.firebase.Connection`),
+  never in chat.
 
 Read the exact types with `get_plugin` (`declarations`) or in
 `platform.d.ts` once added.

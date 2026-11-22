@@ -69,7 +69,8 @@ const POLICY_ID = "<id replace_network_policy returned>";
 const PLUGIN_PREFIX = "@plugin.";
 // an account's own API plugins: module @api.<name>, plugin name api.<name>
 const API_PREFIX = "@api.";
-const PLUGIN_NAME = /^(api\.)?[A-Za-z_][A-Za-z0-9_]*$/;
+// dotted names are fine (o365.email, google.push): the module is @plugin.<name> as is
+const PLUGIN_NAME = /^(api\.)?[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/;
 const pluginModule = (name) => name.startsWith("api.") ? `@${name}` : `${PLUGIN_PREFIX}${name}`;
 const HTTP_SCHEMES = ["https", "http"];
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
@@ -1015,7 +1016,7 @@ function checkForeignKeyCriteria(fk, field, where, error) {
   if (!Array.isArray(fk.criteria)) { error(where, `${at} must be a list of { fieldName, operator, value }`); return; }
   fk.criteria.forEach((c, i) => {
     if (!c || typeof c !== "object" || Array.isArray(c)) { error(where, `${at}[${i}] must be { fieldName, operator, value }`); return; }
-    if (["Or", "And"].includes(c.operator) || c.conditions) { error(where, `${at}[${i}]: foreign key criteria have no Or/And groups, only conditions (ANDed)`); return; }
+    if (["Or", "And"].includes(c.operator) || c.conditions) { error(where, `${at}[${i}]: foreign key criteria have no Or/And groups, only conditions (ANDed); a group set in the designer is read only and can't be sent through MCP`); return; }
     if (typeof c.fieldName !== "string" || !c.fieldName) error(where, `${at}[${i}]: fieldName is required (a field of ${fk.referenceObjectType}, case sensitive)`);
     if (!FOREIGN_KEY_CRITERIA_OPERATORS.includes(c.operator)) error(where, `${at}[${i}]: operator must be one of ${FOREIGN_KEY_CRITERIA_OPERATORS.join(", ")}`);
     else if (["In", "Nin"].includes(c.operator) && !Array.isArray(c.value)) error(where, `${at}[${i}]: ${c.operator} takes a list value`);

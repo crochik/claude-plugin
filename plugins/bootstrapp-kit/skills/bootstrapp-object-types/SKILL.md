@@ -79,7 +79,8 @@ Relationship shapes on the platform:
   renaming moves its access and constraints but changes the API paths, so
   regenerate the client. A foreign key's optional `criteria`
   (`[{ fieldName, operator, value }]` on the referenced class' fields,
-  ANDed, no groups) limits the records the field can pick, e.g. an
+  ANDed, no groups; a group set in the designer comes back read only and
+MCP refuses to write it) limits the records the field can pick, e.g. an
   `ObjectStatus` id meant for one class takes `ObjectType Eq <class>`; see
   the server's `schema-conventions.md`. Keep it in the manifest: an entry
   without it clears it. Many-to-many: an array of ids on the side that is read more,

@@ -269,7 +269,8 @@ asks to add and connect the plugin's integration and to allow its host
 in the network policy. An account's own plugins only use the account's
 own providers.
 
-Code plugins today: `sample` (an example with no side effects) and `github`
+Code plugins today: `sample` (an example with no side effects),
+`o365.email`, `google.push` and `github`
 (GitHub REST API with a token from the account's `github` integration,
 always that provider, so it has no settings;
 rule book, "@plugin.github"). With nobody connected, `github` calls go
@@ -280,6 +281,39 @@ the rest of the run as the bot (`asApp(false)` goes back, and it returns
 the previous value). The bot can't call `github.user()`. In
 GitHub's JSON, `number` is a keyword in scripts: read it as
 `issue["number"]`.
+
+`o365.email` and `google.push` are service plugins: each call runs an
+action of another BootstrApp service and waits for it (30 s at most), so
+nothing leaves the script's host and they need no network policy. Each
+call counts as one of the run's action calls, is recorded in the run's
+flow run, and throws on a failure. Text goes out as given: `{{...}}` is
+not a template there, so build the text in the script.
+
+- `@plugin.o365.email` (`plugins/o365.email.json`): `sendEmail(email)`
+  and `saveDraft(email)` send, or save as a draft, from a Microsoft 365
+  mailbox through the O365Mail service's `SendEmailO365` action, and
+  return `{ status, id, webLink, runId }` (`status` is `sent`, `draft`,
+  or `skipped` when the lead is inactive or opted out; `webLink` opens a
+  draft in Outlook on the web). `to` is an address or `lead`, `assignedEntity`,
+  `entity`, `account` read from `objectType`/`objectId`. The mailbox
+  defaults to the user the script runs for, so a script with no caller
+  (a class event script) passes `assignedEntity` or an address. It needs
+  the tenant's consent (an account admin, once) or, with
+  `credentials: "user"`, the mailbox user's own Microsoft connection;
+  `pending` says which is missing.
+- `@plugin.google.push` (`plugins/google.push.json`): `registerToken(token,
+  clientId?)` / `unregisterToken(token)` register the device token of the
+  user the script runs for (a script without a signed-in user can't), and
+  `sendToUser(userId, n)`, `sendToUserClient(userId, clientId, n)`,
+  `sendToToken(token, n)` send a push notification (Firebase) and record
+  it for the user, `n = { title, body, url, action, category, data,
+  objectType, objectId, firebaseApp }`. They return `{ status: "sent" |
+  "notSent", notificationId, successCount, failureCount, runId }`; an
+  unknown token, inactive user or missing title and body throws. Any
+  script of the account can notify any active user of the account.
+
+Read the exact types with `get_plugin` (`declarations`) or in
+`platform.d.ts` once added.
 
 ## Workflow
 

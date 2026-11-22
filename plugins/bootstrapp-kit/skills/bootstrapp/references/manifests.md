@@ -484,7 +484,8 @@ An optional plugin the app adds, so its scripts can import its module
 ```
 
 `name` is the plugin's name from `get_plugins` (`sample`, not
-`@plugin.sample`; an account's own API plugin is `api.<name>`, in
+`@plugin.sample`; a dotted name stays as is, `plugins/o365.email.json`
+for `@plugin.o365.email`; an account's own API plugin is `api.<name>`, in
 `plugins/api.<name>.json`, imported as `@api.<name>`). `settings` (optional) are the plugin's per-app
 settings that `get_plugin` lists, an object of strings, never secrets:
 credentials live in the account's integrations. Changing them changes

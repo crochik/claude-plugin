@@ -196,6 +196,12 @@ the MCP tools (`get_buckets`, `create_folder`, `replace_folder_access`) and
 never ask for bucket keys. Store the file id on the domain object
 (`receiptFileId`). The client side is in the `bootstrapp-client` skill.
 
+While building, a file the developer has on their computer (seed data, a
+template) goes into a folder with `add_file` when that tool is in your
+tool list (the client supports MCP file uploads); otherwise use the
+designer. That's for the developer only: the app's users upload through
+the app as above.
+
 ## HTTP calls
 
 A script calls another service with `@system.http.fetch(url, init?)`,
